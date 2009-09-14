@@ -1,3 +1,9 @@
+mountall (0.1.1) karmic; urgency=low
+
+  * Fix build issue due to libnih being symlinks. 
+
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 00:56:12 +0100
+
 mountall (0.1.0) karmic; urgency=low
 
   * Initial release.
