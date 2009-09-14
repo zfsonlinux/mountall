@@ -1,0 +1,3 @@
+etc/init/*.conf
+sbin/mountall
+usr/share/man

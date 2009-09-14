@@ -1,0 +1,5 @@
+mountall (0.1.0) karmic; urgency=low
+
+  * Initial release.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Mon, 14 Sep 2009 23:21:05 +0100
