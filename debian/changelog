@@ -1,4 +1,4 @@
-mountall (0.1.4) UNRELEASED; urgency=low
+mountall (0.1.4) karmic; urgency=low
 
   [Johan Kiviniemi]
   * Don't run fsck when the device has already been marked ready.
@@ -7,7 +7,7 @@ mountall (0.1.4) UNRELEASED; urgency=low
   * Don't abort when we have nothing to copy into /dev and /var/run, or
     nothing to remove from /tmp
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 00:12:37 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 00:15:53 +0100
 
 mountall (0.1.3) karmic; urgency=low
 
