@@ -1460,7 +1460,7 @@ run_mount_finished (Mount *mnt,
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
-		if (is_fhs (mnt))
+		if (is_fhs (mnt) && (! is_remote (mnt)))
 			delayed_exit (EXIT_MOUNT);
 		return;
 	}

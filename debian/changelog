@@ -7,6 +7,9 @@ mountall (0.1.2ubuntu1) UNRELEASED; urgency=low
     filesystems 
   * Failure to check or mount a filesystem that's not critical to the boot
     no longer results in immediate termination of mountall.
+  * Failure to mount a remote filesystem no longer results in immediate
+    termination of mountall, since these may be retried when other interfaces
+    are brought up.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 02:18:36 +0100
 
