@@ -1987,8 +1987,10 @@ dev_hook (Mount *mnt)
 	}
 
 
-	return nftw ("/lib/udev/devices", dev_hook_walk, 1024,
-		     FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+	nftw ("/lib/udev/devices", dev_hook_walk, 1024,
+	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+
+	return 0;
 }
 
 int
@@ -2061,8 +2063,10 @@ tmp_hook (Mount *mnt)
 		return FTW_CONTINUE;
 	}
 
-	return nftw (mnt->mountpoint, tmp_hook_walk, 1024,
-		     FTW_ACTIONRETVAL | FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+	nftw (mnt->mountpoint, tmp_hook_walk, 1024,
+	      FTW_ACTIONRETVAL | FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+
+	return 0;
 }
 
 int
@@ -2189,8 +2193,10 @@ var_run_hook (Mount *mnt)
 	}
 
 
-	return nftw ("/dev/.initramfs/varrun", var_run_hook_walk, 1024,
-		     FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+	nftw ("/dev/.initramfs/varrun", var_run_hook_walk, 1024,
+	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+
+	return 0;
 }
 
 
