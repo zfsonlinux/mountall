@@ -1381,7 +1381,9 @@ run_mount (Mount *mnt,
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
 	if (fake) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-f"));
-	} else if (! written_mtab) {
+	} else if ((! written_mtab)
+		   && strcmp (mnt->type, "ntfs")
+		   && strcmp (mnt->type, "ntfs-3g")) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
