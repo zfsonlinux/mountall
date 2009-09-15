@@ -187,6 +187,8 @@ int    dev_hook             (Mount *mnt);
 int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
 
+void   delayed_exit         (int code);
+
 
 static const struct {
 	const char *mountpoint;
@@ -673,7 +675,8 @@ parse_fstab (void)
 	fstab = setmntent (_PATH_MNTTAB, "r");
 	if (! fstab) {
 		nih_fatal ("%s: %s", _PATH_MNTTAB, strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return;
 	}
 
 	while ((mntent = getmntent (fstab)) != NULL) {
@@ -719,7 +722,8 @@ parse_mountinfo (void)
 			nih_fatal ("%s: %s: %s", "/proc",
 				   _("unable to mount"),
 				   strerror (errno));
-			exit (EXIT_MOUNT);
+			delayed_exit (EXIT_MOUNT);
+			return;
 		}
 
 		mnt = find_mount ("/proc");
@@ -731,7 +735,8 @@ parse_mountinfo (void)
 	if (! mountinfo) {
 		nih_fatal ("%s: %s", "/proc/self/mountinfo",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_MOUNT);
+		return;
 	}
 
 	bufsz = 4096;
@@ -828,7 +833,8 @@ parse_mountinfo (void)
 	if (fclose (mountinfo) < 0) {
 		nih_fatal ("%s: %s", "/proc/self/mountinfo",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return;
 	}
 }
 
@@ -845,7 +851,8 @@ parse_filesystems (void)
 	if (! fs) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return;
 	}
 
 	bufsz = 4096;
@@ -885,7 +892,8 @@ parse_filesystems (void)
 	if (fclose (fs) < 0) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			  strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return;
 	}
 }
 
@@ -1017,9 +1025,8 @@ mounted (Mount *mnt)
 
 	if (mnt->hook) {
 		if (mnt->hook (mnt) < 0) {
-			exit_code = nih_max (exit_code, EXIT_ERROR);
-			if (NIH_LIST_EMPTY (procs))
-				exit (exit_code);
+			delayed_exit (EXIT_ERROR);
+			return;
 		}
 	}
 
@@ -1232,7 +1239,8 @@ spawn (Mount *         mnt,
 		nih_fatal ("%s %s: %s", args[0],
 			   is_swap (mnt) ? mnt->device : mnt->mountpoint,
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return -1;
 	} else if (! pid) {
 		nih_local char *msg = NULL;
 
@@ -1255,10 +1263,7 @@ spawn (Mount *         mnt,
 		close (fds[0]);
 
 		if (ret > 0) {
-			exit_code = nih_max (exit_code, EXIT_ERROR);
-			if (NIH_LIST_EMPTY (procs))
-				exit (exit_code);
-
+			delayed_exit (EXIT_ERROR);
 			return -1;
 		}
 	}
@@ -1321,9 +1326,7 @@ spawn_child_handler (Process *      proc,
 				   pid, status);
 		}
 
-		exit_code = nih_max (exit_code, EXIT_ERROR);
-		if (NIH_LIST_EMPTY (procs))
-			exit (exit_code);
+		delayed_exit (EXIT_ERROR);
 
 		nih_free (proc);
 		return;
@@ -1342,8 +1345,8 @@ spawn_child_handler (Process *      proc,
 
 	nih_free (proc);
 
-	if (exit_code && NIH_LIST_EMPTY (procs))
-		exit (exit_code);
+	/* Exit now if there's a delayed exit */
+	delayed_exit (EXIT_OK);
 }
 
 
@@ -1425,9 +1428,7 @@ run_mount (Mount *mnt,
 		    && (errno != EEXIST)) {
 			nih_fatal ("mkdir %s: %s", mountpoint, strerror (errno));
 
-			exit_code = nih_max (exit_code, EXIT_ERROR);
-			if (NIH_LIST_EMPTY (procs))
-				exit (exit_code);
+			delayed_exit (EXIT_ERROR);
 			return;
 		} else
 			NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mountpoint));
@@ -1459,7 +1460,7 @@ run_mount_finished (Mount *mnt,
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
-		exit_code = nih_max (exit_code, EXIT_MOUNT);
+		delayed_exit (EXIT_MOUNT);
 		return;
 	}
 
@@ -1587,14 +1588,17 @@ run_fsck_finished (Mount *mnt,
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s",
 			   mnt->mountpoint);
-		exit_code = nih_max (exit_code, EXIT_REBOOT);
+		delayed_exit (EXIT_REBOOT);
+		return;
 	} else if (status & 4) {
 		nih_error ("Filesystem has errors: %s",
 			   mnt->mountpoint);
-		exit_code = nih_max (exit_code, EXIT_FSCK);
+		delayed_exit (EXIT_FSCK);
+		return;
 	} else if (status & (8 | 16 | 128)) {
 		nih_fatal ("General fsck error");
-		exit_code = nih_max (exit_code, EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
+		return;
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s",
 			  mnt->mountpoint);
@@ -1756,9 +1760,7 @@ void
 upstart_disconnected (DBusConnection *connection)
 {
 	nih_fatal (_("Disconnected from Upstart"));
-	exit_code = nih_max (exit_code, EXIT_ERROR);
-	if (NIH_LIST_EMPTY (procs))
-		exit (exit_code);
+	delayed_exit (EXIT_ERROR);
 }
 
 void
@@ -2268,7 +2270,7 @@ main (int   argc,
 			   err->message);
 		nih_free (err);
 
-		exit (1);
+		exit (EXIT_ERROR);
 	}
 
 	upstart = NIH_SHOULD (nih_dbus_proxy_new (NULL, connection,
@@ -2282,7 +2284,7 @@ main (int   argc,
 			   err->message);
 		nih_free (err);
 
-		exit (1);
+		exit (EXIT_ERROR);
 	}
 
 	/* Initialise the connection to udev */
@@ -2402,3 +2404,13 @@ main (int   argc,
 	return ret;
 }
 
+void
+delayed_exit (int code)
+{
+	exit_code = nih_max (exit_code, code);
+
+	if (exit_code && NIH_LIST_EMPTY (procs)) {
+		nih_main_unlink_pidfile ();
+		exit (exit_code);
+	}
+}
