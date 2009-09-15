@@ -1534,16 +1534,16 @@ run_fsck (Mount *mnt)
 	nih_assert (mnt->device != NULL);
 	nih_assert (mnt->type != NULL);
 
-	if (! mnt->check) {
+	if (mnt->device_ready) {
+		nih_debug ("%s: already ready", mnt->mountpoint);
+		return;
+	} else if (! mnt->check) {
 		nih_debug ("%s: no check required", mnt->mountpoint);
 		device_ready (mnt);
 		return;
 	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
 		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
 		device_ready (mnt);
-		return;
-	} else if (mnt->mount_pid > 0) {
-		nih_debug ("%s: already mounting", mnt->mountpoint);
 		return;
 	} else if (mnt->fsck_pid > 0) {
 		nih_debug ("%s: already checking", mnt->mountpoint);
