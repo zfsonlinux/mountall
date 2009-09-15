@@ -1460,7 +1460,8 @@ run_mount_finished (Mount *mnt,
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
-		delayed_exit (EXIT_MOUNT);
+		if (is_fhs (mnt))
+			delayed_exit (EXIT_MOUNT);
 		return;
 	}
 
@@ -1593,7 +1594,8 @@ run_fsck_finished (Mount *mnt,
 	} else if (status & 4) {
 		nih_error ("Filesystem has errors: %s",
 			   mnt->mountpoint);
-		delayed_exit (EXIT_FSCK);
+		if (is_fhs (mnt))
+			delayed_exit (EXIT_FSCK);
 		return;
 	} else if (status & (8 | 16 | 128)) {
 		nih_fatal ("General fsck error");

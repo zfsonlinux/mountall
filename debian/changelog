@@ -5,6 +5,8 @@ mountall (0.1.2ubuntu1) UNRELEASED; urgency=low
     complex, and seems safe against failing to write to mtab, work around
     it in mountall and never pass -n to mount for ntfs and ntfs-3g
     filesystems 
+  * Failure to check or mount a filesystem that's not critical to the boot
+    no longer results in immediate termination of mountall.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 02:18:36 +0100
 
