@@ -10,7 +10,8 @@ mountall (0.1.2ubuntu1) UNRELEASED; urgency=low
   * Failure to mount a remote filesystem no longer results in immediate
     termination of mountall, since these may be retried when other interfaces
     are brought up.
-  * Improved error message output on mountall failure.
+  * Improved error message output on mountall failure, temporarily enabled
+    output so important messages aren't lost.
   * Removed /forcefsck after checks are complete.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 02:18:36 +0100
