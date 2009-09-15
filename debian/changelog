@@ -1,3 +1,9 @@
+mountall (0.1.2) karmic; urgency=low
+
+  * Unconditionally configure.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 01:27:49 +0100
+
 mountall (0.1.1) karmic; urgency=low
 
   * Fix build issue due to libnih being symlinks. 

@@ -38,7 +38,7 @@ endif
 
 
 # Run the package configure script
-config.status: configure
+configure:
 	./configure $(confflags) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" \
 		--prefix=/usr \
 		--exec-prefix= \
@@ -48,7 +48,7 @@ config.status: configure
 
 # Build the package
 build: build-stamp
-build-stamp: config.status
+build-stamp: configure
 	dh_testdir
 
 	$(MAKE)
@@ -96,4 +96,4 @@ clean:
 	dh_clean 
 
 
-.PHONY: build install binary-indep binary-arch binary clean
+.PHONY: configure build install binary-indep binary-arch binary clean
