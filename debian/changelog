@@ -1,4 +1,4 @@
-mountall (0.1.2ubuntu1) UNRELEASED; urgency=low
+mountall (0.1.3) karmic; urgency=low
 
   * mount.ntfs and mount.ntfs-3g do not support the standard "-n" (no mtab)
     mount option, and error when passed.  Since the ntfs code is rather
@@ -14,7 +14,7 @@ mountall (0.1.2ubuntu1) UNRELEASED; urgency=low
     output so important messages aren't lost.
   * Removed /forcefsck after checks are complete.
 
- -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 02:18:36 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 15 Sep 2009 02:53:34 +0100
 
 mountall (0.1.2) karmic; urgency=low
 
