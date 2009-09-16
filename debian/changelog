@@ -33,7 +33,7 @@ mountall (0.1.6) karmic; urgency=low
     just because mountall exited before we had a chance to kill it
     LP: #430755.
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 23:17:19 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 23:55:33 +0100
 
 mountall (0.1.4) karmic; urgency=low
 
