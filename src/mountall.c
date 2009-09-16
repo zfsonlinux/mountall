@@ -1381,6 +1381,9 @@ run_mount (Mount *mnt,
 
 	if (fake) {
 		nih_debug ("mtab %s", mnt->mountpoint);
+	} else if (mnt->mount_pid > 0) {
+		nih_debug ("%s: already mounting", mnt->mountpoint);
+		return;
 	} else if (mnt->mounted) {
 		if (needs_remount (mnt)) {
 			nih_info ("remounting %s", mnt->mountpoint);
@@ -1389,9 +1392,6 @@ run_mount (Mount *mnt,
 			mounted (mnt);
 			return;
 		}
-	} else if (mnt->mount_pid > 0) {
-		nih_debug ("%s: already mounting", mnt->mountpoint);
-		return;
 	} else if (! mnt->type) {
 		nih_debug ("%s: hook", mnt->mountpoint);
 		mounted (mnt);
