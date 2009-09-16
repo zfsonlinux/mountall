@@ -1,4 +1,4 @@
-mountall (0.1.6) UNRELEASED; urgency=low
+mountall (0.1.6) karmic; urgency=low
 
   [ Scott James Remnant ]
   * Restored mistakenly removed dh_installchangelogs & dh_installdocs.
@@ -18,11 +18,11 @@ mountall (0.1.6) UNRELEASED; urgency=low
     LP: #430880.
   * Never consider the root filesystem to be virtual or remote, even when
     it is, since we assert that it's already mounted so we don't have to
-    take care of it.
+    take care of it.  LP: #431028.
   * Check whether filesystems mounted readonly when we start do not have
     "ro" in their fstab, before assuming we need to remount them.
     Readonly filesystems not in fstab (e.g. LiveCD, Wubi, etc.) never need
-    remounting.
+    remounting.  LP: #431028.
   * Only virtual filesystems will be mounted while the root filesystem is
     readonly, not filesystems such as /usr and /var.
   * fuse filesystems are never considered virtual, since they probably
@@ -33,7 +33,7 @@ mountall (0.1.6) UNRELEASED; urgency=low
     just because mountall exited before we had a chance to kill it
     LP: #430755.
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 15:06:43 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 23:17:19 +0100
 
 mountall (0.1.4) karmic; urgency=low
 
