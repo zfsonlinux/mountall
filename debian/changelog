@@ -1,6 +1,8 @@
 mountall (0.1.5) UNRELEASED; urgency=low
 
-  * Restored mistakenly removed dh_installchangelogs
+  * Restored mistakenly removed dh_installchangelogs.
+  * Allow a further udev event for a block-device to retry swapon/mount
+    after fsck has been already been completed for a prior event.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 15:06:43 +0100
 
