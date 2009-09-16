@@ -1536,6 +1536,7 @@ run_fsck (Mount *mnt)
 
 	if (mnt->device_ready) {
 		nih_debug ("%s: already ready", mnt->mountpoint);
+		device_ready (mnt);
 		return;
 	} else if (! mnt->check) {
 		nih_debug ("%s: no check required", mnt->mountpoint);
