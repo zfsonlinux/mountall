@@ -1840,7 +1840,7 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 
 	action    = udev_device_get_action (udev_device);
 	subsystem = udev_device_get_subsystem (udev_device);
-	kernel    = udev_device_get_devname (udev_device);
+	kernel    = udev_device_get_sysname (udev_device);
 	devname   = udev_device_get_devnode (udev_device);
 	devlinks  = udev_device_get_devlinks_list_entry (udev_device);
 	uuid      = udev_device_get_property_value (udev_device, "ID_FS_UUID");
