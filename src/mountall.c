@@ -1813,9 +1813,8 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 	struct udev_device *    udev_device;
 	const char *            action;
 	const char *            subsystem;
+	const char *            kernel;
 	const char *            devname;
-	const char *            usage;
-	const char *            type;
 	const char *            uuid;
 	const char *            label;
 	struct udev_list_entry *devlinks;
@@ -1826,10 +1825,9 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 
 	action    = udev_device_get_action (udev_device);
 	subsystem = udev_device_get_subsystem (udev_device);
+	kernel    = udev_device_get_devname (udev_device);
 	devname   = udev_device_get_devnode (udev_device);
 	devlinks  = udev_device_get_devlinks_list_entry (udev_device);
-	usage     = udev_device_get_property_value (udev_device, "ID_FS_USAGE");
-	type      = udev_device_get_property_value (udev_device, "ID_FS_TYPE");
 	uuid      = udev_device_get_property_value (udev_device, "ID_FS_UUID");
 	label     = udev_device_get_property_value (udev_device, "ID_FS_LABEL");
 
@@ -1846,13 +1844,20 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 		return;
 	}
 
-	if ((! usage)
-	    || (strcmp (usage, "filesystem")
-	        && (strcmp (usage, "other")
-		    || (! type)
-		    || strcmp (type, "swap")))) {
-		udev_device_unref (udev_device);
-		return;
+	/* devmapper and md devices must be "ready" before we'll try them */
+	if ((! strncmp (kernel, "dm-", 3))
+	    || (! strncmp (kernel, "md", 2))) {
+		const char *usage;
+		const char *type;
+
+		usage = udev_device_get_property_value (udev_device, "ID_FS_USAGE");
+		type = udev_device_get_property_value (udev_device, "ID_FS_TYPE");
+
+		if ((! usage) && (! type)) {
+			nih_debug ("ignored %s (not yet ready?)", devname);
+			udev_device_unref (udev_device);
+			return;
+		}
 	}
 
 	nih_debug ("%s %s %s %s", subsystem, devname, uuid, label);
