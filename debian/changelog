@@ -12,6 +12,11 @@ mountall (0.1.6) UNRELEASED; urgency=low
     /dev/sda1 in their fstab, which has multiple metadata, this won't break
     their boot.
 
+  * Only include FHS filesystems in the {virtual,local,remote}-filesystems
+    events.  This prevents an unmountable entry in fstab blocking things like
+    starting D-Bus or the Network which are required to mount that filesystem.
+    LP: #430880.
+
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly
     just because mountall exited before we had a chance to kill it
