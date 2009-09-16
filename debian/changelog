@@ -16,6 +16,9 @@ mountall (0.1.6) UNRELEASED; urgency=low
     events.  This prevents an unmountable entry in fstab blocking things like
     starting D-Bus or the Network which are required to mount that filesystem.
     LP: #430880.
+  * Never consider the root filesystem to be virtual or remote, even when
+    it is, since we assert that it's already mounted so we don't have to
+    take care of it.
 
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly
