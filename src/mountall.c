@@ -938,24 +938,27 @@ cleanup (void)
 			drop = TRUE;
 		}
 
+		if (no_remote && is_remote (&mounts[i])) {
+			nih_debug ("%s: dropping remote filesystem (--no-remote)",
+				   mounts[i].mountpoint);
+			drop = TRUE;
+		}
+
 		if (drop) {
 			memmove (&mounts[i], &mounts[i+1],
 				 sizeof (Mount) * (num_mounts - i - 1));
 			num_mounts--;
 			i--;
-		} else {
+		} else if (is_fhs (&mounts[i])) {
 			if (is_virtual (&mounts[i])) {
 				nih_debug ("virtual %s", mounts[i].mountpoint);
-			} else if (is_swap (&mounts[i])) {
-				nih_debug ("swap    %s", mounts[i].device);
 			} else if (is_remote (&mounts[i])) {
 				nih_debug ("remote  %s", mounts[i].mountpoint);
 			} else {
 				nih_debug ("local   %s", mounts[i].mountpoint);
 			}
-
-			if (is_fhs (&mounts[i]))
-				nih_debug ("FHS     %s", mounts[i].mountpoint);
+		} else if (is_swap (&mounts[i])) {
+			nih_debug ("swap    %s", mounts[i].device);
 		}
 	}
 }
@@ -1018,6 +1021,7 @@ mounted (Mount *mnt)
 	size_t     num_fhs = 0;
 	size_t     num_fhs_mounted = 0;
 	static int fhs_triggered = FALSE;
+	size_t     num_mounted = 0;
 
 	nih_assert (mnt != NULL);
 
@@ -1044,56 +1048,59 @@ mounted (Mount *mnt)
 
 	/* Look at the current table state */
 	for (size_t i = 0; i < num_mounts; i++) {
-		int mounted = FALSE;
+		if (is_fhs (&mounts[i])) {
+			int mounted = FALSE;
 
-		if (is_virtual (&mounts[i])) {
-			num_virtual++;
-			if (mounts[i].mounted) {
-				num_virtual_mounted++;
-				mounted = TRUE;
+			if (is_virtual (&mounts[i])) {
+				num_virtual++;
+				if (mounts[i].mounted) {
+					num_virtual_mounted++;
+					mounted = TRUE;
+				}
+			} else if (is_remote (&mounts[i])) {
+				num_remote++;
+				if (mounts[i].mounted) {
+					num_remote_mounted++;
+					mounted = TRUE;
+				}
+			} else {
+				num_local++;
+				if (mounts[i].mounted && (! needs_remount (&mounts[i]))) {
+					num_local_mounted++;
+					mounted = TRUE;
+				}
 			}
+
+			num_fhs++;
+			if (mounted) {
+				num_fhs_mounted++;
+				num_mounted++;
+			}
+
 		} else if (is_swap (&mounts[i])) {
 			num_swap++;
 			if (mounts[i].mounted) {
 				num_swap_mounted++;
-				mounted = TRUE;
+				num_mounted++;
 			}
-		} else if (is_remote (&mounts[i])) {
-			num_remote++;
-			if (mounts[i].mounted) {
-				num_remote_mounted++;
-				mounted = TRUE;
-			}
-		} else {
-			num_local++;
-			if (mounts[i].mounted && (! needs_remount (&mounts[i]))) {
-				num_local_mounted++;
-				mounted = TRUE;
-			}
-		}
 
-		if (is_fhs (&mounts[i])) {
-			num_fhs++;
-			if (mounted)
-				num_fhs_mounted++;
+		} else if (mounts[i].mounted) {
+			num_mounted++;
 		}
 	}
 
-	nih_debug ("virtual %zi/%zi swap %zi/%zi remote %zi/%zi local %zi/%zi",
+	nih_debug ("virtual %zi/%zi remote %zi/%zi local %zi/%zi (%zi/%zi) swap %zi/%zi [%zi/%zi]",
 		   num_virtual_mounted, num_virtual,
-		   num_swap_mounted, num_swap,
 		   num_remote_mounted, num_remote,
-		   num_local_mounted, num_local);
+		   num_local_mounted, num_local,
+		   num_fhs_mounted, num_fhs,
+		   num_swap_mounted, num_swap,
+		   num_mounted, num_mounts);
 
 	if ((! virtual_triggered) && (num_virtual_mounted == num_virtual)) {
 		nih_info ("virtual filesystems finished");
 		emit_event ("virtual-filesystems");
 		virtual_triggered = TRUE;
-	}
-	if ((! swap_triggered) && (num_swap_mounted == num_swap)) {
-		nih_info ("swap finished");
-		emit_event ("all-swaps");
-		swap_triggered = TRUE;
 	}
 	if ((! remote_triggered) && (num_remote_mounted == num_remote)) {
 		nih_info ("remote finished");
@@ -1105,18 +1112,19 @@ mounted (Mount *mnt)
 		emit_event ("local-filesystems");
 		local_triggered = TRUE;
 	}
-
-	nih_debug ("fhs %zi/%zi", num_fhs_mounted, num_fhs);
 	if ((! fhs_triggered) && (num_fhs_mounted == num_fhs)) {
 		nih_info ("fhs mounted");
 		emit_event ("filesystem");
 		fhs_triggered = TRUE;
 	}
 
-	if ((num_virtual_mounted == num_virtual)
-	    && (num_swap_mounted == num_swap)
-	    && (no_remote || (num_remote_mounted == num_remote))
-	    && (num_local_mounted == num_local)) {
+	if ((! swap_triggered) && (num_swap_mounted == num_swap)) {
+		nih_info ("swap finished");
+		emit_event ("all-swaps");
+		swap_triggered = TRUE;
+	}
+
+	if (num_mounted == num_mounts) {
 		nih_info ("finished");
 		emit_event ("all-filesystems");
 		nih_main_loop_exit (EXIT_OK);
