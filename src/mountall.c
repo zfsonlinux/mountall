@@ -555,7 +555,11 @@ is_virtual (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	return mnt->virtual;
+	if (strcmp (mnt->mountpoint, "/")) {
+		return mnt->virtual;
+	} else {
+		return FALSE;
+	}
 }
 
 int
@@ -563,7 +567,9 @@ is_remote (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	if (has_option (mnt, "_netdev", FALSE)) {
+	if (! strcmp (mnt->mountpoint, "/")) {
+		return FALSE;
+	} else if (has_option (mnt, "_netdev", FALSE)) {
 		return TRUE;
 	} else if (! mnt->type) {
 		return FALSE;
