@@ -19,6 +19,10 @@ mountall (0.1.6) UNRELEASED; urgency=low
   * Never consider the root filesystem to be virtual or remote, even when
     it is, since we assert that it's already mounted so we don't have to
     take care of it.
+  * Check whether filesystems mounted readonly when we start do not have
+    "ro" in their fstab, before assuming we need to remount them.
+    Readonly filesystems not in fstab (e.g. LiveCD, Wubi, etc.) never need
+    remounting.
 
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly

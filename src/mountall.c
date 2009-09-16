@@ -198,7 +198,7 @@ static const struct {
 	const char *opts;
 	MountHook   hook;
 } builtins[] = {
-	{ "/",                        "/dev/root", TRUE,  "rootfs",      NULL,                              NULL         },
+	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL         },
 	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL         },
 	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", NULL,                              NULL         },
 	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL         },
@@ -605,7 +605,8 @@ needs_remount (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	if (mnt->mounted && has_option (mnt, "ro", TRUE)) {
+	if (mnt->mounted && has_option (mnt, "ro", TRUE)
+	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
 		return TRUE;
 	} else {
 		return FALSE;
