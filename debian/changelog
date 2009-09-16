@@ -4,13 +4,17 @@ mountall (0.1.6) UNRELEASED; urgency=low
   * Restored mistakenly removed dh_installchangelogs & dh_installdocs.
   * Allow a further udev event for a block-device to retry swapon/mount
     after fsck has been already been completed for a prior event.
+  * Massively reduce the pickyness of mountall when it comes to block
+    devices; only expect ID_FS_USAGE and ID_FS_TYPE for dm and md devices,
+    and don't actually expect the values.  For most people this won't make
+    a difference, since we use UUID= anyway.  But for people with hardcoded
+    /dev/sda1 in their fstab, which has multiple metadata, this won't break
+    their boot.
 
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly
     just because mountall exited before we had a chance to kill it
     LP: #430755.
-
-  [ Scott James Remnant ]
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 15:06:43 +0100
 
