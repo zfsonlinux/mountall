@@ -1193,14 +1193,18 @@ children_ready (Mount *root,
 				}
 			}
 		} else {
-			/* If there is no type to mount, then this is a hook
-			 * placeholder and we want don't want to run it in
-			 * the initial "mounted ro" pass.  Otherwise
-			 * we don't don't want to run mount in the "remount"
-			 * pass.
+			/* We can, and indeed want to, mount virtual
+			 * filesystems while the root filesystem is still
+			 * read-only - but don't want to remount them once
+			 * it's remounted r/w.
 			 */
-			if (pass != (path->mnt->type ? 2 : 1))
-				mountpoint_ready (path->mnt);
+			if (is_virtual (path->mnt)) {
+				if (pass != 2)
+					mountpoint_ready (path->mnt);
+			} else {
+				if (pass != 1)
+					mountpoint_ready (path->mnt);
+			}
 
 			/* Children of this mount point aren't ready until
 			 * this mountpoint is mounted, unless they're always

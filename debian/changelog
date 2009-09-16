@@ -23,6 +23,8 @@ mountall (0.1.6) UNRELEASED; urgency=low
     "ro" in their fstab, before assuming we need to remount them.
     Readonly filesystems not in fstab (e.g. LiveCD, Wubi, etc.) never need
     remounting.
+  * Only virtual filesystems will be mounted while the root filesystem is
+    readonly, not filesystems such as /usr and /var.
 
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly
