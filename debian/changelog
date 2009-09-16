@@ -2,9 +2,9 @@ mountall (0.1.6) UNRELEASED; urgency=low
 
   [ Scott James Remnant ]
   * Restored mistakenly removed dh_installchangelogs & dh_installdocs.
+
   * Allow a further udev event for a block-device to retry swapon/mount
     after fsck has been already been completed for a prior event.
-
   * Massively reduce the pickyness of mountall when it comes to block
     devices; only expect ID_FS_USAGE and ID_FS_TYPE for dm and md devices,
     and don't actually expect the values.  For most people this won't make
