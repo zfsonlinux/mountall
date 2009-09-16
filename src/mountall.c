@@ -923,7 +923,8 @@ cleanup (void)
 					break;
 
 			if (j < num_filesystems) {
-				if (filesystems[j].nodev && (! is_remote (&mounts[i])))
+				if (filesystems[j].nodev && (! is_remote (&mounts[i]))
+				    && strncmp (filesystems[j].name, "fuse", 4))
 					mounts[i].virtual = TRUE;
 			} else if ((! mounts[i].device) && (! mounts[i].mounted)) {
 				nih_debug ("%s: dropping unknown filesystem",

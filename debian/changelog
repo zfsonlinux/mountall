@@ -25,6 +25,8 @@ mountall (0.1.6) UNRELEASED; urgency=low
     remounting.
   * Only virtual filesystems will be mounted while the root filesystem is
     readonly, not filesystems such as /usr and /var.
+  * fuse filesystems are never considered virtual, since they probably
+    need devices, write access and the hand of god to be mounted.
 
   [ Colin Watson ]
   * Ignore errors from kill in mountall-net, since they're almost certainly
