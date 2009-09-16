@@ -1,8 +1,14 @@
 mountall (0.1.5) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * Restored mistakenly removed dh_installchangelogs.
   * Allow a further udev event for a block-device to retry swapon/mount
     after fsck has been already been completed for a prior event.
+
+  [ Colin Watson ]
+  * Ignore errors from kill in mountall-net, since they're almost certainly
+    just because mountall exited before we had a chance to kill it
+    LP: #430755.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 16 Sep 2009 15:06:43 +0100
 
