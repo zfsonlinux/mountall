@@ -4,7 +4,7 @@ mountall (0.1.7) UNRELEASED; urgency=low
     filesystem would always be considered "local", retain that from the
     POV of the {virtual,local,remote}-filesystems events, but do mount
     the root straight away when it's virtual since there's no device to
-    wait until it's ready.
+    wait until it's ready.  LP: #431204.
 
  -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 11:58:36 -0700
 
