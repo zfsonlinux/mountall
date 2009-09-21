@@ -555,11 +555,7 @@ is_virtual (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	if (strcmp (mnt->mountpoint, "/")) {
-		return mnt->virtual;
-	} else {
-		return FALSE;
-	}
+	return mnt->virtual;
 }
 
 int
@@ -567,9 +563,7 @@ is_remote (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	if (! strcmp (mnt->mountpoint, "/")) {
-		return FALSE;
-	} else if (has_option (mnt, "_netdev", FALSE)) {
+	if (has_option (mnt, "_netdev", FALSE)) {
 		return TRUE;
 	} else if (! mnt->type) {
 		return FALSE;
@@ -632,7 +626,7 @@ build_paths (void)
 
 		if (mounts[i].device
 		    && strncmp (mounts[i].device, "/dev/", 5)
-		    && (! mounts[i].virtual)) {
+		    && (! is_virtual (&mounts[i]))) {
 			paths = NIH_MUST (nih_realloc (paths, NULL,
 						       sizeof (Path) * (num_paths + 1)));
 			path = &paths[num_paths++];
@@ -957,6 +951,8 @@ cleanup (void)
 				 sizeof (Mount) * (num_mounts - i - 1));
 			num_mounts--;
 			i--;
+		} else if (! strcmp (mounts[i].mountpoint, "/")) {
+			nih_debug ("local   %s", mounts[i].mountpoint);
 		} else if (is_fhs (&mounts[i])) {
 			if (is_virtual (&mounts[i])) {
 				nih_debug ("virtual %s", mounts[i].mountpoint);
@@ -1056,7 +1052,15 @@ mounted (Mount *mnt)
 
 	/* Look at the current table state */
 	for (size_t i = 0; i < num_mounts; i++) {
-		if (is_fhs (&mounts[i])) {
+		if (! strcmp (mounts[i].mountpoint, "/")) {
+			num_fhs++;
+			num_local++;
+			if (mounts[i].mounted && (! needs_remount (&mounts[i]))) {
+				num_fhs_mounted++;
+				num_local_mounted++;
+			}
+
+		} else if (is_fhs (&mounts[i])) {
 			int mounted = FALSE;
 
 			if (is_virtual (&mounts[i])) {
