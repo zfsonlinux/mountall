@@ -1002,6 +1002,7 @@ mountpoint_ready (Mount *mnt)
 	 */
 	mnt->mountpoint_ready = TRUE;
 	if (is_virtual (mnt)
+	    || (is_remote (mnt) && mnt->mounted && (! needs_remount (mnt)))
 	    || (! mnt->type)
 	    || (mnt->device_ready && (! is_swap (mnt))))
 		run_mount (mnt, FALSE);
