@@ -1820,7 +1820,7 @@ mount_showthrough (Mount *root)
 			nih_warn ("rmdir %s: %s", mountpoint, strerror (errno));
 
 		if (written_mtab)
-			run_mount (mnt, TRUE);
+			run_mount (root, TRUE);
 	}
 }
 
