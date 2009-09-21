@@ -8,7 +8,10 @@ mountall (0.1.7) UNRELEASED; urgency=low
   * If a remote filesystem is already mounted and doesn't need a remount,
     don't wait for a network device to come up.  LP: #430348.
 
- -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 11:58:36 -0700
+  * Ignore single and double quotes in fstab device specifications, since
+    mount -a used to.  LP: #431064.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 12:13:21 -0700
 
 mountall (0.1.6) karmic; urgency=low
 
