@@ -314,6 +314,23 @@ static int no_remote = FALSE;
 static int tmptime = 0;
 
 
+static void
+dequote (char *str)
+{
+	size_t len;
+
+	nih_assert (str != NULL);
+
+	if ((str[0] != '"') && (str[0] != '\''))
+		return;
+
+	len = strlen (str);
+	len -= 2;
+
+	memmove (str, str + 1, len);
+	str[len] = '\0';
+}
+
 Mount *
 new_mount (const char *mountpoint,
 	   const char *device,
@@ -340,6 +357,16 @@ new_mount (const char *mountpoint,
 	mnt->check = check;
 	mnt->fsck_pid = -1;
 	mnt->device_ready = FALSE;
+
+	if (mnt->device) {
+		if (! strncmp (mnt->device, "UUID=", 5)) {
+			dequote (mnt->device + 5);
+		} else if (! strncmp (mnt->device, "LABEL=", 6)) {
+			dequote (mnt->device + 6);
+		} else {
+			dequote (mnt->device);
+		}
+	}
 
 	mnt->type = type ? NIH_MUST (nih_strdup (mounts, type)) : NULL;
 	mnt->virtual = FALSE;
@@ -385,6 +412,14 @@ update_mount (Mount *     mnt,
 		if (mnt->device)
 			nih_unref (mnt->device, mounts);
 		mnt->device = NIH_MUST (nih_strdup (mounts, device));
+
+		if (! strncmp (mnt->device, "UUID=", 5)) {
+			dequote (mnt->device + 5);
+		} else if (! strncmp (mnt->device, "LABEL=", 6)) {
+			dequote (mnt->device + 6);
+		} else {
+			dequote (mnt->device);
+		}
 	}
 
 	if (check >= 0)
@@ -681,7 +716,8 @@ parse_fstab (void)
 	}
 
 	while ((mntent = getmntent (fstab)) != NULL) {
-		Mount *mnt;
+		Mount *         mnt;
+		nih_local char *fsname = NULL;
 
 		mnt = find_mount (mntent->mnt_dir);
 		if (mnt) {
