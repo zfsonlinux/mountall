@@ -5,6 +5,8 @@ mountall (0.1.7) UNRELEASED; urgency=low
     POV of the {virtual,local,remote}-filesystems events, but do mount
     the root straight away when it's virtual since there's no device to
     wait until it's ready.  LP: #431204.
+  * If a remote filesystem is already mounted and doesn't need a remount,
+    don't wait for a network device to come up.  LP: #430348.
 
  -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 11:58:36 -0700
 
