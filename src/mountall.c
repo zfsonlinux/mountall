@@ -1449,6 +1449,8 @@ run_mount (Mount *mnt,
 		   && strcmp (mnt->type, "ntfs")
 		   && strcmp (mnt->type, "ntfs-3g")) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
+	} else if (has_showthrough (mnt)) {
+		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-t"));
@@ -1816,6 +1818,9 @@ mount_showthrough (Mount *root)
 		if ((rmdir (mountpoint) < 0)
 		    && (errno != EEXIST))
 			nih_warn ("rmdir %s: %s", mountpoint, strerror (errno));
+
+		if (written_mtab)
+			run_mount (mnt, TRUE);
 	}
 }
 
