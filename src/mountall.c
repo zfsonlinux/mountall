@@ -189,6 +189,13 @@ int    var_run_hook         (Mount *mnt);
 
 void   delayed_exit         (int code);
 
+struct {
+	/* com mon */
+	Mount *mnt;
+	/* tmp_hook */
+	int    purge;
+	time_t barrier;
+} nftw_hook_args;
 
 static const struct {
 	const char *mountpoint;
@@ -2018,6 +2025,41 @@ usr1_handler (void *     data,
 }
 
 
+int dev_hook_walk (const char *       fpath,
+		   const struct stat *sb,
+		   int                typeflag,
+		   struct FTW *       ftwbuf)
+{
+	Mount * mnt = nftw_hook_args.mnt;
+	char dest[PATH_MAX];
+
+	strcpy (dest, mnt->mountpoint);
+	strcat (dest, fpath + 17);
+
+	if (S_ISDIR (sb->st_mode)) {
+		if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
+		    && (errno != EEXIST))
+			nih_warn ("%s: %s", dest, strerror (errno));
+	} else if (S_ISLNK (sb->st_mode)) {
+		char target[PATH_MAX];
+		ssize_t len;
+
+		len = readlink (fpath, target, sizeof target);
+		target[len] = '\0';
+
+		if ((symlink (target, dest) < 0)
+		    && (errno != EEXIST))
+			nih_warn ("%s: %s", dest, strerror (errno));
+	} else {
+		if ((mknod (dest, sb->st_mode, sb->st_rdev) < 0)
+		    && (errno != EEXIST))
+			nih_warn ("%s: %s", dest, strerror (errno));
+	}
+
+	return FTW_CONTINUE;
+}
+
+
 int
 dev_hook (Mount *mnt)
 {
@@ -2025,15 +2067,102 @@ dev_hook (Mount *mnt)
 
 	nih_debug ("populating %s", mnt->mountpoint);
 
-	int dev_hook_walk (const char *       fpath,
-			   const struct stat *sb,
-			   int                typeflag,
-			   struct FTW *       ftwbuf)
+	nftw_hook_args.mnt = mnt;
+	nftw ("/lib/udev/devices", dev_hook_walk, 1024,
+	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+	nftw_hook_args.mnt = NULL;
+
+	return 0;
+}
+
+int tmp_hook_walk (const char *       fpath,
+		   const struct stat *sb,
+		   int                typeflag,
+		   struct FTW *       ftwbuf)
+{
+	Mount * mnt = nftw_hook_args.mnt;
+	const char *name = fpath + ftwbuf->base;
+
+	if (! ftwbuf->level)
+		return FTW_CONTINUE;
+
+	if (S_ISDIR (sb->st_mode)) {
+		if (strcmp (name, "lost+found")
+		    && (nftw_hook_args.purge
+			|| ((sb->st_mtime < nftw_hook_args.barrier
+			     && (sb->st_ctime < nftw_hook_args.barrier)))))
+		{
+			if (rmdir (fpath) < 0)
+				nih_warn ("%s: %s", fpath, strerror (errno));
+		}
+
+	} else {
+		if (strcmp (name, "quota.user")
+		    && strcmp (name, "aquota.user")
+		    && strcmp (name, "quote.group")
+		    && strcmp (name, "aquota.group")
+		    && strcmp (name, ".journal")
+		    && fnmatch ("...security*", name, FNM_PATHNAME)
+		    && (nftw_hook_args.purge
+			|| ((sb->st_mtime < nftw_hook_args.barrier)
+			    && (sb->st_ctime < nftw_hook_args.barrier)
+			    && (sb->st_atime < nftw_hook_args.barrier))
+			|| ((ftwbuf->level == 1)
+			    && (! fnmatch (".X*-lock", fpath + ftwbuf->base, FNM_PATHNAME)))))
+		{
+			if (unlink (fpath) < 0)
+				nih_warn ("%s: %s", fpath, strerror (errno));
+		}
+
+	}
+
+	return FTW_CONTINUE;
+}
+
+int
+tmp_hook (Mount *mnt)
+{
+	struct stat statbuf;
+
+	nih_assert (mnt != NULL);
+
+	if ((lstat (mnt->mountpoint, &statbuf) < 0)
+	    || (! (statbuf.st_mode & S_IWOTH))) {
+		nih_debug ("cowardly not cleaning up %s", mnt->mountpoint);
+		return 0;
+	} else if (tmptime < 0) {
+		nih_debug ("not cleaning up %s", mnt->mountpoint);
+		return 0;
+	}
+
+	nih_debug ("cleaning up %s", mnt->mountpoint);
+
+	if (tmptime > 0) {
+		nftw_hook_args.purge = FALSE;
+		nftw_hook_args.barrier = time (NULL) - (tmptime * 3600);
+	} else {
+		nftw_hook_args.purge = TRUE;
+		nftw_hook_args.barrier = 0;
+	}
+
+	nftw_hook_args.mnt = mnt;
+	nftw (mnt->mountpoint, tmp_hook_walk, 1024,
+	      FTW_ACTIONRETVAL | FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+	nftw_hook_args.mnt = NULL;
+
+	return 0;
+}
+
+	int var_run_hook_walk (const char *       fpath,
+			       const struct stat *sb,
+			       int                typeflag,
+			       struct FTW *       ftwbuf)
 	{
+		Mount * mnt = nftw_hook_args.mnt;
 		char dest[PATH_MAX];
 
 		strcpy (dest, mnt->mountpoint);
-		strcat (dest, fpath + 17);
+		strcat (dest, fpath + 22);
 
 		if (S_ISDIR (sb->st_mode)) {
 			if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
@@ -2050,96 +2179,36 @@ dev_hook (Mount *mnt)
 			    && (errno != EEXIST))
 				nih_warn ("%s: %s", dest, strerror (errno));
 		} else {
-			if ((mknod (dest, sb->st_mode, sb->st_rdev) < 0)
-			    && (errno != EEXIST))
+			int     in_fd;
+			int     out_fd;
+			char    buf[4096];
+			ssize_t len;
+
+			in_fd = open (fpath, O_RDONLY);
+			if (in_fd < 0) {
+				nih_warn ("%s: %s", fpath, strerror (errno));
+				return FTW_CONTINUE;
+			}
+
+			out_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC,
+				       0644);
+			if (out_fd < 0) {
+				nih_warn ("%s: %s", dest, strerror (errno));
+				close (in_fd);
+				return FTW_CONTINUE;
+			}
+
+			while ((len = read (in_fd, buf, sizeof buf)) > 0)
+				write (out_fd, buf, len);
+
+			close (in_fd);
+			if (close (out_fd) < 0)
 				nih_warn ("%s: %s", dest, strerror (errno));
 		}
 
 		return FTW_CONTINUE;
 	}
 
-
-	nftw ("/lib/udev/devices", dev_hook_walk, 1024,
-	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
-
-	return 0;
-}
-
-int
-tmp_hook (Mount *mnt)
-{
-	struct stat statbuf;
-	int         purge = FALSE;
-	time_t      barrier;
-
-	nih_assert (mnt != NULL);
-
-	if ((lstat (mnt->mountpoint, &statbuf) < 0)
-	    || (! (statbuf.st_mode & S_IWOTH))) {
-		nih_debug ("cowardly not cleaning up %s", mnt->mountpoint);
-		return 0;
-	} else if (tmptime < 0) {
-		nih_debug ("not cleaning up %s", mnt->mountpoint);
-		return 0;
-	}
-
-	nih_debug ("cleaning up %s", mnt->mountpoint);
-
-	if (tmptime > 0) {
-		barrier = time (NULL) - (tmptime * 3600);
-	} else {
-		purge = TRUE;
-		barrier = 0;
-	}
-
-	int tmp_hook_walk (const char *       fpath,
-			   const struct stat *sb,
-			   int                typeflag,
-			   struct FTW *       ftwbuf)
-	{
-		const char *name = fpath + ftwbuf->base;
-
-		if (! ftwbuf->level)
-			return FTW_CONTINUE;
-
-		if (S_ISDIR (sb->st_mode)) {
-			if (strcmp (name, "lost+found")
-			    && (purge
-				|| ((sb->st_mtime < barrier
-				     && (sb->st_ctime < barrier)))))
-			{
-				if (rmdir (fpath) < 0)
-					nih_warn ("%s: %s", fpath, strerror (errno));
-			}
-
-		} else {
-			if (strcmp (name, "quota.user")
-			    && strcmp (name, "aquota.user")
-			    && strcmp (name, "quote.group")
-			    && strcmp (name, "aquota.group")
-			    && strcmp (name, ".journal")
-			    && fnmatch ("...security*", name, FNM_PATHNAME)
-			    && (purge
-				|| ((sb->st_mtime < barrier)
-				    && (sb->st_ctime < barrier)
-				    && (sb->st_atime < barrier))
-				|| ((ftwbuf->level == 1)
-				    && (! fnmatch (".X*-lock", fpath + ftwbuf->base, FNM_PATHNAME)))))
-			{
-				if (unlink (fpath) < 0)
-					nih_warn ("%s: %s", fpath, strerror (errno));
-			}
-
-		}
-
-		return FTW_CONTINUE;
-	}
-
-	nftw (mnt->mountpoint, tmp_hook_walk, 1024,
-	      FTW_ACTIONRETVAL | FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
-
-	return 0;
-}
 
 int
 var_run_hook (Mount *mnt)
@@ -2209,64 +2278,10 @@ var_run_hook (Mount *mnt)
 
 	nih_debug ("populating %s from initramfs", mnt->mountpoint);
 
-	int var_run_hook_walk (const char *       fpath,
-			       const struct stat *sb,
-			       int                typeflag,
-			       struct FTW *       ftwbuf)
-	{
-		char dest[PATH_MAX];
-
-		strcpy (dest, mnt->mountpoint);
-		strcat (dest, fpath + 22);
-
-		if (S_ISDIR (sb->st_mode)) {
-			if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
-			    && (errno != EEXIST))
-				nih_warn ("%s: %s", dest, strerror (errno));
-		} else if (S_ISLNK (sb->st_mode)) {
-			char target[PATH_MAX];
-			ssize_t len;
-
-			len = readlink (fpath, target, sizeof target);
-			target[len] = '\0';
-
-			if ((symlink (target, dest) < 0)
-			    && (errno != EEXIST))
-				nih_warn ("%s: %s", dest, strerror (errno));
-		} else {
-			int     in_fd;
-			int     out_fd;
-			char    buf[4096];
-			ssize_t len;
-
-			in_fd = open (fpath, O_RDONLY);
-			if (in_fd < 0) {
-				nih_warn ("%s: %s", fpath, strerror (errno));
-				return FTW_CONTINUE;
-			}
-
-			out_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC,
-				       0644);
-			if (out_fd < 0) {
-				nih_warn ("%s: %s", dest, strerror (errno));
-				close (in_fd);
-				return FTW_CONTINUE;
-			}
-
-			while ((len = read (in_fd, buf, sizeof buf)) > 0)
-				write (out_fd, buf, len);
-
-			close (in_fd);
-			if (close (out_fd) < 0)
-				nih_warn ("%s: %s", dest, strerror (errno));
-		}
-
-		return FTW_CONTINUE;
-	}
-
-
+	nftw_hook_args.mnt = mnt;
 	nftw ("/dev/.initramfs/varrun", var_run_hook_walk, 1024,
 	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
+	nftw_hook_args.mnt = NULL;
 
 	return 0;
 }
