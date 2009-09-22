@@ -1,4 +1,4 @@
-mountall (0.1.7~) UNRELEASED; urgency=low
+mountall (0.1.8~) UNRELEASED; urgency=low
 
   * Further work on the fix from the previous version where the root
     filesystem would always be considered "local", retain that from the
@@ -15,6 +15,13 @@ mountall (0.1.7~) UNRELEASED; urgency=low
     later.  LP: #434172.
 
  -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 12:15:33 -0700
+
+mountall (0.1.7) karmic; urgency=low
+
+  * Build with -O2 on powerpc to work around wrong-code generation with -Os.
+    LP: #432222.
+
+ -- Matthias Klose <doko@ubuntu.com>  Tue, 22 Sep 2009 00:31:52 +0200
 
 mountall (0.1.6) karmic; urgency=low
 
