@@ -16,10 +16,6 @@ DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
 	CFLAGS += -O0
 	LDFLAGS += -Wl,-O0
-else ifneq (,$(findstring powerpc,$(DEB_HOST_ARCH)))
-	# see LP: #432222
-	CFLAGS += -O2
-	LDFLAGS += -Wl,-O1
 else
 	CFLAGS += -Os
 	LDFLAGS += -Wl,-O1

@@ -1,5 +1,6 @@
 mountall (0.1.8~) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * Further work on the fix from the previous version where the root
     filesystem would always be considered "local", retain that from the
     POV of the {virtual,local,remote}-filesystems events, but do mount
@@ -14,7 +15,14 @@ mountall (0.1.8~) UNRELEASED; urgency=low
     and instead update mtab once we've moved it into place
     later.  LP: #434172.
 
- -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Sep 2009 12:15:33 -0700
+  [ Kees Cook ]
+  * src/mountall.c: rework nftw hooks to use a global for argument passing
+    instead of using nested functions and the resulting trampolines that
+    cause an executable stack.  LP: #434813.
+  * debian/rules: revert powerpc exception, since the cause is fixed by
+    removing the nested functions.
+
+ -- Kees Cook <kees@ubuntu.com>  Tue, 22 Sep 2009 11:11:35 -0700
 
 mountall (0.1.7) karmic; urgency=low
 
