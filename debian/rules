@@ -10,10 +10,16 @@ export DH_OPTIONS
 CFLAGS = -Wall -g -fstack-protector -fPIE
 LDFLAGS = -Wl,-z,relro -Wl,-z,now -pie
 
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
 # Disable optimisations if noopt found in $DEB_BUILD_OPTIONS
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
 	CFLAGS += -O0
 	LDFLAGS += -Wl,-O0
+else ifneq (,$(findstring powerpc,$(DEB_HOST_ARCH)))
+	# see LP: #432222
+	CFLAGS += -O2
+	LDFLAGS += -Wl,-O1
 else
 	CFLAGS += -Os
 	LDFLAGS += -Wl,-O1
@@ -30,7 +36,6 @@ else
 	confflags += --build=$(DEB_BUILD_GNU_TYPE) --host=$(DEB_HOST_GNU_TYPE)
 endif
 
-DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 CHECK_VARS =
 ifeq ($(DEB_HOST_ARCH),armel)
 CHECK_VARS += CFLAGS="$(filter-out -fPIE,$(CFLAGS))"
