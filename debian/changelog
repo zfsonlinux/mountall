@@ -1,4 +1,4 @@
-mountall (0.1.8~) UNRELEASED; urgency=low
+mountall (0.1.8) karmic; urgency=low
 
   [ Scott James Remnant ]
   * Further work on the fix from the previous version where the root
@@ -22,7 +22,7 @@ mountall (0.1.8~) UNRELEASED; urgency=low
   * debian/rules: revert powerpc exception, since the cause is fixed by
     removing the nested functions.
 
- -- Kees Cook <kees@ubuntu.com>  Tue, 22 Sep 2009 11:11:35 -0700
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 23 Sep 2009 14:19:01 -0700
 
 mountall (0.1.7) karmic; urgency=low
 
