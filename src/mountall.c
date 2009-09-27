@@ -1299,6 +1299,9 @@ spawn (Mount *         mnt,
 
 	NIH_ZERO (pipe2 (fds, O_CLOEXEC));
 
+	fflush (stdout);
+	fflush (stderr);
+
 	pid = fork ();
 	if (pid < 0) {
 		close (fds[0]);
