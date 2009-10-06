@@ -70,6 +70,8 @@ typedef struct mount Mount;
 typedef int (*MountHook) (Mount *mnt);
 
 struct mount {
+	NihList             entry;
+
 	char *              mountpoint;
 	int                 mountpoint_ready;
 	pid_t               mount_pid;
@@ -148,6 +150,7 @@ void   cleanup              (void);
 void   device_ready         (Mount *mnt);
 void   mountpoint_ready     (Mount *mnt);
 void   mounted              (Mount *mnt);
+void   trigger_events       (void);
 void   children_ready       (Mount *mnt, int pass);
 
 pid_t  spawn                (Mount *mnt, char * const *args, int wait,
@@ -254,8 +257,7 @@ static const char *fhs[] = {
 };
 
 
-Mount *mounts = NULL;
-size_t num_mounts = 0;
+NihList *mounts = NULL;
 
 Path *paths = NULL;
 size_t num_paths = 0;
@@ -344,9 +346,8 @@ new_mount (const char *mountpoint,
 
 	nih_assert (mountpoint != NULL);
 
-	mounts = NIH_MUST (nih_realloc (mounts, NULL,
-					sizeof (Mount) * (num_mounts + 1)));
-	mnt = &mounts[num_mounts++];
+	mnt = NIH_MUST (nih_new (NULL, Mount));
+	nih_list_init (&mnt->entry);
 
 	mnt->mountpoint = NIH_MUST (nih_strdup (mounts, mountpoint));
 	mnt->mountpoint_ready = FALSE;
@@ -376,6 +377,9 @@ new_mount (const char *mountpoint,
 
 	mnt->hook = hook;
 
+	nih_alloc_set_destructor (mnt, nih_list_destroy);
+	nih_list_add (mounts, &mnt->entry);
+
 	nih_debug ("%s: %s %s %s%s%s",
 		   mnt->mountpoint,
 		   mnt->device ?: "-",
@@ -392,9 +396,12 @@ find_mount (const char *mountpoint)
 {
 	nih_assert (mountpoint != NULL);
 
-	for (size_t i = 0; i < num_mounts; i++)
-		if (! strcmp (mounts[i].mountpoint, mountpoint))
-			return &mounts[i];
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (! strcmp (mnt->mountpoint, mountpoint))
+			return mnt;
+	}
 
 	return NULL;
 }
@@ -647,28 +654,29 @@ needs_remount (Mount *mnt)
 void
 build_paths (void)
 {
-	for (size_t i = 0; i < num_mounts; i++) {
-		Path *path;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+		Path * path;
 
-		if (mounts[i].mountpoint[0] == '/') {
+		if (mnt->mountpoint[0] == '/') {
 			paths = NIH_MUST (nih_realloc (paths, NULL,
 						       sizeof (Path) * (num_paths + 1)));
 			path = &paths[num_paths++];
 
-			path->path = mounts[i].mountpoint;
-			path->mnt = &mounts[i];
+			path->path = mnt->mountpoint;
+			path->mnt = mnt;
 			path->device = FALSE;
 		}
 
-		if (mounts[i].device
-		    && strncmp (mounts[i].device, "/dev/", 5)
-		    && (! mounts[i].nodev)) {
+		if (mnt->device
+		    && strncmp (mnt->device, "/dev/", 5)
+		    && (! mnt->nodev)) {
 			paths = NIH_MUST (nih_realloc (paths, NULL,
 						       sizeof (Path) * (num_paths + 1)));
 			path = &paths[num_paths++];
 
-			path->path = mounts[i].device;
-			path->mnt = &mounts[i];
+			path->path = mnt->device;
+			path->mnt = mnt;
 			path->device = TRUE;
 		}
 	}
@@ -938,7 +946,8 @@ parse_filesystems (void)
 void
 cleanup (void)
 {
-	for (size_t i = 0; i < num_mounts; i++) {
+	NIH_LIST_FOREACH_SAFE (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
 		int    drop = FALSE;
 		size_t j;
 
@@ -948,22 +957,22 @@ cleanup (void)
 		 * filesystem type, and no device is specified, drop as this
 		 * is platform-dependent (e.g. spufs).
 		 */
-		if (mounts[i].type) {
+		if (mnt->type) {
 			for (j = 0; j < num_filesystems; j++)
-				if (! strcmp (mounts[i].type, filesystems[j].name))
+				if (! strcmp (mnt->type, filesystems[j].name))
 					break;
 
 			if (j < num_filesystems) {
-				if (filesystems[j].nodev && (! is_remote (&mounts[i]))
+				if (filesystems[j].nodev && (! is_remote (mnt))
 				    && strcmp (filesystems[j].name, "fuse"))
-					mounts[i].nodev = TRUE;
-			} else if ((! mounts[i].device) && (! mounts[i].mounted)) {
+					mnt->nodev = TRUE;
+			} else if ((! mnt->device) && (! mnt->mounted)) {
 				nih_debug ("%s: dropping unknown filesystem",
-					   mounts[i].mountpoint);
+					   mnt->mountpoint);
 				drop = TRUE;
-			} else if (! strcmp (mounts[i].type, "ignore")) {
+			} else if (! strcmp (mnt->type, "ignore")) {
 				nih_debug ("%s: dropping ignored filesystem",
-					   mounts[i].mountpoint);
+					   mnt->mountpoint);
 				drop = TRUE;
 			}
 		}
@@ -971,35 +980,32 @@ cleanup (void)
 		/* Drop anything that's not auto-mounted which isn't already
 		 * mounted.
 		 */
-		if (has_option (&mounts[i], "noauto", FALSE) && (! mounts[i].mounted)) {
+		if (has_option (mnt, "noauto", FALSE) && (! mnt->mounted)) {
 			nih_debug ("%s: dropping noauto filesystem",
-				   mounts[i].mountpoint);
+				   mnt->mountpoint);
 			drop = TRUE;
 		}
 
-		if (no_remote && is_remote (&mounts[i])) {
+		if (no_remote && is_remote (mnt)) {
 			nih_debug ("%s: dropping remote filesystem (--no-remote)",
-				   mounts[i].mountpoint);
+				   mnt->mountpoint);
 			drop = TRUE;
 		}
 
 		if (drop) {
-			memmove (&mounts[i], &mounts[i+1],
-				 sizeof (Mount) * (num_mounts - i - 1));
-			num_mounts--;
-			i--;
-		} else if (! strcmp (mounts[i].mountpoint, "/")) {
-			nih_debug ("local   %s", mounts[i].mountpoint);
-		} else if (is_fhs (&mounts[i])) {
-			if (is_virtual (&mounts[i])) {
-				nih_debug ("virtual %s", mounts[i].mountpoint);
-			} else if (is_remote (&mounts[i])) {
-				nih_debug ("remote  %s", mounts[i].mountpoint);
+			nih_free (mnt);
+		} else if (! strcmp (mnt->mountpoint, "/")) {
+			nih_debug ("local   %s", mnt->mountpoint);
+		} else if (is_fhs (mnt)) {
+			if (is_virtual (mnt)) {
+				nih_debug ("virtual %s", mnt->mountpoint);
+			} else if (is_remote (mnt)) {
+				nih_debug ("remote  %s", mnt->mountpoint);
 			} else {
-				nih_debug ("local   %s", mounts[i].mountpoint);
+				nih_debug ("local   %s", mnt->mountpoint);
 			}
-		} else if (is_swap (&mounts[i])) {
-			nih_debug ("swap    %s", mounts[i].device);
+		} else if (is_swap (mnt)) {
+			nih_debug ("swap    %s", mnt->device);
 		}
 	}
 }
@@ -1048,23 +1054,6 @@ mountpoint_ready (Mount *mnt)
 void
 mounted (Mount *mnt)
 {
-	size_t     num_virtual = 0;
-	size_t     num_virtual_mounted = 0;
-	static int virtual_triggered = FALSE;
-	size_t     num_swap = 0;
-	size_t     num_swap_mounted = 0;
-	static int swap_triggered = FALSE;
-	size_t     num_remote = 0;
-	size_t     num_remote_mounted = 0;
-	static int remote_triggered = FALSE;
-	size_t     num_local = 0;
-	size_t     num_local_mounted = 0;
-	static int local_triggered = FALSE;
-	size_t     num_fhs = 0;
-	size_t     num_fhs_mounted = 0;
-	static int fhs_triggered = FALSE;
-	size_t     num_mounted = 0;
-
 	nih_assert (mnt != NULL);
 
 	nih_debug ("%s", mnt->mountpoint);
@@ -1088,34 +1077,71 @@ mounted (Mount *mnt)
 	if (! written_mtab)
 		write_mtab ();
 
-	/* Look at the current table state */
-	for (size_t i = 0; i < num_mounts; i++) {
-		if (! strcmp (mounts[i].mountpoint, "/")) {
+	trigger_events ();
+
+	/* Mount points underneath this are now ready for mounting,
+	 * unless this was the root filesystem in which case they
+	 * were already ready anyway so don't mark them again.
+	 */
+	if (! is_swap (mnt)) {
+		if (strcmp (mnt->mountpoint, "/")) {
+			children_ready (mnt, 0);
+		} else {
+			children_ready (mnt, 2);
+		}
+	}
+}
+
+void
+trigger_events (void)
+{
+	size_t     num_virtual = 0;
+	size_t     num_virtual_mounted = 0;
+	static int virtual_triggered = FALSE;
+	size_t     num_swap = 0;
+	size_t     num_swap_mounted = 0;
+	static int swap_triggered = FALSE;
+	size_t     num_remote = 0;
+	size_t     num_remote_mounted = 0;
+	static int remote_triggered = FALSE;
+	size_t     num_local = 0;
+	size_t     num_local_mounted = 0;
+	static int local_triggered = FALSE;
+	size_t     num_fhs = 0;
+	size_t     num_fhs_mounted = 0;
+	static int fhs_triggered = FALSE;
+	size_t     num_mounts = 0;
+	size_t     num_mounted = 0;
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (! strcmp (mnt->mountpoint, "/")) {
 			num_fhs++;
 			num_local++;
-			if (mounts[i].mounted && (! needs_remount (&mounts[i]))) {
+			if (mnt->mounted && (! needs_remount (mnt))) {
 				num_fhs_mounted++;
 				num_local_mounted++;
 			}
 
-		} else if (is_fhs (&mounts[i])) {
+		} else if (is_fhs (mnt)) {
 			int mounted = FALSE;
 
-			if (is_virtual (&mounts[i])) {
+			if (is_virtual (mnt)) {
 				num_virtual++;
-				if (mounts[i].mounted) {
+				if (mnt->mounted) {
 					num_virtual_mounted++;
 					mounted = TRUE;
 				}
-			} else if (is_remote (&mounts[i])) {
+			} else if (is_remote (mnt)) {
 				num_remote++;
-				if (mounts[i].mounted) {
+				if (mnt->mounted) {
 					num_remote_mounted++;
 					mounted = TRUE;
 				}
 			} else {
 				num_local++;
-				if (mounts[i].mounted && (! needs_remount (&mounts[i]))) {
+				if (mnt->mounted && (! needs_remount (mnt))) {
 					num_local_mounted++;
 					mounted = TRUE;
 				}
@@ -1127,16 +1153,18 @@ mounted (Mount *mnt)
 				num_mounted++;
 			}
 
-		} else if (is_swap (&mounts[i])) {
+		} else if (is_swap (mnt)) {
 			num_swap++;
-			if (mounts[i].mounted) {
+			if (mnt->mounted) {
 				num_swap_mounted++;
 				num_mounted++;
 			}
 
-		} else if (mounts[i].mounted) {
+		} else if (mnt->mounted) {
 			num_mounted++;
 		}
+
+		num_mounts++;
 	}
 
 	nih_debug ("virtual %zi/%zi remote %zi/%zi local %zi/%zi (%zi/%zi) swap %zi/%zi [%zi/%zi]",
@@ -1178,18 +1206,6 @@ mounted (Mount *mnt)
 		nih_info ("finished");
 		emit_event ("all-filesystems");
 		nih_main_loop_exit (EXIT_OK);
-	}
-
-	/* Mount points underneath this are now ready for mounting,
-	 * unless this was the root filesystem in which case they
-	 * were already ready anyway so don't mark them again.
-	 */
-	if (! is_swap (mnt)) {
-		if (strcmp (mnt->mountpoint, "/")) {
-			children_ready (mnt, 0);
-		} else {
-			children_ready (mnt, 2);
-		}
 	}
 }
 
@@ -1691,15 +1707,17 @@ write_mtab (void)
 	    || (close (mtab) < 0))
 		return;
 
-	for (size_t i = 0; i < num_mounts; i++) {
-		if (! mounts[i].mounted)
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (! mnt->mounted)
 			continue;
-		if (! mounts[i].type)
+		if (! mnt->type)
 			continue;
-		if (is_swap (&mounts[i]))
+		if (is_swap (mnt))
 			continue;
 
-		run_mount (&mounts[i], TRUE);
+		run_mount (mnt, TRUE);
 	}
 
 	written_mtab = TRUE;
@@ -1933,50 +1951,52 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 
 	nih_debug ("%s %s %s %s", subsystem, devname, uuid, label);
 
-	for (size_t i = 0; i < num_mounts; i++) {
-		if (! mounts[i].device)
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (! mnt->device)
 			continue;
 
-		if ((! strncmp (mounts[i].device, "UUID=", 5))
+		if ((! strncmp (mnt->device, "UUID=", 5))
 		    && uuid
-		    && (! strcmp (mounts[i].device + 5, uuid))) {
+		    && (! strcmp (mnt->device + 5, uuid))) {
 			struct udev_list_entry *devlink;
 
-			nih_debug ("%s by uuid", mounts[i].mountpoint);
+			nih_debug ("%s by uuid", mnt->mountpoint);
 
 			for (devlink = devlinks; devlink;
 			     devlink = udev_list_entry_get_next (devlink)) {
 				const char *name = udev_list_entry_get_name (devlink);
 
 				if (! strncmp (name, "/dev/disk/by-uuid/", 18)) {
-					update_mount (&mounts[i], name, -1, NULL, NULL, NULL);
+					update_mount (mnt, name, -1, NULL, NULL, NULL);
 					break;
 				}
 			}
 
 			if (! devlink)
-				update_mount (&mounts[i], devname, -1, NULL, NULL, NULL);
-		} else if ((! strncmp (mounts[i].device, "LABEL=", 6))
+				update_mount (mnt, devname, -1, NULL, NULL, NULL);
+		} else if ((! strncmp (mnt->device, "LABEL=", 6))
 			   && label
-			   && (! strcmp (mounts[i].device + 6, label))) {
+			   && (! strcmp (mnt->device + 6, label))) {
 			struct udev_list_entry *devlink;
 
-			nih_debug ("%s by label", mounts[i].mountpoint);
+			nih_debug ("%s by label", mnt->mountpoint);
 
 			for (devlink = devlinks; devlink;
 			     devlink = udev_list_entry_get_next (devlink)) {
 				const char *name = udev_list_entry_get_name (devlink);
 
 				if (! strncmp (name, "/dev/disk/by-label/", 18)) {
-					update_mount (&mounts[i], name, -1, NULL, NULL, NULL);
+					update_mount (mnt, name, -1, NULL, NULL, NULL);
 					break;
 				}
 			}
 
 			if (! devlink)
-				update_mount (&mounts[i], devname, -1, NULL, NULL, NULL);
-		} else if (! strcmp (mounts[i].device, devname)) {
-			nih_debug ("%s by name", mounts[i].mountpoint);
+				update_mount (mnt, devname, -1, NULL, NULL, NULL);
+		} else if (! strcmp (mnt->device, devname)) {
+			nih_debug ("%s by name", mnt->mountpoint);
 		} else {
 			struct udev_list_entry *devlink;
 
@@ -1984,8 +2004,8 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     devlink = udev_list_entry_get_next (devlink)) {
 				const char *name = udev_list_entry_get_name (devlink);
 
-				if (! strcmp (mounts[i].device, name)) {
-					nih_debug ("%s by link %s", mounts[i].mountpoint,
+				if (! strcmp (mnt->device, name)) {
+					nih_debug ("%s by link %s", mnt->mountpoint,
 						   name);
 					break;
 				}
@@ -1995,13 +2015,13 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 				continue;
 		}
 
-		if (mounts[i].udev_device)
-			udev_device_unref (mounts[i].udev_device);
+		if (mnt->udev_device)
+			udev_device_unref (mnt->udev_device);
 
-		mounts[i].udev_device = udev_device;
-		udev_device_ref (mounts[i].udev_device);
+		mnt->udev_device = udev_device;
+		udev_device_ref (mnt->udev_device);
 
-		run_fsck (&mounts[i]);
+		run_fsck (mnt);
 	}
 
 	udev_device_unref (udev_device);
@@ -2016,10 +2036,13 @@ usr1_handler (void *     data,
 
 	nih_debug ("Received SIGUSR1 (network device up)");
 
-	for (size_t i = 0; i < num_mounts; i++)
-		if (is_remote (&mounts[i])
-		    && (! mounts[i].mounted))
-			device_ready (&mounts[i]);
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (is_remote (mnt)
+		    && (! mnt->mounted))
+			device_ready (mnt);
+	}
 }
 
 
@@ -2395,6 +2418,7 @@ main (int   argc,
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
 	 * we need to do.
 	 */
+	mounts = NIH_MUST (nih_list_new (NULL));
 	for (builtin = builtins; builtin->mountpoint; builtin++)
 		new_mount (builtin->mountpoint, builtin->device, builtin->check,
 			   builtin->type, builtin->opts, builtin->hook);
