@@ -9,6 +9,13 @@ mountall (0.1.9) UNRELEASED; urgency=low
   * Always check the root filesystem if --force-fsck is used, regardless of
     passno.  LP: #435707.
 
+  [ Johan Kiviniemi ]
+  * Have each fsck instance create a lock for each underlying physical device.
+    If you have a single disk or RAID, all filesystem checks will happen
+    sequentially in order to avoid thrashing.  On more complex configurations,
+    you’ll benefit from the parallel checks mountall has been doing all along.
+    LP: #434974.
+
  -- Scott James Remnant <scott@ubuntu.com>  Sun, 27 Sep 2009 14:50:48 -0700
 
 mountall (0.1.8) karmic; urgency=low
