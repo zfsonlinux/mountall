@@ -82,7 +82,7 @@ struct mount {
 	int                 device_ready;
 
 	char *              type;
-	int                 virtual;
+	int                 nodev;
 	char *              opts;
 	char *              mount_opts;
 
@@ -370,7 +370,7 @@ new_mount (const char *mountpoint,
 	}
 
 	mnt->type = type ? NIH_MUST (nih_strdup (mounts, type)) : NULL;
-	mnt->virtual = FALSE;
+	mnt->nodev = FALSE;
 	mnt->opts = opts ? NIH_MUST (nih_strdup (mounts, opts)) : NULL;
 	mnt->mount_opts = NULL;
 
@@ -591,7 +591,7 @@ is_virtual (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	return mnt->virtual;
+	return mnt->nodev;
 }
 
 int
@@ -662,7 +662,7 @@ build_paths (void)
 
 		if (mounts[i].device
 		    && strncmp (mounts[i].device, "/dev/", 5)
-		    && (! is_virtual (&mounts[i]))) {
+		    && (! mounts[i].nodev)) {
 			paths = NIH_MUST (nih_realloc (paths, NULL,
 						       sizeof (Path) * (num_paths + 1)));
 			path = &paths[num_paths++];
@@ -942,7 +942,7 @@ cleanup (void)
 		int    drop = FALSE;
 		size_t j;
 
-		/* Check through the known filesystems, if this is a virtual
+		/* Check through the known filesystems, if this is a nodev
 		 * filesystem then mark it as such so we don't wait for any
 		 * device to be ready.  Otherwise if we didn't find the
 		 * filesystem type, and no device is specified, drop as this
@@ -956,7 +956,7 @@ cleanup (void)
 			if (j < num_filesystems) {
 				if (filesystems[j].nodev && (! is_remote (&mounts[i]))
 				    && strcmp (filesystems[j].name, "fuse"))
-					mounts[i].virtual = TRUE;
+					mounts[i].nodev = TRUE;
 			} else if ((! mounts[i].device) && (! mounts[i].mounted)) {
 				nih_debug ("%s: dropping unknown filesystem",
 					   mounts[i].mountpoint);
@@ -1032,13 +1032,13 @@ mountpoint_ready (Mount *mnt)
 
 	nih_debug ("%s", mnt->mountpoint);
 
-	/* Activate virtual filesystems as soon as the mountpoint
+	/* Activate nodev filesystems as soon as the mountpoint
 	 * is ready, otherwise don't mount filesystems until the
 	 * device is ready.  Be sure to ignore swap partitions
 	 * since they're mounted in device_ready() itself.
 	 */
 	mnt->mountpoint_ready = TRUE;
-	if (is_virtual (mnt)
+	if (mnt->nodev
 	    || (is_remote (mnt) && mnt->mounted && (! needs_remount (mnt)))
 	    || (! mnt->type)
 	    || (mnt->device_ready && (! is_swap (mnt))))
@@ -1236,12 +1236,12 @@ children_ready (Mount *root,
 				}
 			}
 		} else {
-			/* We can, and indeed want to, mount virtual
+			/* We can, and indeed want to, mount nodev
 			 * filesystems while the root filesystem is still
 			 * read-only - but don't want to remount them once
 			 * it's remounted r/w.
 			 */
-			if (is_virtual (path->mnt)) {
+			if (path->mnt->nodev) {
 				if (pass != 2)
 					mountpoint_ready (path->mnt);
 			} else {
@@ -2482,7 +2482,7 @@ main (int   argc,
 	/* All of the mountpoints under the root filesystem are now ready
 	 * for mounting, even though it's still read-only.  All of the
 	 * devices will be ready when it's mounted for writing.  This means
-	 * we'll mount all of the virtual filesystems.
+	 * we'll mount all of the nodev filesystems.
 	 *
 	 * Once that's done, mark the root mountpoint itself ready so we
 	 * can remount the root filesystem when the device itself is ready.
