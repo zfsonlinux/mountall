@@ -1,8 +1,13 @@
 mountall (0.1.9) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * Flush standard output and error before spawning processes to make
     capturing logs easier (otherwise we end up repeating things still in
     the buffer).
+
+  [ Colin Watson ]
+  * Always check the root filesystem if --force-fsck is used, regardless of
+    passno.  LP: #435707.
 
  -- Scott James Remnant <scott@ubuntu.com>  Sun, 27 Sep 2009 14:50:48 -0700
 

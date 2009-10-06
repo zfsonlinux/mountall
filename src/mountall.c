@@ -1611,7 +1611,8 @@ run_fsck (Mount *mnt)
 		nih_debug ("%s: already ready", mnt->mountpoint);
 		device_ready (mnt);
 		return;
-	} else if (! mnt->check) {
+	} else if (! mnt->check
+		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
 		nih_debug ("%s: no check required", mnt->mountpoint);
 		device_ready (mnt);
 		return;
