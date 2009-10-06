@@ -2459,7 +2459,7 @@ main (int   argc,
 		umask (0);
 
 		/* Send all logging output to syslog */
-		//openlog (program_name, LOG_PID, LOG_DAEMON|LOG_CONS);
+		//openlog (program_name, LOG_PID, LOG_DAEMON);
 		//nih_log_set_logger (nih_logger_syslog);
 
 		nih_signal_set_ignore (SIGHUP);
