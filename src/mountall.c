@@ -385,8 +385,8 @@ new_mount (const char *mountpoint,
 		   mnt->device ?: "-",
 		   mnt->type ?: "-",
 		   mnt->opts ?: "-",
-		   mnt->check ? "*" : "",
-		   mnt->hook ? "+" : "");
+		   mnt->check ? " check" : "",
+		   mnt->hook ? " hook" : "");
 
 	return mnt;
 }
@@ -458,8 +458,8 @@ update_mount (Mount *     mnt,
 		   mnt->device ?: "-",
 		   mnt->type ?: "-",
 		   mnt->opts ?: "-",
-		   mnt->check ? "*" : "",
-		   mnt->hook ? "+" : "");
+		   mnt->check ? " check" : "",
+		   mnt->hook ? " hook" : "");
 }
 
 
