@@ -49,11 +49,12 @@
 #include <nih/macros.h>
 #include <nih/alloc.h>
 #include <nih/string.h>
-#include <nih/option.h>
-#include <nih/child.h>
+#include <nih/list.h>
 #include <nih/signal.h>
+#include <nih/child.h>
 #include <nih/io.h>
 #include <nih/main.h>
+#include <nih/option.h>
 #include <nih/logging.h>
 #include <nih/error.h>
 
@@ -62,13 +63,6 @@
 
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
-
-
-/* FIXME
- *
- * fsck queuing
- * fsck progress (usplash activation)
- */
 
 
 typedef struct mount Mount;
