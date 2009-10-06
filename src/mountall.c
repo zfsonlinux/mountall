@@ -45,6 +45,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fnmatch.h>
+#include <dirent.h>
 
 #include <nih/macros.h>
 #include <nih/alloc.h>
@@ -57,6 +58,7 @@
 #include <nih/option.h>
 #include <nih/logging.h>
 #include <nih/error.h>
+#include <nih/hash.h>
 
 #include <nih-dbus/dbus_connection.h>
 #include <nih-dbus/dbus_proxy.h>
@@ -79,6 +81,8 @@ struct mount {
 
 	char *              device;
 	struct udev_device *udev_device;
+	NihHash *           physical_dev_ids;
+	int                 physical_dev_ids_needed;
 	int                 check;
 	pid_t               fsck_pid;
 	int                 device_ready;
@@ -127,6 +131,7 @@ Mount *find_mount           (const char *mountpoint);
 void   update_mount         (Mount *mnt, const char *device, int check,
 			     const char *type, const char *opts,
 			     MountHook hook);
+void   update_mount_dev_ids (Mount *mnt);
 
 int    has_option           (Mount *mnt, const char *option, int current);
 char * get_option           (const void *parent, Mount *mnt, const char *option,
@@ -164,7 +169,11 @@ void   run_mount_finished   (Mount *mnt, pid_t pid, int status);
 void   run_swapon           (Mount *mnt);
 void   run_swapon_finished  (Mount *mnt, pid_t pid, int status);
 
-void   run_fsck             (Mount *mnt);
+int    fsck_lock            (Mount *mnt);
+void   fsck_unlock          (Mount *mnt);
+void   queue_fsck           (Mount *mnt);
+void   run_fsck_queue       (void);
+int    run_fsck             (Mount *mnt);
 void   run_fsck_finished    (Mount *mnt, pid_t pid, int status);
 
 void   write_mtab           (void);
@@ -271,6 +280,11 @@ int written_mtab = FALSE;
 
 int exit_code = EXIT_OK;
 
+
+static NihList *fsck_queue = NULL;
+static NihHash *fsck_locks = NULL;
+
+
 /**
  * upstart:
  *
@@ -356,6 +370,8 @@ new_mount (const char *mountpoint,
 
 	mnt->device = device ? NIH_MUST (nih_strdup (mounts, device)) : NULL;
 	mnt->udev_device = NULL;
+	mnt->physical_dev_ids = NULL;
+	mnt->physical_dev_ids_needed = FALSE;
 	mnt->check = check;
 	mnt->fsck_pid = -1;
 	mnt->device_ready = FALSE;
@@ -460,6 +476,169 @@ update_mount (Mount *     mnt,
 		   mnt->opts ?: "-",
 		   mnt->check ? " check" : "",
 		   mnt->hook ? " hook" : "");
+}
+
+static void
+destroy_device (NihListEntry *entry)
+{
+	struct udev_device *dev;
+
+	nih_assert (entry != NULL);
+
+	dev = (struct udev_device *)entry->data;
+	nih_assert (dev != NULL);
+
+	udev_device_unref (dev);
+	nih_list_destroy (&entry->entry);
+}
+
+static void
+add_device (NihList *           devices,
+	    struct udev_device *srcdev,
+	    struct udev_device *newdev,
+	    size_t *            nadded)
+{
+	NihListEntry *new_entry;
+
+	nih_assert (devices != NULL);
+	nih_assert (newdev != NULL);
+
+	udev_device_ref (newdev);
+
+	new_entry = NIH_MUST (nih_list_entry_new (devices));
+	new_entry->data = newdev;
+	nih_alloc_set_destructor (new_entry, destroy_device);
+	nih_list_add (devices, &new_entry->entry);
+
+	if (nadded)
+		(*nadded)++;
+
+	if (srcdev)
+		nih_debug ("traverse: %s -> %s",
+			   udev_device_get_sysname (srcdev),
+			   udev_device_get_sysname (newdev));
+}
+
+void
+update_mount_dev_ids (Mount *mnt)
+{
+	nih_local NihList *devices = NULL;
+	NihHash *          results;
+	struct udev *      udev;
+
+	nih_assert (mnt != NULL);
+	nih_assert (mnt->udev_device != NULL);
+
+	if (! mnt->physical_dev_ids_needed)
+		return;
+
+	mnt->physical_dev_ids_needed = FALSE;
+
+	if (mnt->physical_dev_ids) {
+		nih_free (mnt->physical_dev_ids);
+		nih_debug ("recomputing physical_dev_ids for %s",
+			   mnt->mountpoint);
+	}
+
+	results = NIH_MUST (nih_hash_string_new (mnt, 10));
+	mnt->physical_dev_ids = results;
+
+	nih_assert (udev = udev_device_get_udev (mnt->udev_device));
+
+	devices = NIH_MUST (nih_list_new (NULL));
+	add_device (devices, NULL, mnt->udev_device, NULL);
+
+	while (! NIH_LIST_EMPTY (devices)) {
+		NihListEntry *      entry;
+
+		struct udev_device *dev;
+		struct udev_device *newdev;
+
+		size_t              nadded;
+
+		const char *        syspath;
+		nih_local char *    slavespath = NULL;
+
+		const char *        dev_id;
+
+		DIR *               dir;
+		struct dirent *     ent;
+
+		entry = (NihListEntry *)devices->next;
+		dev = (struct udev_device *)entry->data;
+
+		/* Does this device have a parent? */
+
+		newdev = udev_device_get_parent_with_subsystem_devtype (
+			dev, "block", "disk");
+		if (newdev) {
+			add_device (devices, dev, newdev, NULL);
+			goto finish;
+		}
+
+		/* Does this device have slaves? */
+
+		nadded = 0;
+
+		nih_assert (syspath = udev_device_get_syspath (dev));
+		slavespath = NIH_MUST (nih_sprintf (NULL, "%s/slaves",
+						    syspath));
+
+		if ((dir = opendir (slavespath))) {
+			while ((ent = readdir (dir))) {
+				nih_local char *slavepath = NULL;
+
+				if ((! strcmp (ent->d_name, "."))
+				    || (! strcmp (ent->d_name, "..")))
+					continue;
+
+				slavepath = NIH_MUST (nih_sprintf (NULL,
+					"%s/%s", slavespath, ent->d_name));
+
+				newdev = udev_device_new_from_syspath (
+					udev, slavepath);
+				if (! newdev) {
+					nih_warn ("%s: %s", slavepath,
+						  "udev_device_new_from_syspath"
+						  " failed");
+					continue;
+				}
+
+				add_device (devices, dev, newdev, &nadded);
+				udev_device_unref (newdev);
+			}
+
+			closedir (dir);
+		} else if (errno != ENOENT) {
+			nih_warn ("%s: opendir: %s", slavespath,
+				  strerror (errno));
+		}
+
+		if (nadded > 0)
+			goto finish;
+
+		/* This device has no parents or slaves; we’ve reached the
+		 * physical device.
+		 */
+
+		dev_id = udev_device_get_sysattr_value (dev, "dev");
+		if (dev_id) {
+			nih_local NihListEntry *entry = NULL;
+
+			entry = NIH_MUST (nih_list_entry_new (results));
+			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
+
+			if (nih_hash_add_unique (results, &entry->entry)) {
+				nih_debug ("results: %s -> %s",
+					   mnt->mountpoint, dev_id);
+			}
+		} else {
+			nih_warn ("%s: failed to get sysattr 'dev'", syspath);
+		}
+
+finish:
+		nih_free (entry);
+	}
 }
 
 
@@ -1607,7 +1786,90 @@ run_swapon_finished (Mount *mnt,
 }
 
 
+/* Returns: TRUE if the devices were successfully locked; FALSE if something
+ * else had already locked one or more of them.
+ */
+int
+fsck_lock (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+	nih_assert (mnt->physical_dev_ids != NULL);
+
+	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
+		char *dev_id = ((NihListEntry *)iter)->str;
+
+		if (nih_hash_lookup (fsck_locks, dev_id))
+			return FALSE;
+	}
+
+	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
+		char *        dev_id = ((NihListEntry *)iter)->str;
+		NihListEntry *entry;
+
+		entry = NIH_MUST (nih_list_entry_new (fsck_locks));
+		entry->str = NIH_MUST (nih_strdup (entry, dev_id));
+
+		nih_hash_add (fsck_locks, &entry->entry);
+
+		nih_debug ("%s: lock dev_id %s", mnt->mountpoint, dev_id);
+	}
+
+	return TRUE;
+}
+
 void
+fsck_unlock (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+	nih_assert (mnt->physical_dev_ids != NULL);
+
+	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
+		char *        dev_id = ((NihListEntry *)iter)->str;
+		NihListEntry *entry;
+
+		entry = (NihListEntry *)nih_hash_lookup (fsck_locks, dev_id);
+		nih_assert (entry != NULL);
+
+		nih_free (entry);
+
+		nih_debug ("%s: unlock dev_id %s", mnt->mountpoint, dev_id);
+	}
+}
+
+void
+queue_fsck (Mount *mnt)
+{
+	NihListEntry *entry;
+
+	nih_assert (mnt != NULL);
+
+	entry = NIH_MUST (nih_list_entry_new (fsck_queue));
+	entry->data = mnt;
+	nih_list_add (fsck_queue, &entry->entry);
+
+	nih_debug ("%s: queuing check", mnt->mountpoint);
+
+	run_fsck_queue ();
+}
+
+void
+run_fsck_queue (void)
+{
+	NIH_LIST_FOREACH_SAFE (fsck_queue, iter) {
+		NihListEntry *entry = (NihListEntry *)iter;
+		Mount *mnt = (Mount *)entry->data;
+
+		if (run_fsck (mnt)) {
+			nih_free (entry);
+			nih_debug ("%s: dequeuing check", mnt->mountpoint);
+		}
+	}
+}
+
+/* Returns: TRUE if the check can be dequeued, FALSE if it should be retried
+ * later.
+ */
+int
 run_fsck (Mount *mnt)
 {
 	nih_local char **args = NULL;
@@ -1620,24 +1882,28 @@ run_fsck (Mount *mnt)
 	if (mnt->device_ready) {
 		nih_debug ("%s: already ready", mnt->mountpoint);
 		device_ready (mnt);
-		return;
+		return TRUE;
 	} else if (! mnt->check
 		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
 		nih_debug ("%s: no check required", mnt->mountpoint);
 		device_ready (mnt);
-		return;
+		return TRUE;
 	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
 		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
 		device_ready (mnt);
-		return;
+		return TRUE;
 	} else if (mnt->fsck_pid > 0) {
 		nih_debug ("%s: already checking", mnt->mountpoint);
-		return;
+		return TRUE;
 	}
 
-	/* FIXME look up underlying device, and add to fsck queue.
-	 * only continue if was first in the queue.
-	 */
+	update_mount_dev_ids (mnt);
+
+	if (! fsck_lock (mnt))
+		/* Another instance has already locked one or more of the
+		 * physical devices.
+		 */
+		return FALSE;
 
 	nih_info ("checking %s", mnt->mountpoint);
 
@@ -1655,6 +1921,8 @@ run_fsck (Mount *mnt)
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device));
 
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
+
+	return TRUE;
 }
 
 void
@@ -1666,10 +1934,6 @@ run_fsck_finished (Mount *mnt,
 	nih_assert (mnt->fsck_pid == pid);
 
 	mnt->fsck_pid = -1;
-
-	/* FIXME remove from fsck queue for underlying device,
-	 * queue next in that list if there is one.
-	 */
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s",
@@ -1693,6 +1957,9 @@ run_fsck_finished (Mount *mnt,
 		nih_info ("Filesytem check cancelled: %s",
 			  mnt->mountpoint);
 	}
+
+	fsck_unlock (mnt);
+	run_fsck_queue ();
 
 	device_ready (mnt);
 }
@@ -2021,7 +2288,9 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 		mnt->udev_device = udev_device;
 		udev_device_ref (mnt->udev_device);
 
-		run_fsck (mnt);
+		mnt->physical_dev_ids_needed = TRUE;
+
+		queue_fsck (mnt);
 	}
 
 	udev_device_unref (udev_device);
@@ -2438,6 +2707,10 @@ main (int   argc,
 	build_paths ();
 	procs = NIH_MUST (nih_list_new (NULL));
 
+	/* Initialise the fsck queue. */
+	fsck_queue = NIH_MUST (nih_list_new (NULL));
+	fsck_locks = NIH_MUST (nih_hash_string_new (NULL, 10));
+
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
 	if (! root->mounted) {
@@ -2515,6 +2788,9 @@ main (int   argc,
 	mountpoint_ready (root);
 
 	ret = nih_main_loop ();
+
+	nih_discard (fsck_queue);
+	nih_discard (fsck_locks);
 
 	nih_main_unlink_pidfile ();
 
