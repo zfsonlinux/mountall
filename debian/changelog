@@ -20,6 +20,7 @@ mountall (0.2.0) UNRELEASED; urgency=low
     remote) don't delay the virtual or local events.  LP: #431040.
   * Fixed issue with trailing slashes.  LP: #443035.
   * Only run hooks if the filesystem was not already mounted.  LP: #444252.
+  * Ignore loop and ram devices until ready.  LP: #441454.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 07 Oct 2009 17:30:21 +0100
 
