@@ -1599,7 +1599,7 @@ run_swapon (Mount *mnt)
 	}
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device));
 
-	mnt->mount_pid = spawn (mnt, args, FALSE, run_swapon_finished);
+	spawn (mnt, args, TRUE, run_swapon_finished);
 }
 
 void
