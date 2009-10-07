@@ -27,6 +27,9 @@ mountall (0.2.0) UNRELEASED; urgency=low
   * Ignore loop and ram devices until ready.  LP: #441454.
   * Add options to binfmt_misc filesystem, which will probably cause it to
     be mounted on boot as well.
+  * Synchronously mount local and virtual filesystems, I suspect this is
+    the real cause behind the XFS races as one will modprobe and the other
+    will not (and fail).  LP: #432620.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 07 Oct 2009 17:30:21 +0100
 

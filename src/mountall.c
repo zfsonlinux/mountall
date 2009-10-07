@@ -934,8 +934,7 @@ mount_policy (void)
 			 * and no options, it's a built-in that we might
 			 * not work on this architecture, so ignore it.
 			 */
-			if ((! mnt->device) && (! mnt->opts)
-			    && (j == num_filesystems)) {
+			if ((! mnt->device) && (j == num_filesystems)) {
 				nih_debug ("%s: dropping unknown filesystem",
 					   mnt->mountpoint);
 				nih_free (mnt);
@@ -1530,7 +1529,7 @@ run_mount (Mount *mnt,
 
 	if (fake) {
  		spawn (mnt, args, TRUE, NULL);
-	} else if (has_option (mnt, "showthrough", FALSE)) {
+	} else if (! is_remote (mnt)) {
  		spawn (mnt, args, TRUE, run_mount_finished);
 	} else {
 		mnt->mount_pid = spawn (mnt, args, FALSE, run_mount_finished);
