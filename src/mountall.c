@@ -65,6 +65,14 @@
 #include "com.ubuntu.Upstart.h"
 
 
+typedef enum {
+	TAG_OTHER,
+	TAG_LOCAL,
+	TAG_REMOTE,
+	TAG_VIRTUAL,
+	TAG_SWAP
+} Tag;
+
 typedef struct mount Mount;
 
 typedef int (*MountHook) (Mount *mnt);
@@ -73,29 +81,27 @@ struct mount {
 	NihList             entry;
 
 	char *              mountpoint;
-	int                 mountpoint_ready;
 	pid_t               mount_pid;
 	int                 mounted;
 
 	char *              device;
 	struct udev_device *udev_device;
-	int                 check;
 	pid_t               fsck_pid;
-	int                 device_ready;
+	int                 ready;
 
 	char *              type;
 	int                 nodev;
 	char *              opts;
 	char *              mount_opts;
+	int                 check;
+
+	Tag                 tag;
+	int                 has_showthrough;
+	Mount *             showthrough;
+	NihList             deps;
 
 	MountHook           hook;
 };
-
-typedef struct path {
-	const char *path;
-	Mount *     mnt;
-	int         device;
-} Path;
 
 typedef struct filesystem {
 	char *name;
@@ -133,25 +139,18 @@ char * get_option           (const void *parent, Mount *mnt, const char *option,
 			     int current);
 char * cut_options          (const void *parent, Mount *mnt, ...);
 
-int    is_swap              (Mount *mnt);
-int    is_virtual           (Mount *mnt);
-int    is_remote            (Mount *mnt);
-int    is_fhs               (Mount *mnt);
-int    needs_remount        (Mount *mnt);
-
-void   build_paths          (void);
-int    path_compar          (const void *a, const void *b);
-
 void   parse_fstab          (void);
 void   parse_mountinfo      (void);
-void   parse_filesystems    (void);
-void   cleanup              (void);
 
-void   device_ready         (Mount *mnt);
-void   mountpoint_ready     (Mount *mnt);
+void   parse_filesystems    (void);
+
+void   mount_policy         (void);
+
 void   mounted              (Mount *mnt);
 void   trigger_events       (void);
-void   children_ready       (Mount *mnt, int pass);
+
+void   try_mounts           (void);
+void   try_mount            (Mount *mnt, int force);
 
 pid_t  spawn                (Mount *mnt, char * const *args, int wait,
 			     void (*handler) (Mount *mnt, pid_t pid, int status));
@@ -169,7 +168,6 @@ void   run_fsck_finished    (Mount *mnt, pid_t pid, int status);
 
 void   write_mtab           (void);
 
-int    has_showthrough      (Mount *root);
 void   mount_showthrough    (Mount *root);
 
 void   upstart_disconnected (DBusConnection *connection);
@@ -232,7 +230,7 @@ static const char *fhs[] = {
 	"/proc",			/* Linux appendix */
 	"/proc/sys/fs/binfmt_misc",	/* Built-in */
 	"/spu",				/* Built-in */
-	"/srv"
+	"/srv",
 	"/sys",				/* Not in FHS yet */
 	"/sys/fs/fuse/connections",	/* Built-in */
 	"/sys/kernel/debug",		/* Built-in */
@@ -258,9 +256,6 @@ static const char *fhs[] = {
 
 
 NihList *mounts = NULL;
-
-Path *paths = NULL;
-size_t num_paths = 0;
 
 Filesystem *filesystems = NULL;
 size_t num_filesystems = 0;
@@ -302,13 +297,6 @@ static int force_fsck = FALSE;
 static int fsck_fix = FALSE;
 
 /**
- * no_remote:
- *
- * Set to TRUE if we should ignore remote filesystems.
- **/
-static int no_remote = FALSE;
-
-/**
  * tmptime:
  *
  * Set to the number of hours grace files and directories in /tmp
@@ -334,6 +322,19 @@ dequote (char *str)
 	str[len] = '\0';
 }
 
+static void
+strip_slashes (char *str)
+{
+	char *p;
+
+	nih_assert (str != NULL);
+
+	p = str + strlen (str) - 1;
+	while ((p > str) && (*p == '/'))
+		*(p--) = '\0';
+}
+
+
 Mount *
 new_mount (const char *mountpoint,
 	   const char *device,
@@ -350,15 +351,15 @@ new_mount (const char *mountpoint,
 	nih_list_init (&mnt->entry);
 
 	mnt->mountpoint = NIH_MUST (nih_strdup (mounts, mountpoint));
-	mnt->mountpoint_ready = FALSE;
+	strip_slashes (mnt->mountpoint);
+
 	mnt->mount_pid = -1;
 	mnt->mounted = FALSE;
 
 	mnt->device = device ? NIH_MUST (nih_strdup (mounts, device)) : NULL;
 	mnt->udev_device = NULL;
-	mnt->check = check;
 	mnt->fsck_pid = -1;
-	mnt->device_ready = FALSE;
+	mnt->ready = FALSE;
 
 	if (mnt->device) {
 		if (! strncmp (mnt->device, "UUID=", 5)) {
@@ -367,6 +368,7 @@ new_mount (const char *mountpoint,
 			dequote (mnt->device + 6);
 		} else {
 			dequote (mnt->device);
+			strip_slashes (mnt->device);
 		}
 	}
 
@@ -374,6 +376,12 @@ new_mount (const char *mountpoint,
 	mnt->nodev = FALSE;
 	mnt->opts = opts ? NIH_MUST (nih_strdup (mounts, opts)) : NULL;
 	mnt->mount_opts = NULL;
+	mnt->check = check;
+
+	mnt->tag = TAG_OTHER;
+	mnt->has_showthrough = FALSE;
+	mnt->showthrough = NULL;
+	nih_list_init (&mnt->deps);
 
 	mnt->hook = hook;
 
@@ -427,6 +435,7 @@ update_mount (Mount *     mnt,
 			dequote (mnt->device + 6);
 		} else {
 			dequote (mnt->device);
+			strip_slashes (mnt->device);
 		}
 	}
 
@@ -577,138 +586,6 @@ cut_options (const void *parent,
 }
 
 
-int
-is_swap (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (! mnt->type) {
-		return FALSE;
-	} else if (strcmp (mnt->type, "swap")) {
-		return FALSE;
-	} else if (! mnt->device) {
-		return FALSE;
-	} else {
-		return TRUE;
-	}
-}
-
-int
-is_virtual (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	return mnt->nodev;
-}
-
-int
-is_remote (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (has_option (mnt, "_netdev", FALSE)) {
-		return TRUE;
-	} else if (! mnt->type) {
-		return FALSE;
-	} else if (strcmp (mnt->type, "nfs")
-		   && strcmp (mnt->type, "nfs4")
-		   && strcmp (mnt->type, "smbfs")
-		   && strcmp (mnt->type, "cifs")
-		   && strcmp (mnt->type, "coda")
-		   && strcmp (mnt->type, "ncp")
-		   && strcmp (mnt->type, "ncpfs")
-		   && strcmp (mnt->type, "ocfs2")
-		   && strcmp (mnt->type, "gfs")) {
-		return FALSE;
-	} else {
-		return TRUE;
-	}
-}
-
-int
-is_fhs (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	for (const char * const *path = fhs; path && *path; path++)
-		if (! strcmp (*path, mnt->mountpoint))
-			return TRUE;
-
-	return FALSE;
-}
-
-int
-needs_remount (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (mnt->mounted && has_option (mnt, "ro", TRUE)
-	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
-		return TRUE;
-	} else {
-		return FALSE;
-	}
-}
-
-
-void
-build_paths (void)
-{
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-		Path * path;
-
-		if (mnt->mountpoint[0] == '/') {
-			paths = NIH_MUST (nih_realloc (paths, NULL,
-						       sizeof (Path) * (num_paths + 1)));
-			path = &paths[num_paths++];
-
-			path->path = mnt->mountpoint;
-			path->mnt = mnt;
-			path->device = FALSE;
-		}
-
-		if (mnt->device
-		    && strncmp (mnt->device, "/dev/", 5)
-		    && (! mnt->nodev)) {
-			paths = NIH_MUST (nih_realloc (paths, NULL,
-						       sizeof (Path) * (num_paths + 1)));
-			path = &paths[num_paths++];
-
-			path->path = mnt->device;
-			path->mnt = mnt;
-			path->device = TRUE;
-		}
-	}
-
-	qsort (paths, num_paths, sizeof (Path),
-	       path_compar);
-}
-
-int
-path_compar (const void *a,
-	     const void *b)
-{
-	const Path *path_a;
-	const Path *path_b;
-	int         ret;
-
-	path_a = a;
-	path_b = b;
-
-	ret = strcmp (path_a->path, path_b->path);
-	if (ret) {
-		return ret;
-	} else if (path_a->device && (! path_b->device)) {
-		return 1;
-	} else if (path_b->device && (! path_a->device)) {
-		return -1;
-	} else {
-		return 0;
-	}
-}
-
-
 void
 parse_fstab (void)
 {
@@ -729,7 +606,8 @@ parse_fstab (void)
 		nih_local char *fsname = NULL;
 
 		mnt = find_mount (mntent->mnt_dir);
-		if (mnt) {
+		if (mnt
+		    && strcmp (mntent->mnt_type, "swap")) {
 			update_mount (mnt,
 				      mntent->mnt_fsname,
 				      mntent->mnt_passno != 0,
@@ -854,6 +732,8 @@ parse_mountinfo (void)
 			continue;
 		if (! strcmp (device, "/dev/root"))
 			device = NULL;
+		if (! strcmp (device, "none"))
+			device = NULL;
 
 		/* superblock opts */
 		super_opts = strtok_r (NULL, " \t\n", &saveptr);
@@ -862,7 +742,8 @@ parse_mountinfo (void)
 
 
 		mnt = find_mount (mountpoint);
-		if (mnt) {
+		if (mnt
+		    && strcmp (type, "swap")) {
 			update_mount (mnt, device, -1, type, NULL, NULL);
 
 			if (mnt->mount_opts)
@@ -883,6 +764,7 @@ parse_mountinfo (void)
 		return;
 	}
 }
+
 
 void
 parse_filesystems (void)
@@ -943,38 +825,84 @@ parse_filesystems (void)
 	}
 }
 
+
+static int
+is_parent (char *root,
+	   char *path)
+{
+	size_t len;
+
+	nih_assert (root != NULL);
+	nih_assert (path != NULL);
+
+	len = strlen (root);
+	if ((! strncmp (path, root, len))
+	    && ((path[len] == '\0')
+		|| (path[len] == '/')
+		|| (len && path[len-1] == '/')))
+		return TRUE;
+
+	return FALSE;
+}
+
+static int
+is_fhs (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	for (const char * const *path = fhs; path && *path; path++)
+		if (! strcmp (*path, mnt->mountpoint))
+			return TRUE;
+
+	return FALSE;
+}
+
+static int
+is_swap (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	return (mnt->type && (! strcmp (mnt->type, "swap")) ? TRUE : FALSE);
+}
+
+static int
+is_remote (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	if (has_option (mnt, "_netdev", FALSE)) {
+		return TRUE;
+	} else if (! mnt->type) {
+		return FALSE;
+	} else if (strcmp (mnt->type, "nfs")
+		   && strcmp (mnt->type, "nfs4")
+		   && strcmp (mnt->type, "smbfs")
+		   && strcmp (mnt->type, "cifs")
+		   && strcmp (mnt->type, "coda")
+		   && strcmp (mnt->type, "ncp")
+		   && strcmp (mnt->type, "ncpfs")
+		   && strcmp (mnt->type, "ocfs2")
+		   && strcmp (mnt->type, "gfs")) {
+		return FALSE;
+	} else {
+		return TRUE;
+	}
+}
+
 void
-cleanup (void)
+mount_policy (void)
 {
 	NIH_LIST_FOREACH_SAFE (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
-		int    drop = FALSE;
-		size_t j;
+		Mount *mount_parent = NULL;
+		Mount *device_parent = NULL;
 
-		/* Check through the known filesystems, if this is a nodev
-		 * filesystem then mark it as such so we don't wait for any
-		 * device to be ready.  Otherwise if we didn't find the
-		 * filesystem type, and no device is specified, drop as this
-		 * is platform-dependent (e.g. spufs).
-		 */
-		if (mnt->type) {
-			for (j = 0; j < num_filesystems; j++)
-				if (! strcmp (mnt->type, filesystems[j].name))
-					break;
-
-			if (j < num_filesystems) {
-				if (filesystems[j].nodev && (! is_remote (mnt))
-				    && strcmp (filesystems[j].name, "fuse"))
-					mnt->nodev = TRUE;
-			} else if ((! mnt->device) && (! mnt->mounted)) {
-				nih_debug ("%s: dropping unknown filesystem",
-					   mnt->mountpoint);
-				drop = TRUE;
-			} else if (! strcmp (mnt->type, "ignore")) {
-				nih_debug ("%s: dropping ignored filesystem",
-					   mnt->mountpoint);
-				drop = TRUE;
-			}
+		/* Drop anything with ignore as its type. */
+		if (mnt->type && (! strcmp (mnt->type, "ignore"))) {
+			nih_debug ("%s: dropping ignored filesystem",
+				   mnt->mountpoint);
+			nih_free (mnt);
+			return;
 		}
 
 		/* Drop anything that's not auto-mounted which isn't already
@@ -983,72 +911,184 @@ cleanup (void)
 		if (has_option (mnt, "noauto", FALSE) && (! mnt->mounted)) {
 			nih_debug ("%s: dropping noauto filesystem",
 				   mnt->mountpoint);
-			drop = TRUE;
-		}
-
-		if (no_remote && is_remote (mnt)) {
-			nih_debug ("%s: dropping remote filesystem (--no-remote)",
-				   mnt->mountpoint);
-			drop = TRUE;
-		}
-
-		if (drop) {
 			nih_free (mnt);
-		} else if (! strcmp (mnt->mountpoint, "/")) {
-			nih_debug ("local   %s", mnt->mountpoint);
-		} else if (is_fhs (mnt)) {
-			if (is_virtual (mnt)) {
-				nih_debug ("virtual %s", mnt->mountpoint);
-			} else if (is_remote (mnt)) {
-				nih_debug ("remote  %s", mnt->mountpoint);
-			} else {
-				nih_debug ("local   %s", mnt->mountpoint);
+			return;
+		}
+
+		/* Check through the known filesystems, if this is a nodev
+		 * filesystem then mark the mount as such so we don't wait
+		 * for any device to be ready.
+		 */
+		if (mnt->type) {
+			size_t j;
+
+			for (j = 0; j < num_filesystems; j++) {
+				if ((! strcmp (mnt->type, filesystems[j].name))
+				    && filesystems[j].nodev)
+					mnt->nodev = TRUE;
 			}
-		} else if (is_swap (mnt)) {
-			nih_debug ("swap    %s", mnt->device);
+		}
+
+		/* Iterate through the list of mounts, we're looking for the
+		 * parentof the mountpoint (e.g. /var/tmp's parent is /var)
+		 * and the parent mountpoint of the device spec
+		 * (e.g. /usr/loop.img's parent is /usr).
+		 */
+		NIH_LIST_FOREACH (mounts, iter) {
+			Mount *other = (Mount *)iter;
+
+			/* Skip this mount entry, taking care of skipping over
+			 * the cursor from the outer loop as well.
+			 */
+			if (other == mnt) {
+				iter = iter->next;
+				continue;
+			}
+
+			/* Is this a parent of our mountpoint? */
+			if (mnt->mountpoint && other->mountpoint
+			    && is_parent (other->mountpoint, mnt->mountpoint)){
+				if ((! mount_parent)
+				    || (strlen (mount_parent->mountpoint) < strlen (other->mountpoint)))
+					mount_parent = other;
+			}
+
+			/* Is this a parent mountpoint of our device? */
+			if (mnt->device && other->mountpoint
+			    && is_parent (other->mountpoint, mnt->device)){
+				if ((! device_parent)
+				    || (strlen (device_parent->mountpoint) < strlen (other->mountpoint)))
+					device_parent = other;
+			}
+		}
+
+		/* We nearly always depend on our mountpoint's parent, the only
+		 * exceptions are swap devices (which aren't mounted),
+		 * showthrough entries (which explicitly don't need to wait)
+		 * and virtual filesystems directly under the root.
+		 */
+		if (mount_parent
+		    && (! is_swap (mnt))) {
+			if (has_option (mnt, "showthrough", FALSE)
+			    && strcmp (mount_parent->mountpoint, "/")) {
+				mount_parent->has_showthrough = TRUE;
+				mnt->showthrough = mount_parent;
+				nih_debug ("%s shows through parent %s",
+					   mnt->mountpoint,
+					   mount_parent->mountpoint);
+				mount_parent = NULL;
+			} else if ((! strcmp (mount_parent->mountpoint, "/"))
+				   && mnt->nodev) {
+				nih_debug ("%s can be mounted while root readonly",
+					   mnt->mountpoint);
+				mount_parent = NULL;
+			} else {
+				NihListEntry *dep;
+
+				dep = NIH_MUST (nih_list_entry_new (mnt));
+				dep->data = mount_parent;
+				nih_ref (mount_parent, dep);
+
+				nih_list_add (&mnt->deps, &dep->entry);
+				nih_debug ("%s parent is %s",
+					   mnt->mountpoint,
+					   mount_parent->mountpoint);
+			}
+		}
+
+		/* It's also a pretty good idea to wait for the mountpoint on
+		 * which our device exists to appear first, assuming we have
+		 * one and that it's a valid path.
+		 */
+		if (device_parent
+		    && (! mnt->nodev)
+		    && mnt->device
+		    && (mnt->device[0] == '/')
+		    && strncmp (mnt->device, "/dev/", 5)) {
+			NihListEntry *dep;
+
+			dep = NIH_MUST (nih_list_entry_new (mnt));
+			dep->data = device_parent;
+			nih_ref (device_parent, dep);
+
+			nih_list_add (&mnt->deps, &dep->entry);
+			nih_debug ("%s parent is %s (mount %s)",
+				   mnt->mountpoint, device_parent->mountpoint,
+				   mnt->device);
+		}
+
+		/* Kernel filesystems can require rather more to mount than
+		 * first appears, if a device spec has been given (ie. it's
+		 * listed in fstab) then we also wait for the previous fstab
+		 * entry - whatever it was.
+		 */
+		if (mnt->nodev
+		    && mnt->device
+		    && mnt->type
+		    && (mnt->entry.prev != mounts)
+		    && ((Mount *)mnt->entry.prev)->device
+		    && ((Mount *)mnt->entry.prev)->type) {
+			NihListEntry *dep;
+			Mount *       prior;
+
+			prior = (Mount *)mnt->entry.prev;
+
+			dep = NIH_MUST (nih_list_entry_new (mnt));
+			dep->data = prior;
+			nih_ref (prior, dep);
+
+			nih_list_add (&mnt->deps, &dep->entry);
+			nih_debug ("%s prior fstab entry %s",
+				   mnt->mountpoint, prior->mountpoint);
+		}
+
+		/* Tag the filesystem so we know which event it blocks */
+		if (is_swap (mnt)) {
+			mnt->tag = TAG_SWAP;
+			nih_debug ("%s is swap", mnt->device);
+		} else if (! strcmp (mnt->mountpoint, "/")) {
+			mnt->tag = TAG_LOCAL;
+			nih_debug ("%s is local (root)", mnt->mountpoint);
+		} else if (mount_parent && (mount_parent->tag == TAG_OTHER)) {
+			mnt->tag = TAG_OTHER;
+			nih_debug ("%s is other (inherited)", mnt->mountpoint);
+		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)) {
+			mnt->tag = TAG_LOCAL;
+			nih_debug ("%s is local (inherited)", mnt->mountpoint);
+		} else if (mount_parent && (mount_parent->tag == TAG_REMOTE)) {
+			mnt->tag = TAG_REMOTE;
+			nih_debug ("%s is remote (inherited)", mnt->mountpoint);
+		} else if (is_fhs (mnt)) {
+			if (is_remote (mnt)) {
+				mnt->tag = TAG_REMOTE;
+				nih_debug ("%s is remote", mnt->mountpoint);
+			} else if (mnt->nodev
+				   && ((! mnt->type)
+				       || strcmp (mnt->type, "fuse"))) {
+				mnt->tag = TAG_VIRTUAL;
+				nih_debug ("%s is virtual", mnt->mountpoint);
+			} else {
+				mnt->tag = TAG_LOCAL;
+				nih_debug ("%s is local", mnt->mountpoint);
+			}
+		} else {
+			nih_debug ("%s is other (default)", mnt->mountpoint);
 		}
 	}
 }
 
 
-void
-device_ready (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-	nih_assert (mnt->device != NULL);
-	nih_assert (mnt->type != NULL);
-
-	nih_debug ("%s", mnt->mountpoint);
-
-	/* Activate swap devices as soon as the device is ready;
-	 * don't mount filesystems until the mountpoint is ready
-	 * as well.
-	 */
-	mnt->device_ready = TRUE;
-	if (is_swap (mnt)) {
-		run_swapon (mnt);
-	} else if (mnt->mountpoint_ready)
-		run_mount (mnt, FALSE);
-}
-
-void
-mountpoint_ready (Mount *mnt)
+static int
+needs_remount (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
-	nih_debug ("%s", mnt->mountpoint);
-
-	/* Activate nodev filesystems as soon as the mountpoint
-	 * is ready, otherwise don't mount filesystems until the
-	 * device is ready.  Be sure to ignore swap partitions
-	 * since they're mounted in device_ready() itself.
-	 */
-	mnt->mountpoint_ready = TRUE;
-	if (mnt->nodev
-	    || (is_remote (mnt) && mnt->mounted && (! needs_remount (mnt)))
-	    || (! mnt->type)
-	    || (mnt->device_ready && (! is_swap (mnt))))
-		run_mount (mnt, FALSE);
+	if (mnt->mounted && has_option (mnt, "ro", TRUE)
+	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
 }
 
 void
@@ -1058,7 +1098,8 @@ mounted (Mount *mnt)
 
 	nih_debug ("%s", mnt->mountpoint);
 
-	if (mnt->hook) {
+	if (mnt->hook
+	    && (! mnt->mounted)) {
 		if (mnt->hook (mnt) < 0) {
 			delayed_exit (EXIT_ERROR);
 			return;
@@ -1077,19 +1118,11 @@ mounted (Mount *mnt)
 	if (! written_mtab)
 		write_mtab ();
 
-	trigger_events ();
-
-	/* Mount points underneath this are now ready for mounting,
-	 * unless this was the root filesystem in which case they
-	 * were already ready anyway so don't mark them again.
+	/* Trigger any new events, and see if we can mount anything
+	 * else.
 	 */
-	if (! is_swap (mnt)) {
-		if (strcmp (mnt->mountpoint, "/")) {
-			children_ready (mnt, 0);
-		} else {
-			children_ready (mnt, 2);
-		}
-	}
+	trigger_events ();
+	try_mounts ();
 }
 
 void
@@ -1116,55 +1149,59 @@ trigger_events (void)
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (! strcmp (mnt->mountpoint, "/")) {
+		switch (mnt->tag) {
+		case TAG_OTHER:
+			num_mounts++;
+			if (mnt->mounted)
+				num_mounted++;
+			break;
+		case TAG_LOCAL:
 			num_fhs++;
 			num_local++;
+			num_mounts++;
 			if (mnt->mounted && (! needs_remount (mnt))) {
 				num_fhs_mounted++;
 				num_local_mounted++;
-			}
-
-		} else if (is_fhs (mnt)) {
-			int mounted = FALSE;
-
-			if (is_virtual (mnt)) {
-				num_virtual++;
-				if (mnt->mounted) {
-					num_virtual_mounted++;
-					mounted = TRUE;
-				}
-			} else if (is_remote (mnt)) {
-				num_remote++;
-				if (mnt->mounted) {
-					num_remote_mounted++;
-					mounted = TRUE;
-				}
-			} else {
-				num_local++;
-				if (mnt->mounted && (! needs_remount (mnt))) {
-					num_local_mounted++;
-					mounted = TRUE;
-				}
-			}
-
-			num_fhs++;
-			if (mounted) {
-				num_fhs_mounted++;
 				num_mounted++;
+			} else {
+				nih_debug ("local: waiting for %s", mnt->mountpoint);
 			}
-
-		} else if (is_swap (mnt)) {
+			break;
+		case TAG_REMOTE:
+			num_fhs++;
+			num_remote++;
+			num_mounts++;
+			if (mnt->mounted) {
+				num_fhs_mounted++;
+				num_remote_mounted++;
+				num_mounted++;
+			} else {
+				nih_debug ("remote: waiting for %s", mnt->mountpoint);
+			}
+			break;
+		case TAG_VIRTUAL:
+			num_fhs++;
+			num_virtual++;
+			num_mounts++;
+			if (mnt->mounted) {
+				num_fhs_mounted++;
+				num_virtual_mounted++;
+				num_mounted++;
+			} else {
+				nih_debug ("virtual: waiting for %s", mnt->mountpoint);
+			}
+			break;
+		case TAG_SWAP:
 			num_swap++;
+			num_mounts++;
 			if (mnt->mounted) {
 				num_swap_mounted++;
 				num_mounted++;
+			} else {
+				nih_debug ("swap: waiting for %s", mnt->device);
 			}
-
-		} else if (mnt->mounted) {
-			num_mounted++;
+			break;
 		}
-
-		num_mounts++;
 	}
 
 	nih_debug ("virtual %zi/%zi remote %zi/%zi local %zi/%zi (%zi/%zi) swap %zi/%zi [%zi/%zi]",
@@ -1209,84 +1246,51 @@ trigger_events (void)
 	}
 }
 
+
 void
-children_ready (Mount *root,
-		int    pass)
+try_mounts (void)
 {
-	size_t i = 0;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
 
-	nih_assert (root != NULL);
+		if (! mnt->mounted)
+			try_mount (mnt, FALSE);
+	}
+}
 
-	while ((i < num_paths)
-	       && ((paths[i].mnt != root) || paths[i].device))
-		i++;
-	nih_assert (i++ < num_paths);
+void
+try_mount (Mount *mnt,
+	   int    force)
+{
+	nih_assert (mnt != NULL);
 
-	while ((i < num_paths)
-	       && (! strncmp (paths[i].path, root->mountpoint,
-			      strlen (root->mountpoint)))
-	       && ((! strcmp (root->mountpoint, "/"))
-		   || (paths[i].path[strlen (root->mountpoint)] == '/')
-		   || (paths[i].path[strlen (root->mountpoint)] == '\0'))) {
-		Path *      path;
-		struct stat statbuf;
+	NIH_LIST_FOREACH (&mnt->deps, dep_iter) {
+		NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+		Mount *       dep = (Mount *)dep_entry->data;
 
-		path = &paths[i++];
-		if (lstat (path->path, &statbuf) < 0) {
-			nih_debug ("ignored %s: %s", path->path,
-				   strerror (errno));
-			continue;
+		if (! dep->mounted) {
+			nih_debug ("%s waiting for %s",
+				   mnt->mountpoint, dep->mountpoint);
+			return;
 		}
+	}
 
-		if (path->device) {
-			/* Do not consider devices ready in the "mounted ro"
-			 * pass, only when writable.
-			 */
-			if (pass != 1) {
-				if ((S_ISREG (statbuf.st_mode)
-				     || S_ISDIR (statbuf.st_mode))) {
-					device_ready (path->mnt);
-				} else {
-					nih_debug ("ignored %s: not regular",
-						   path->path);
-				}
-			}
+	/* Make sure that the underlying device is ready; we ignore this
+	 * for kernel filesystems (which don't have a device), remote
+	 * filesystems that are already mounted for writing and those
+	 * built-ins without a type (ie. hooks).
+	 */
+	if (force
+	    || mnt->ready
+	    || mnt->nodev
+	    || (is_remote (mnt) && mnt->mounted && (! needs_remount (mnt)))
+	    || (! mnt->type))
+	{
+		/* Run swapon or mount as appropriate */
+		if (is_swap (mnt)) {
+			run_swapon (mnt);
 		} else {
-			/* We can, and indeed want to, mount nodev
-			 * filesystems while the root filesystem is still
-			 * read-only - but don't want to remount them once
-			 * it's remounted r/w.
-			 */
-			if (path->mnt->nodev) {
-				if (pass != 2)
-					mountpoint_ready (path->mnt);
-			} else {
-				if (pass != 1)
-					mountpoint_ready (path->mnt);
-			}
-
-			/* Children of this mount point aren't ready until
-			 * this mountpoint is mounted, unless they're always
-			 * expected to show through.
-			 */
-			while ((i < num_paths)
-			       && (! strncmp (paths[i].path, path->path,
-					      strlen (path->path)))
-			       && ((paths[i].path[strlen (path->path)] == '/')
-				   || (paths[i].path[strlen (path->path)] == '\0')))
-			{
-				if ((! paths[i].device)
-				    && paths[i].mnt->type
-				    && has_option (paths[i].mnt, "showthrough", FALSE)
-				    && (lstat (paths[i].path, &statbuf) == 0)
-				    && S_ISDIR (statbuf.st_mode)) {
-					mountpoint_ready (paths[i].mnt);
-				} else {
-					nih_debug ("skipped %s", paths[i].path);
-				}
-
-				i++;
-			}
+			run_mount (mnt, FALSE);
 		}
 	}
 }
@@ -1330,6 +1334,8 @@ spawn (Mount *         mnt,
 
 		nih_debug ("%s", msg);
 
+		fflush (stdout);
+		fflush (stderr);
 		execvp (args[0], args);
 		nih_fatal ("%s %s [%d]: %s", args[0],
 			   is_swap (mnt) ? mnt->device : mnt->mountpoint,
@@ -1469,7 +1475,7 @@ run_mount (Mount *mnt,
 		   && strcmp (mnt->type, "ntfs")
 		   && strcmp (mnt->type, "ntfs-3g")) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
-	} else if (has_showthrough (mnt)) {
+	} else if (mnt->has_showthrough) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
@@ -1496,7 +1502,7 @@ run_mount (Mount *mnt,
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "remount"));
 	}
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device ?: "none"));
-	if (has_showthrough (mnt) && (! fake)) {
+	if (mnt->has_showthrough && (! fake)) {
 		nih_local char *mountpoint = NULL;
 
 		mountpoint = NIH_MUST (nih_sprintf (NULL, "/dev/%s",
@@ -1548,7 +1554,8 @@ run_mount_finished (Mount *mnt,
 		return;
 	}
 
-	mount_showthrough (mnt);
+	if (mnt->has_showthrough)
+		mount_showthrough (mnt);
 	mounted (mnt);
 }
 
@@ -1617,18 +1624,20 @@ run_fsck (Mount *mnt)
 	nih_assert (mnt->device != NULL);
 	nih_assert (mnt->type != NULL);
 
-	if (mnt->device_ready) {
+	if (mnt->ready) {
 		nih_debug ("%s: already ready", mnt->mountpoint);
-		device_ready (mnt);
+		try_mount (mnt, FALSE);
 		return;
 	} else if (! mnt->check
 		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
 		nih_debug ("%s: no check required", mnt->mountpoint);
-		device_ready (mnt);
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
 		return;
 	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
 		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
-		device_ready (mnt);
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
 		return;
 	} else if (mnt->fsck_pid > 0) {
 		nih_debug ("%s: already checking", mnt->mountpoint);
@@ -1694,7 +1703,8 @@ run_fsck_finished (Mount *mnt,
 			  mnt->mountpoint);
 	}
 
-	device_ready (mnt);
+	mnt->ready = TRUE;
+	try_mount (mnt, FALSE);
 }
 
 
@@ -1724,63 +1734,15 @@ write_mtab (void)
 }
 
 
-int
-has_showthrough (Mount *root)
-{
-	size_t i = 0;
-
-	nih_assert (root != NULL);
-
-	/* Root cannot have showthroughs */
-	if (! strcmp (root->mountpoint, "/"))
-		return FALSE;
-
-	while ((i < num_paths)
-	       && ((paths[i].mnt != root) || paths[i].device))
-		i++;
-	nih_assert (i++ < num_paths);
-
-	while ((i < num_paths)
-	       && (! strncmp (paths[i].path, root->mountpoint,
-			      strlen (root->mountpoint)))
-	       && ((paths[i].path[strlen (root->mountpoint)] == '/')
-		   || (paths[i].path[strlen (root->mountpoint)] == '\0'))) {
-		Path *path;
-
-		path = &paths[i++];
-		if (path->device)
-			continue;
-		if (! has_option (path->mnt, "showthrough", FALSE))
-			continue;
-		if (! path->mnt->mounted)
-			continue;
-
-		/* Mount option that should show though */
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
 void
 mount_showthrough (Mount *root)
 {
 	nih_local char * mountpoint = NULL;
-	size_t           i = 0;
 	nih_local char **args = NULL;
 	size_t           args_len = 0;
-	int              move = FALSE;
 
 	nih_assert (root != NULL);
-
-	/* Root cannot have showthroughs */
-	if (! strcmp (root->mountpoint, "/"))
-		return;
-
-	while ((i < num_paths)
-	       && ((paths[i].mnt != root) || paths[i].device))
-		i++;
-	nih_assert (i++ < num_paths);
+	nih_assert (root->has_showthrough);
 
 	/* This is the mountpoint we actually used */
 	mountpoint = NIH_MUST (nih_sprintf (NULL, "/dev/%s", root->mountpoint));
@@ -1788,63 +1750,54 @@ mount_showthrough (Mount *root)
 		if (mountpoint[i] == '/')
 			mountpoint[i] = '.';
 
-	while ((i < num_paths)
-	       && (! strncmp (paths[i].path, root->mountpoint,
-			      strlen (root->mountpoint)))
-	       && ((paths[i].path[strlen (root->mountpoint)] == '/')
-		   || (paths[i].path[strlen (root->mountpoint)] == '/'))) {
-		Path *           path;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *          mnt = (Mount *)iter;
 		nih_local char * submount = NULL;
 		nih_local char **args = NULL;
 		size_t           args_len = 0;
 
-		path = &paths[i++];
-		if (path->device)
+		if (mnt->showthrough != root)
 			continue;
-		if (! has_option (path->mnt, "showthrough", FALSE))
-			continue;
-		if (! path->mnt->mounted)
+		if (! mnt->mounted)
 			continue;
 
 		submount = NIH_MUST (nih_sprintf (NULL, "%s%s", mountpoint,
-						  path->mnt->mountpoint + strlen (root->mountpoint)));
+						  mnt->mountpoint + strlen (root->mountpoint)));
 
 		args = NIH_MUST (nih_str_array_new (NULL));
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "--bind"));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, path->mnt->mountpoint));
+		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->mountpoint));
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, submount));
 
-		nih_debug ("binding %s to %s", path->mnt->mountpoint, submount);
+		nih_debug ("binding %s to %s", mnt->mountpoint, submount);
 
-
-		if (spawn (path->mnt, args, TRUE, NULL) < 0)
+		if (spawn (mnt, args, TRUE, NULL) < 0)
 			return;
-
-		move = TRUE;
 	}
 
-	if (move) {
-		args = NIH_MUST (nih_str_array_new (NULL));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "--move"));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mountpoint));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, root->mountpoint));
+	/* Now move the root mountpoint into the right place, along with
+	 * all the bound mounts under it.
+	 */
+	args = NIH_MUST (nih_str_array_new (NULL));
+	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
+	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
+	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "--move"));
+	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mountpoint));
+	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, root->mountpoint));
 
-		nih_debug ("moving %s", root->mountpoint);
+	nih_debug ("moving %s", root->mountpoint);
 
-		if (spawn (root, args, TRUE, NULL) < 0)
-			return;
+	if (spawn (root, args, TRUE, NULL) < 0)
+		return;
 
-		if ((rmdir (mountpoint) < 0)
-		    && (errno != EEXIST))
-			nih_warn ("rmdir %s: %s", mountpoint, strerror (errno));
+	if ((rmdir (mountpoint) < 0)
+	    && (errno != EEXIST))
+		nih_warn ("rmdir %s: %s", mountpoint, strerror (errno));
 
-		if (written_mtab)
-			run_mount (root, TRUE);
-	}
+	if (written_mtab)
+		run_mount (root, TRUE);
 }
 
 
@@ -2031,17 +1984,13 @@ void
 usr1_handler (void *     data,
 	      NihSignal *signal)
 {
-	if (no_remote)
-		return;
-
 	nih_debug ("Received SIGUSR1 (network device up)");
 
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (is_remote (mnt)
-		    && (! mnt->mounted))
-			device_ready (mnt);
+		if (is_remote (mnt) && (! mnt->mounted))
+			try_mount (mnt, TRUE);
 	}
 }
 
@@ -2342,8 +2291,6 @@ static NihOption options[] = {
 	  NULL, NULL, &force_fsck, NULL },
 	{ 0, "fsck-fix", N_("Attempt to fix all fsck errors"),
 	  NULL, NULL, &fsck_fix, NULL },
-	{ 0, "no-remote", N_("Ignore remote filesystems"),
-	  NULL, NULL, &no_remote, NULL },
 	{ 0, "tmptime", N_("Grace to give files in /tmp"),
 	  NULL, "HOURS", &tmptime, tmptime_option },
 
@@ -2416,7 +2363,8 @@ main (int   argc,
 
 	/* Initialse mount table with built-in filesystems, then parse
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
-	 * we need to do.
+	 * we need to do.  Parse /proc/filesystems to see which don't
+	 * have devices, then apply the policy.
 	 */
 	mounts = NIH_MUST (nih_list_new (NULL));
 	for (builtin = builtins; builtin->mountpoint; builtin++)
@@ -2425,17 +2373,9 @@ main (int   argc,
 
 	parse_fstab ();
 	parse_mountinfo ();
-
-	/* Parse /proc/filesystems and eliminate anything we don't know
-	 * about, or anything that's got "noauto" in its options, etc.
-	 */
 	parse_filesystems ();
-	cleanup ();
+	mount_policy ();
 
-	/* Build a path table so we can lookup both children mountpoints
-	 * and devices.  Initialise a process list.
-	 */
-	build_paths ();
 	procs = NIH_MUST (nih_list_new (NULL));
 
 	/* Sanity check, the root filesystem should be already mounted */
@@ -2502,17 +2442,8 @@ main (int   argc,
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
 
-
-	/* All of the mountpoints under the root filesystem are now ready
-	 * for mounting, even though it's still read-only.  All of the
-	 * devices will be ready when it's mounted for writing.  This means
-	 * we'll mount all of the nodev filesystems.
-	 *
-	 * Once that's done, mark the root mountpoint itself ready so we
-	 * can remount the root filesystem when the device itself is ready.
-	 */
-	children_ready (root, 1);
-	mountpoint_ready (root);
+	/* See what we can mount straight away */
+	try_mounts ();
 
 	ret = nih_main_loop ();
 

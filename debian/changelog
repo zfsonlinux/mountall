@@ -1,15 +1,27 @@
-mountall (0.1.9) UNRELEASED; urgency=low
-
-  [ Scott James Remnant ]
-  * Flush standard output and error before spawning processes to make
-    capturing logs easier (otherwise we end up repeating things still in
-    the buffer).
+mountall (0.2.0) UNRELEASED; urgency=low
 
   [ Colin Watson ]
   * Always check the root filesystem if --force-fsck is used, regardless of
     passno.  LP: #435707.
 
- -- Scott James Remnant <scott@ubuntu.com>  Sun, 27 Sep 2009 14:50:48 -0700
+  [ Scott James Remnant ]
+  * Flush standard output and error before spawning processes to make
+    capturing logs easier (otherwise we end up repeating things still in
+    the buffer), and before calling exec().
+  * Turn the code upside down so that each mount knows what it's waiting
+    for, and allow multiple dependencies.  This makes the code much more
+    readable putting the "policy" in a single function, and will make it
+    much easier in future when this is done by Upstart.
+  * For kernel filesystems listed in fstab, honour the order that they
+    are listed in fstab.  LP: #432571, #433537, #436796
+  * Always create new swap partition mounts for each fstab entry, don't
+    treat them as updating the same.  LP: #435027.
+  * Virtual filesystems under local or remote filesystems (and local under
+    remote) don't delay the virtual or local events.  LP: #431040.
+  * Fixed issue with trailing slashes.  LP: #443035.
+  * Only run hooks if the filesystem was not already mounted.  LP: #444252.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 07 Oct 2009 17:30:21 +0100
 
 mountall (0.1.8) karmic; urgency=low
 
