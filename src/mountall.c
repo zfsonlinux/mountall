@@ -1710,7 +1710,8 @@ run_fsck_finished (Mount *mnt,
 		return;
 	} else if (status & (8 | 16 | 128)) {
 		nih_fatal ("General fsck error");
-		delayed_exit (EXIT_ERROR);
+		if (is_fhs (mnt))
+			delayed_exit (EXIT_ERROR);
 		return;
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s",
