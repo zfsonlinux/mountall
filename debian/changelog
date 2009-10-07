@@ -30,6 +30,8 @@ mountall (0.2.0) UNRELEASED; urgency=low
   * Synchronously mount local and virtual filesystems, I suspect this is
     the real cause behind the XFS races as one will modprobe and the other
     will not (and fail).  LP: #432620.
+  * Synchronously activate swap to avoid out of memory issues when checking
+    the root filesystem.
   * Enumerate existing udev devices on startup, so we don't always have to
     see udev be coldplugged.
 
