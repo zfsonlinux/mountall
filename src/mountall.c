@@ -1886,9 +1886,12 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 		return;
 	}
 
-	/* devmapper and md devices must be "ready" before we'll try them */
+	/* devmapper, md, loop and ram devices must be "ready" before
+	 * we'll try them */
 	if ((! strncmp (kernel, "dm-", 3))
-	    || (! strncmp (kernel, "md", 2))) {
+	    || (! strncmp (kernel, "md", 2))
+	    || (! strncmp (kernel, "loop", 4))
+	    || (! strncmp (kernel, "ram", 3))) {
 		const char *usage;
 		const char *type;
 
