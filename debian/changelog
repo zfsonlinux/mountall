@@ -18,6 +18,9 @@ mountall (0.2.0) UNRELEASED; urgency=low
     treat them as updating the same.  LP: #435027.
   * Virtual filesystems under local or remote filesystems (and local under
     remote) don't delay the virtual or local events.  LP: #431040.
+  * Simplify event emission, this has the advantage that we can now output
+    what mount points we're waiting for and what they are waiting for as
+    well.
   * Fixed issue with trailing slashes.  LP: #443035.
   * Only run hooks if the filesystem was not already mounted.  LP: #444252.
   * Ignore loop and ram devices until ready.  LP: #441454.
