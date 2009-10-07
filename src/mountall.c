@@ -322,7 +322,7 @@ static int fsck_fix = FALSE;
  * Set to the number of hours grace files and directories in /tmp
  * are given before being removed.
  **/
-static int tmptime = 0;
+static int tmptime = -1;
 
 
 static void
