@@ -202,7 +202,7 @@ static const struct {
 } builtins[] = {
 	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL         },
 	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL         },
-	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", NULL,                              NULL         },
+	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid",             NULL         },
 	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL         },
 	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     NULL,                              NULL         },
 	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     NULL,                              NULL         },
@@ -915,30 +915,6 @@ mount_policy (void)
  	NIH_LIST_FOREACH_SAFE (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		/* Drop anything with ignore as its type. */
-		if (mnt->type && (! strcmp (mnt->type, "ignore"))) {
-			nih_debug ("%s: dropping ignored filesystem",
-				   mnt->mountpoint);
-			nih_free (mnt);
-			return;
-		}
-
-		/* Drop anything that's not auto-mounted which isn't already
-		 * mounted.
-		 */
-		if (has_option (mnt, "noauto", FALSE) && (! mnt->mounted)) {
-			nih_debug ("%s: dropping noauto filesystem",
-				   mnt->mountpoint);
-			nih_free (mnt);
-			return;
-		}
-	}
-
- 	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-		Mount *mount_parent = NULL;
-		Mount *device_parent = NULL;
-
 		/* Check through the known filesystems, if this is a nodev
 		 * filesystem then mark the mount as such so we don't wait
 		 * for any device to be ready.
@@ -948,16 +924,54 @@ mount_policy (void)
 
 			for (j = 0; j < num_filesystems; j++) {
 				if ((! strcmp (mnt->type, filesystems[j].name))
-				    && filesystems[j].nodev)
+				    && filesystems[j].nodev) {
 					mnt->nodev = TRUE;
+					break;
+				}
+			}
+
+			/* If there's no device spec for this filesystem,
+			 * and no options, it's a built-in that we might
+			 * not work on this architecture, so ignore it.
+			 */
+			if ((! mnt->device) && (! mnt->opts)
+			    && (j == num_filesystems)) {
+				nih_debug ("%s: dropping unknown filesystem",
+					   mnt->mountpoint);
+				nih_free (mnt);
+				continue;
+			}
+
+			/* Otherwise If there's no device, it's implicitly
+			 * nodev whether or not we know about the filesystem.
+			 */
+			if (! mnt->device)
+				mnt->nodev = TRUE;
+
+			/* Drop anything with ignore as its type. */
+			if (! strcmp (mnt->type, "ignore")) {
+				nih_debug ("%s: dropping ignored filesystem",
+					   mnt->mountpoint);
+				nih_free (mnt);
+				continue;
 			}
 		}
 
-		/* If there's no device, it's implicitly nodev whether or
-		 * not we know about the filesystem.
+		/* Drop anything that's not auto-mounted which isn't already
+		 * mounted.
 		 */
-		if (! mnt->device)
-			mnt->nodev = TRUE;
+		if (has_option (mnt, "noauto", FALSE) && (! mnt->mounted)) {
+			nih_debug ("%s: dropping noauto filesystem",
+				   mnt->mountpoint);
+			nih_free (mnt);
+			continue;
+		}
+	}
+
+ 	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+		Mount *mount_parent = NULL;
+		Mount *device_parent = NULL;
 
 		/* Iterate through the list of mounts, we're looking for the
 		 * parentof the mountpoint (e.g. /var/tmp's parent is /var)
