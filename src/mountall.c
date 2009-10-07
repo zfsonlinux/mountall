@@ -146,7 +146,7 @@ void   parse_filesystems    (void);
 
 void   mount_policy         (void);
 
-void   mounted              (Mount *mnt);
+void   mounted              (Mount *mnt, int try_more);
 void   trigger_events       (void);
 
 void   try_mounts           (void);
@@ -255,7 +255,27 @@ static const char *fhs[] = {
 };
 
 
+/**
+ * mounts:
+ *
+ * List of mounts that we need to process, parsed from /etc/fstab
+ * (with built-ins and previously mounted filesystems added too).
+ * Each list entry is a Mount structure.
+ **/
 NihList *mounts = NULL;
+
+/**
+ * Counters for the different tags, including a special FHS tag for
+ * everything that's not swap or other.
+ **/
+size_t num_local = 0;
+size_t num_local_mounted = 0;
+size_t num_remote = 0;
+size_t num_remote_mounted = 0;
+size_t num_virtual = 0;
+size_t num_virtual_mounted = 0;
+size_t num_swap = 0;
+size_t num_swap_mounted = 0;
 
 Filesystem *filesystems = NULL;
 size_t num_filesystems = 0;
@@ -652,7 +672,7 @@ parse_mountinfo (void)
 
 		mnt = find_mount ("/proc");
 		if (mnt)
-			mnt->mounted = 1;
+			mnt->mounted = TRUE;
 
 		mountinfo = fopen ("/proc/self/mountinfo", "r");
 	}
@@ -752,7 +772,7 @@ parse_mountinfo (void)
 			mnt = new_mount (mountpoint, device, FALSE, type, NULL, NULL);
 		}
 
-		mnt->mounted = 1;
+		mnt->mounted = TRUE;
 		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
 							 mount_opts, super_opts));
 	}
@@ -892,10 +912,8 @@ is_remote (Mount *mnt)
 void
 mount_policy (void)
 {
-	NIH_LIST_FOREACH_SAFE (mounts, iter) {
+ 	NIH_LIST_FOREACH_SAFE (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
-		Mount *mount_parent = NULL;
-		Mount *device_parent = NULL;
 
 		/* Drop anything with ignore as its type. */
 		if (mnt->type && (! strcmp (mnt->type, "ignore"))) {
@@ -914,6 +932,12 @@ mount_policy (void)
 			nih_free (mnt);
 			return;
 		}
+	}
+
+ 	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+		Mount *mount_parent = NULL;
+		Mount *device_parent = NULL;
 
 		/* Check through the known filesystems, if this is a nodev
 		 * filesystem then mark the mount as such so we don't wait
@@ -929,6 +953,12 @@ mount_policy (void)
 			}
 		}
 
+		/* If there's no device, it's implicitly nodev whether or
+		 * not we know about the filesystem.
+		 */
+		if (! mnt->device)
+			mnt->nodev = TRUE;
+
 		/* Iterate through the list of mounts, we're looking for the
 		 * parentof the mountpoint (e.g. /var/tmp's parent is /var)
 		 * and the parent mountpoint of the device spec
@@ -937,13 +967,9 @@ mount_policy (void)
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *other = (Mount *)iter;
 
-			/* Skip this mount entry, taking care of skipping over
-			 * the cursor from the outer loop as well.
-			 */
-			if (other == mnt) {
-				iter = iter->next;
+			/* Skip this mount entry */
+			if (other == mnt)
 				continue;
-			}
 
 			/* Is this a parent of our mountpoint? */
 			if (mnt->mountpoint && other->mountpoint
@@ -1045,35 +1071,52 @@ mount_policy (void)
 		/* Tag the filesystem so we know which event it blocks */
 		if (is_swap (mnt)) {
 			mnt->tag = TAG_SWAP;
+			num_swap++;
 			nih_debug ("%s is swap", mnt->device);
 		} else if (! strcmp (mnt->mountpoint, "/")) {
 			mnt->tag = TAG_LOCAL;
+			num_local++;
 			nih_debug ("%s is local (root)", mnt->mountpoint);
 		} else if (mount_parent && (mount_parent->tag == TAG_OTHER)) {
 			mnt->tag = TAG_OTHER;
 			nih_debug ("%s is other (inherited)", mnt->mountpoint);
 		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)) {
 			mnt->tag = TAG_LOCAL;
+			num_local++;
 			nih_debug ("%s is local (inherited)", mnt->mountpoint);
 		} else if (mount_parent && (mount_parent->tag == TAG_REMOTE)) {
 			mnt->tag = TAG_REMOTE;
+			num_remote++;
 			nih_debug ("%s is remote (inherited)", mnt->mountpoint);
 		} else if (is_fhs (mnt)) {
 			if (is_remote (mnt)) {
 				mnt->tag = TAG_REMOTE;
+				num_remote++;
 				nih_debug ("%s is remote", mnt->mountpoint);
 			} else if (mnt->nodev
 				   && ((! mnt->type)
 				       || strcmp (mnt->type, "fuse"))) {
 				mnt->tag = TAG_VIRTUAL;
+				num_virtual++;
 				nih_debug ("%s is virtual", mnt->mountpoint);
 			} else {
 				mnt->tag = TAG_LOCAL;
+				num_local++;
 				nih_debug ("%s is local", mnt->mountpoint);
 			}
 		} else {
 			nih_debug ("%s is other (default)", mnt->mountpoint);
 		}
+	}
+
+ 	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		/* If it's already mounted, keep count of events and run hooks
+		 * and such.
+		 */
+		if (mnt->mounted)
+			mounted (mnt, FALSE);
 	}
 }
 
@@ -1092,7 +1135,8 @@ needs_remount (Mount *mnt)
 }
 
 void
-mounted (Mount *mnt)
+mounted (Mount *mnt,
+	 int    try_more)
 {
 	nih_assert (mnt != NULL);
 
@@ -1106,7 +1150,7 @@ mounted (Mount *mnt)
 		}
 	}
 
-	mnt->mounted = 1;
+	mnt->mounted = TRUE;
 
 	/* Any previous mount options no longer apply
 	 * (ie. we're not read-only anymore)
@@ -1115,147 +1159,86 @@ mounted (Mount *mnt)
 		nih_unref (mnt->mount_opts, mounts);
 	mnt->mount_opts = NULL;
 
-	if (! written_mtab)
+	if ((! written_mtab) && try_more)
 		write_mtab ();
 
-	/* Trigger any new events, and see if we can mount anything
-	 * else.
-	 */
-	trigger_events ();
-	try_mounts ();
-}
+	/* Does mounting this filesystem mean that we trigger a new event? */
+	switch (mnt->tag) {
+	case TAG_LOCAL:
+		if (++num_local_mounted == num_local) {
+			nih_info ("local finished");
+			emit_event ("local-filesystems");
 
-void
-trigger_events (void)
-{
-	size_t     num_virtual = 0;
-	size_t     num_virtual_mounted = 0;
-	static int virtual_triggered = FALSE;
-	size_t     num_swap = 0;
-	size_t     num_swap_mounted = 0;
-	static int swap_triggered = FALSE;
-	size_t     num_remote = 0;
-	size_t     num_remote_mounted = 0;
-	static int remote_triggered = FALSE;
-	size_t     num_local = 0;
-	size_t     num_local_mounted = 0;
-	static int local_triggered = FALSE;
-	size_t     num_fhs = 0;
-	size_t     num_fhs_mounted = 0;
-	static int fhs_triggered = FALSE;
-	size_t     num_mounts = 0;
-	size_t     num_mounted = 0;
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		switch (mnt->tag) {
-		case TAG_OTHER:
-			num_mounts++;
-			if (mnt->mounted)
-				num_mounted++;
-			break;
-		case TAG_LOCAL:
-			num_fhs++;
-			num_local++;
-			num_mounts++;
-			if (mnt->mounted && (! needs_remount (mnt))) {
-				num_fhs_mounted++;
-				num_local_mounted++;
-				num_mounted++;
-			} else {
-				nih_debug ("local: waiting for %s", mnt->mountpoint);
+			if ((num_remote_mounted == num_remote)
+			    && (num_virtual_mounted == num_virtual)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
 			}
-			break;
-		case TAG_REMOTE:
-			num_fhs++;
-			num_remote++;
-			num_mounts++;
-			if (mnt->mounted) {
-				num_fhs_mounted++;
-				num_remote_mounted++;
-				num_mounted++;
-			} else {
-				nih_debug ("remote: waiting for %s", mnt->mountpoint);
-			}
-			break;
-		case TAG_VIRTUAL:
-			num_fhs++;
-			num_virtual++;
-			num_mounts++;
-			if (mnt->mounted) {
-				num_fhs_mounted++;
-				num_virtual_mounted++;
-				num_mounted++;
-			} else {
-				nih_debug ("virtual: waiting for %s", mnt->mountpoint);
-			}
-			break;
-		case TAG_SWAP:
-			num_swap++;
-			num_mounts++;
-			if (mnt->mounted) {
-				num_swap_mounted++;
-				num_mounted++;
-			} else {
-				nih_debug ("swap: waiting for %s", mnt->device);
-			}
-			break;
 		}
+		break;
+	case TAG_REMOTE:
+		if (++num_remote_mounted == num_remote) {
+			nih_info ("remote finished");
+			emit_event ("remote-filesystems");
+
+			if ((num_local_mounted == num_local)
+			    && (num_virtual_mounted == num_virtual)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
+			}
+		}
+		break;
+	case TAG_VIRTUAL:
+		if (++num_virtual_mounted == num_virtual) {
+			nih_info ("virtual finished");
+			emit_event ("virtual-filesystems");
+
+			if ((num_local_mounted == num_local)
+			    && (num_remote_mounted == num_remote)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
+			}
+		}
+		break;
+	case TAG_SWAP:
+		if (++num_swap_mounted == num_swap) {
+			nih_info ("swap finished");
+			emit_event ("all-swaps");
+		}
+		break;
+	default:
+		/* other ignored */
+		;
 	}
 
-	nih_debug ("virtual %zi/%zi remote %zi/%zi local %zi/%zi (%zi/%zi) swap %zi/%zi [%zi/%zi]",
-		   num_virtual_mounted, num_virtual,
-		   num_remote_mounted, num_remote,
+	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
 		   num_local_mounted, num_local,
-		   num_fhs_mounted, num_fhs,
-		   num_swap_mounted, num_swap,
-		   num_mounted, num_mounts);
+		   num_remote_mounted, num_remote,
+		   num_virtual_mounted, num_virtual,
+		   num_swap_mounted, num_swap);
 
-	if ((! virtual_triggered) && (num_virtual_mounted == num_virtual)) {
-		nih_info ("virtual filesystems finished");
-		emit_event ("virtual-filesystems");
-		virtual_triggered = TRUE;
-	}
-	if ((! remote_triggered) && (num_remote_mounted == num_remote)) {
-		nih_info ("remote finished");
-		emit_event ("remote-filesystems");
-		remote_triggered = TRUE;
-	}
-	if ((! local_triggered) && (num_local_mounted == num_local)) {
-		nih_info ("local finished");
-		emit_event ("local-filesystems");
-		local_triggered = TRUE;
-	}
-	if ((! fhs_triggered) && (num_fhs_mounted == num_fhs)) {
-		nih_info ("fhs mounted");
-		emit_event ("filesystem");
-		fhs_triggered = TRUE;
-	}
-
-	if ((! swap_triggered) && (num_swap_mounted == num_swap)) {
-		nih_info ("swap finished");
-		emit_event ("all-swaps");
-		swap_triggered = TRUE;
-	}
-
-	if (num_mounted == num_mounts) {
-		nih_info ("finished");
-		emit_event ("all-filesystems");
-		nih_main_loop_exit (EXIT_OK);
-	}
+	/* Try mounting something else */
+	if (try_more)
+		try_mounts ();
 }
 
 
 void
 try_mounts (void)
 {
+	int all = TRUE;
+
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (! mnt->mounted)
+		if (! mnt->mounted) {
+			all = FALSE;
 			try_mount (mnt, FALSE);
+		}
 	}
+
+	if (all)
+		nih_main_loop_exit (0);
 }
 
 void
@@ -1270,7 +1253,8 @@ try_mount (Mount *mnt,
 
 		if (! dep->mounted) {
 			nih_debug ("%s waiting for %s",
-				   mnt->mountpoint, dep->mountpoint);
+				   is_swap (mnt) ? mnt->device : mnt->mountpoint,
+				   dep->mountpoint);
 			return;
 		}
 	}
@@ -1292,6 +1276,11 @@ try_mount (Mount *mnt,
 		} else {
 			run_mount (mnt, FALSE);
 		}
+	} else if (is_swap (mnt)) {
+		nih_debug ("%s waiting for device", mnt->device);
+	} else {
+		nih_debug ("%s waiting for device %s",
+			   mnt->mountpoint, mnt->device);
 	}
 }
 
@@ -1456,12 +1445,12 @@ run_mount (Mount *mnt,
 			nih_info ("remounting %s", mnt->mountpoint);
 		} else {
 			nih_debug ("%s: already mounted", mnt->mountpoint);
-			mounted (mnt);
+			mounted (mnt, TRUE);
 			return;
 		}
 	} else if (! mnt->type) {
 		nih_debug ("%s: hook", mnt->mountpoint);
-		mounted (mnt);
+		mounted (mnt, TRUE);
 		return;
 	} else {
 		nih_info ("mounting %s", mnt->mountpoint);
@@ -1556,7 +1545,7 @@ run_mount_finished (Mount *mnt,
 
 	if (mnt->has_showthrough)
 		mount_showthrough (mnt);
-	mounted (mnt);
+	mounted (mnt, TRUE);
 }
 
 
@@ -1572,7 +1561,7 @@ run_swapon (Mount *mnt)
 
 	if (mnt->mounted) {
 		nih_debug ("%s: already activated", mnt->device);
-		mounted (mnt);
+		mounted (mnt, TRUE);
 		return;
 	} else if (mnt->mount_pid > 0) {
 		nih_debug ("%s: already activating", mnt->device);
@@ -1610,7 +1599,7 @@ run_swapon_finished (Mount *mnt,
 	if (status)
 		nih_warn ("Problem activating swap: %s", mnt->device);
 
-	mounted (mnt);
+	mounted (mnt, TRUE);
 }
 
 
@@ -2364,22 +2353,27 @@ main (int   argc,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
 
+	mounts = NIH_MUST (nih_list_new (NULL));
+	procs = NIH_MUST (nih_list_new (NULL));
+
+	/* Parse /proc/filesystems to find out which filesystems don't
+	 * have devices.
+	 */
+	parse_filesystems ();
+
 	/* Initialse mount table with built-in filesystems, then parse
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
-	 * we need to do.  Parse /proc/filesystems to see which don't
-	 * have devices, then apply the policy.
+	 * we need to do.
 	 */
-	mounts = NIH_MUST (nih_list_new (NULL));
 	for (builtin = builtins; builtin->mountpoint; builtin++)
 		new_mount (builtin->mountpoint, builtin->device, builtin->check,
 			   builtin->type, builtin->opts, builtin->hook);
 
 	parse_fstab ();
 	parse_mountinfo ();
-	parse_filesystems ();
-	mount_policy ();
 
-	procs = NIH_MUST (nih_list_new (NULL));
+	/* Apply policy as to what waits for what, etc. */
+	mount_policy ();
 
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
