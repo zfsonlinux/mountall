@@ -177,6 +177,8 @@ void   emit_event_error     (void *data, NihDBusMessage *message);
 
 void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     NihIoWatch *watch, NihIoEvents events);
+void   udev_catchup         (struct udev *udev);
+
 void   usr1_handler         (void *data, NihSignal *signal);
 
 int    dev_hook             (Mount *mnt);
@@ -1853,60 +1855,49 @@ emit_event_error (void *          data,
 }
 
 
-void
-udev_monitor_watcher (struct udev_monitor *udev_monitor,
-		      NihIoWatch *         watch,
-		      NihIoEvents          events)
+static void
+try_udev_device (struct udev_device *udev_device)
 {
-	struct udev_device *    udev_device;
 	const char *            action;
 	const char *            subsystem;
 	const char *            kernel;
 	const char *            devname;
+	const char *            usage;
+	const char *            type;
 	const char *            uuid;
 	const char *            label;
 	struct udev_list_entry *devlinks;
-
-	udev_device = udev_monitor_receive_device (udev_monitor);
-	if (! udev_device)
-		return;
 
 	action    = udev_device_get_action (udev_device);
 	subsystem = udev_device_get_subsystem (udev_device);
 	kernel    = udev_device_get_sysname (udev_device);
 	devname   = udev_device_get_devnode (udev_device);
 	devlinks  = udev_device_get_devlinks_list_entry (udev_device);
+	usage     = udev_device_get_property_value (udev_device, "ID_FS_USAGE");
+	type      = udev_device_get_property_value (udev_device, "ID_FS_TYPE");
 	uuid      = udev_device_get_property_value (udev_device, "ID_FS_UUID");
 	label     = udev_device_get_property_value (udev_device, "ID_FS_LABEL");
 
 	if ((! subsystem)
-	    || strcmp (subsystem, "block")) {
-		udev_device_unref (udev_device);
+	    || strcmp (subsystem, "block"))
 		return;
-	}
 
-	if ((! action)
-	    || (strcmp (action, "add")
-	        && strcmp (action, "change"))) {
-		udev_device_unref (udev_device);
+	if (action
+	    && strcmp (action, "add")
+	    && strcmp (action, "change"))
 		return;
-	}
 
 	/* devmapper, md, loop and ram devices must be "ready" before
-	 * we'll try them */
-	if ((! strncmp (kernel, "dm-", 3))
+	 * we'll try them - as must any device we found without udev.
+	 */
+	if ((! action)
+	    || (! strncmp (kernel, "dm-", 3))
 	    || (! strncmp (kernel, "md", 2))
 	    || (! strncmp (kernel, "loop", 4))
 	    || (! strncmp (kernel, "ram", 3))) {
-		const char *usage;
-		const char *type;
-
-		usage = udev_device_get_property_value (udev_device, "ID_FS_USAGE");
-		type = udev_device_get_property_value (udev_device, "ID_FS_TYPE");
-
-		if ((! usage) && (! type)) {
-			nih_debug ("ignored %s (not yet ready?)", devname);
-			udev_device_unref (udev_device);
+		if ((! usage) && (! type) && (! uuid) && (! label)) {
+			if (action)
+				nih_debug ("ignored %s (not yet ready?)", devname);
 			return;
 		}
 	}
@@ -1985,9 +1976,55 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 
 		run_fsck (mnt);
 	}
+}
+
+void
+udev_monitor_watcher (struct udev_monitor *udev_monitor,
+		      NihIoWatch *         watch,
+		      NihIoEvents          events)
+{
+	struct udev_device *udev_device;
+
+	nih_assert (udev_monitor != NULL);
+
+	udev_device = udev_monitor_receive_device (udev_monitor);
+	if (! udev_device)
+		return;
+
+	try_udev_device (udev_device);
 
 	udev_device_unref (udev_device);
 }
+
+void
+udev_catchup (struct udev *udev)
+{
+	struct udev_enumerate * udev_enumerate;
+	struct udev_list_entry *device_path;
+
+	nih_assert (udev != NULL);
+
+	udev_enumerate = udev_enumerate_new (udev);
+	nih_assert (udev_enumerate_add_match_subsystem (udev_enumerate, "block") == 0);
+
+	nih_debug ("catching up");
+
+	udev_enumerate_scan_devices (udev_enumerate);
+
+	for (device_path = udev_enumerate_get_list_entry (udev_enumerate);
+	     device_path != NULL;
+	     device_path = udev_list_entry_get_next (device_path)) {
+		const char *        path = udev_list_entry_get_name (device_path);
+		struct udev_device *udev_device;
+
+		udev_device = udev_device_new_from_syspath (udev, path);
+		if (udev_device)
+			try_udev_device (udev_device);
+
+		udev_device_unref (udev_device);
+	}
+}
+
 
 void
 usr1_handler (void *     data,
@@ -2462,6 +2499,9 @@ main (int   argc,
 
 	/* See what we can mount straight away */
 	try_mounts ();
+
+	/* Catch up with udev */
+	udev_catchup (udev);
 
 	ret = nih_main_loop ();
 
