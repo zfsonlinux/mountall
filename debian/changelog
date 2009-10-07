@@ -23,6 +23,7 @@ mountall (0.2.0) UNRELEASED; urgency=low
     well.
   * Fixed issue with trailing slashes.  LP: #443035.
   * Only run hooks if the filesystem was not already mounted.  LP: #444252.
+  * Don't clean up /tmp when run without --tmptime argument.
   * Ignore loop and ram devices until ready.  LP: #441454.
   * Add options to binfmt_misc filesystem, which will probably cause it to
     be mounted on boot as well.
