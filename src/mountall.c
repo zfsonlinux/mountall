@@ -970,6 +970,19 @@ is_remote (Mount *mnt)
 	}
 }
 
+static int
+needs_remount (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	if (mnt->mounted && has_option (mnt, "ro", TRUE)
+	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
 void
 mount_policy (void)
 {
@@ -1194,20 +1207,6 @@ mount_policy (void)
 			mnt->mounted = FALSE;
 			mounted (mnt, FALSE);
 		}
-	}
-}
-
-
-static int
-needs_remount (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (mnt->mounted && has_option (mnt, "ro", TRUE)
-	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
-		return TRUE;
-	} else {
-		return FALSE;
 	}
 }
 
