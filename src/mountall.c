@@ -1629,7 +1629,7 @@ run_mount_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
-	if (status & ~(16 | 64)) {
+	if (status) {
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
