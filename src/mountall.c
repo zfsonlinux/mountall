@@ -1867,11 +1867,32 @@ queue_fsck (Mount *mnt)
 
 	nih_assert (mnt != NULL);
 
+	if (mnt->ready) {
+		nih_debug ("%s: already ready", mnt->mountpoint);
+		try_mount (mnt, FALSE);
+		return;
+	} else if (! mnt->check
+		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
+		nih_debug ("%s: no check required", mnt->mountpoint);
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
+		return;
+	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
+		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
+		return;
+	} else if (mnt->fsck_pid > 0) {
+		nih_debug ("%s: already checking", mnt->mountpoint);
+		return;
+	}
+
 	entry = NIH_MUST (nih_list_entry_new (fsck_queue));
 	entry->data = mnt;
 	nih_list_add (fsck_queue, &entry->entry);
 
-	nih_debug ("%s: queuing check", mnt->mountpoint);
+	nih_debug ("%s: queuing check",
+		   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 
 	run_fsck_queue ();
 }
@@ -1885,7 +1906,8 @@ run_fsck_queue (void)
 
 		if (run_fsck (mnt)) {
 			nih_free (entry);
-			nih_debug ("%s: dequeuing check", mnt->mountpoint);
+			nih_debug ("%s: dequeuing check",
+				   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		}
 	}
 }
@@ -1902,26 +1924,6 @@ run_fsck (Mount *mnt)
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->device != NULL);
 	nih_assert (mnt->type != NULL);
-
-	if (mnt->ready) {
-		nih_debug ("%s: already ready", mnt->mountpoint);
-		try_mount (mnt, FALSE);
-		return TRUE;
-	} else if (! mnt->check
-		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
-		nih_debug ("%s: no check required", mnt->mountpoint);
-		mnt->ready = TRUE;
-		try_mount (mnt, FALSE);
-		return TRUE;
-	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
-		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
-		mnt->ready = TRUE;
-		try_mount (mnt, FALSE);
-		return TRUE;
-	} else if (mnt->fsck_pid > 0) {
-		nih_debug ("%s: already checking", mnt->mountpoint);
-		return TRUE;
-	}
 
 	update_mount_dev_ids (mnt);
 
