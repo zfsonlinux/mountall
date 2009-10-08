@@ -1931,6 +1931,18 @@ queue_fsck (Mount *mnt)
 		return;
 	}
 
+	NIH_LIST_FOREACH (fsck_queue, iter) {
+		NihListEntry *entry = (NihListEntry *)iter;
+		Mount *qmnt = (Mount *)entry->data;
+
+		if (mnt != qmnt)
+			continue;
+
+		nih_debug ("%s: check already queued",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
+		return;
+	}
+
 	entry = NIH_MUST (nih_list_entry_new (fsck_queue));
 	entry->data = mnt;
 	nih_list_add (fsck_queue, &entry->entry);
