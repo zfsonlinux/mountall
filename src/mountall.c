@@ -511,47 +511,6 @@ update_mount (Mount *     mnt,
 		   mnt->hook ? " hook" : "");
 }
 
-static void
-destroy_device (NihListEntry *entry)
-{
-	struct udev_device *dev;
-
-	nih_assert (entry != NULL);
-
-	dev = (struct udev_device *)entry->data;
-	nih_assert (dev != NULL);
-
-	udev_device_unref (dev);
-	nih_list_destroy (&entry->entry);
-}
-
-static void
-add_device (NihList *           devices,
-	    struct udev_device *srcdev,
-	    struct udev_device *newdev,
-	    size_t *            nadded)
-{
-	NihListEntry *new_entry;
-
-	nih_assert (devices != NULL);
-	nih_assert (newdev != NULL);
-
-	udev_device_ref (newdev);
-
-	new_entry = NIH_MUST (nih_list_entry_new (devices));
-	new_entry->data = newdev;
-	nih_alloc_set_destructor (new_entry, destroy_device);
-	nih_list_add (devices, &new_entry->entry);
-
-	if (nadded)
-		(*nadded)++;
-
-	if (srcdev)
-		nih_debug ("traverse: %s -> %s",
-			   udev_device_get_sysname (srcdev),
-			   udev_device_get_sysname (newdev));
-}
-
 
 int
 has_option (Mount *     mnt,
@@ -1698,8 +1657,51 @@ run_swapon_finished (Mount *mnt,
 }
 
 
+/* destroy_device and add_device are for update_physical_dev_ids only. */
+
 static void
-update_mount_dev_ids (Mount *mnt)
+destroy_device (NihListEntry *entry)
+{
+	struct udev_device *dev;
+
+	nih_assert (entry != NULL);
+
+	dev = (struct udev_device *)entry->data;
+	nih_assert (dev != NULL);
+
+	udev_device_unref (dev);
+	nih_list_destroy (&entry->entry);
+}
+
+static void
+add_device (NihList *           devices,
+	    struct udev_device *srcdev,
+	    struct udev_device *newdev,
+	    size_t *            nadded)
+{
+	NihListEntry *new_entry;
+
+	nih_assert (devices != NULL);
+	nih_assert (newdev != NULL);
+
+	udev_device_ref (newdev);
+
+	new_entry = NIH_MUST (nih_list_entry_new (devices));
+	new_entry->data = newdev;
+	nih_alloc_set_destructor (new_entry, destroy_device);
+	nih_list_add (devices, &new_entry->entry);
+
+	if (nadded)
+		(*nadded)++;
+
+	if (srcdev)
+		nih_debug ("traverse: %s -> %s",
+			   udev_device_get_sysname (srcdev),
+			   udev_device_get_sysname (newdev));
+}
+
+static void
+update_physical_dev_ids (Mount *mnt)
 {
 	nih_local NihList *devices = NULL;
 	NihHash *          results;
@@ -1832,7 +1834,7 @@ fsck_lock (Mount *mnt)
 	if (! mnt->udev_device)
 		return TRUE;
 
-	update_mount_dev_ids (mnt);
+	update_physical_dev_ids (mnt);
 
 	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
 		char *dev_id = ((NihListEntry *)iter)->str;
