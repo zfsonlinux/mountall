@@ -1188,9 +1188,9 @@ mount_policy (void)
 		Mount *mnt = (Mount *)iter;
 
 		/* If it's already mounted, keep count of events and run hooks
-		 * and such.
+		 * and such, unless we still need to remount it.
 		 */
-		if (mnt->mounted) {
+		if (mnt->mounted && (! needs_remount (mnt))) {
 			mnt->mounted = FALSE;
 			mounted (mnt, FALSE);
 		}
@@ -1314,7 +1314,7 @@ try_mounts (void)
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (! mnt->mounted) {
+		if ((! mnt->mounted) || needs_remount (mnt)) {
 			all = FALSE;
 			try_mount (mnt, FALSE);
 		}
@@ -2336,7 +2336,8 @@ usr1_handler (void *     data,
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (is_remote (mnt) && (! mnt->mounted))
+		if (is_remote (mnt)
+		    && ((! mnt->mounted) || needs_remount (mnt)))
 			try_mount (mnt, TRUE);
 	}
 }
