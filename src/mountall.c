@@ -138,7 +138,6 @@ Mount *find_mount           (const char *mountpoint);
 void   update_mount         (Mount *mnt, const char *device, int check,
 			     const char *type, const char *opts,
 			     MountHook hook);
-void   update_mount_dev_ids (Mount *mnt);
 
 int    has_option           (Mount *mnt, const char *option, int current);
 char * get_option           (const void *parent, Mount *mnt, const char *option,
@@ -551,128 +550,6 @@ add_device (NihList *           devices,
 		nih_debug ("traverse: %s -> %s",
 			   udev_device_get_sysname (srcdev),
 			   udev_device_get_sysname (newdev));
-}
-
-void
-update_mount_dev_ids (Mount *mnt)
-{
-	nih_local NihList *devices = NULL;
-	NihHash *          results;
-	struct udev *      udev;
-
-	nih_assert (mnt != NULL);
-	nih_assert (mnt->udev_device != NULL);
-
-	if (! mnt->physical_dev_ids_needed)
-		return;
-
-	mnt->physical_dev_ids_needed = FALSE;
-
-	if (mnt->physical_dev_ids) {
-		nih_free (mnt->physical_dev_ids);
-		nih_debug ("recomputing physical_dev_ids for %s",
-			   mnt->mountpoint);
-	}
-
-	results = NIH_MUST (nih_hash_string_new (mnt, 10));
-	mnt->physical_dev_ids = results;
-
-	nih_assert (udev = udev_device_get_udev (mnt->udev_device));
-
-	devices = NIH_MUST (nih_list_new (NULL));
-	add_device (devices, NULL, mnt->udev_device, NULL);
-
-	while (! NIH_LIST_EMPTY (devices)) {
-		NihListEntry *      entry;
-
-		struct udev_device *dev;
-		struct udev_device *newdev;
-
-		size_t              nadded;
-
-		const char *        syspath;
-		nih_local char *    slavespath = NULL;
-
-		const char *        dev_id;
-
-		DIR *               dir;
-		struct dirent *     ent;
-
-		entry = (NihListEntry *)devices->next;
-		dev = (struct udev_device *)entry->data;
-
-		/* Does this device have a parent? */
-
-		newdev = udev_device_get_parent_with_subsystem_devtype (
-			dev, "block", "disk");
-		if (newdev) {
-			add_device (devices, dev, newdev, NULL);
-			goto finish;
-		}
-
-		/* Does this device have slaves? */
-
-		nadded = 0;
-
-		nih_assert (syspath = udev_device_get_syspath (dev));
-		slavespath = NIH_MUST (nih_sprintf (NULL, "%s/slaves",
-						    syspath));
-
-		if ((dir = opendir (slavespath))) {
-			while ((ent = readdir (dir))) {
-				nih_local char *slavepath = NULL;
-
-				if ((! strcmp (ent->d_name, "."))
-				    || (! strcmp (ent->d_name, "..")))
-					continue;
-
-				slavepath = NIH_MUST (nih_sprintf (NULL,
-					"%s/%s", slavespath, ent->d_name));
-
-				newdev = udev_device_new_from_syspath (
-					udev, slavepath);
-				if (! newdev) {
-					nih_warn ("%s: %s", slavepath,
-						  "udev_device_new_from_syspath"
-						  " failed");
-					continue;
-				}
-
-				add_device (devices, dev, newdev, &nadded);
-				udev_device_unref (newdev);
-			}
-
-			closedir (dir);
-		} else if (errno != ENOENT) {
-			nih_warn ("%s: opendir: %s", slavespath,
-				  strerror (errno));
-		}
-
-		if (nadded > 0)
-			goto finish;
-
-		/* This device has no parents or slaves; we’ve reached the
-		 * physical device.
-		 */
-
-		dev_id = udev_device_get_sysattr_value (dev, "dev");
-		if (dev_id) {
-			nih_local NihListEntry *entry = NULL;
-
-			entry = NIH_MUST (nih_list_entry_new (results));
-			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
-
-			if (nih_hash_add_unique (results, &entry->entry)) {
-				nih_debug ("results: %s -> %s",
-					   mnt->mountpoint, dev_id);
-			}
-		} else {
-			nih_warn ("%s: failed to get sysattr 'dev'", syspath);
-		}
-
-finish:
-		nih_free (entry);
-	}
 }
 
 
@@ -1465,28 +1342,40 @@ try_mount (Mount *mnt,
 		}
 	}
 
-	/* Make sure that the underlying device is ready; we ignore this
-	 * for kernel filesystems (which don't have a device), remote
-	 * filesystems that are already mounted for writing and those
-	 * built-ins without a type (ie. hooks).
+	/* If there's an underlying device that udev is going to deal with,
+	 * or it's a remote filesystem, we wait for the udev watcher or the
+	 * USR1 signal function to mark it ready.
 	 */
-	if (force
-	    || mnt->ready
-	    || mnt->nodev
-	    || (is_remote (mnt) && mnt->mounted && (! needs_remount (mnt)))
-	    || (! mnt->type))
+	if ((! mnt->ready)
+	    && (! force)
+	    && (((! mnt->nodev)
+		 && mnt->device
+		 && ((! strncmp (mnt->device, "/dev/", 5))
+		     || (! strncmp (mnt->device, "UUID=", 5))
+		     || (! strncmp (mnt->device, "LABEL=", 6))))
+		|| (is_remote (mnt)
+		    && ((! mnt->mounted)
+			|| needs_remount (mnt)))))
 	{
-		/* Run swapon or mount as appropriate */
 		if (is_swap (mnt)) {
-			run_swapon (mnt);
+			nih_debug ("%s waiting for device", mnt->device);
 		} else {
-			run_mount (mnt, FALSE);
+			nih_debug ("%s waiting for device %s",
+				   mnt->mountpoint, mnt->device);
 		}
+
+		return;
+	}
+
+	/* Queue a filesystem check if not yet ready, otherwise run
+	 * swapon or mount as appropriate.
+	 */
+	if (! mnt->ready) {
+		queue_fsck (mnt);
 	} else if (is_swap (mnt)) {
-		nih_debug ("%s waiting for device", mnt->device);
+		run_swapon (mnt);
 	} else {
-		nih_debug ("%s waiting for device %s",
-			   mnt->mountpoint, mnt->device);
+		run_mount (mnt, FALSE);
 	}
 }
 
@@ -1810,6 +1699,128 @@ run_swapon_finished (Mount *mnt,
 }
 
 
+static void
+update_mount_dev_ids (Mount *mnt)
+{
+	nih_local NihList *devices = NULL;
+	NihHash *          results;
+	struct udev *      udev;
+
+	nih_assert (mnt != NULL);
+	nih_assert (mnt->udev_device != NULL);
+
+	if (! mnt->physical_dev_ids_needed)
+		return;
+
+	mnt->physical_dev_ids_needed = FALSE;
+
+	if (mnt->physical_dev_ids) {
+		nih_free (mnt->physical_dev_ids);
+		nih_debug ("recomputing physical_dev_ids for %s",
+			   mnt->mountpoint);
+	}
+
+	results = NIH_MUST (nih_hash_string_new (mnt, 10));
+	mnt->physical_dev_ids = results;
+
+	nih_assert (udev = udev_device_get_udev (mnt->udev_device));
+
+	devices = NIH_MUST (nih_list_new (NULL));
+	add_device (devices, NULL, mnt->udev_device, NULL);
+
+	while (! NIH_LIST_EMPTY (devices)) {
+		NihListEntry *      entry;
+
+		struct udev_device *dev;
+		struct udev_device *newdev;
+
+		size_t              nadded;
+
+		const char *        syspath;
+		nih_local char *    slavespath = NULL;
+
+		const char *        dev_id;
+
+		DIR *               dir;
+		struct dirent *     ent;
+
+		entry = (NihListEntry *)devices->next;
+		dev = (struct udev_device *)entry->data;
+
+		/* Does this device have a parent? */
+
+		newdev = udev_device_get_parent_with_subsystem_devtype (
+			dev, "block", "disk");
+		if (newdev) {
+			add_device (devices, dev, newdev, NULL);
+			goto finish;
+		}
+
+		/* Does this device have slaves? */
+
+		nadded = 0;
+
+		nih_assert (syspath = udev_device_get_syspath (dev));
+		slavespath = NIH_MUST (nih_sprintf (NULL, "%s/slaves",
+						    syspath));
+
+		if ((dir = opendir (slavespath))) {
+			while ((ent = readdir (dir))) {
+				nih_local char *slavepath = NULL;
+
+				if ((! strcmp (ent->d_name, "."))
+				    || (! strcmp (ent->d_name, "..")))
+					continue;
+
+				slavepath = NIH_MUST (nih_sprintf (NULL,
+					"%s/%s", slavespath, ent->d_name));
+
+				newdev = udev_device_new_from_syspath (
+					udev, slavepath);
+				if (! newdev) {
+					nih_warn ("%s: %s", slavepath,
+						  "udev_device_new_from_syspath"
+						  " failed");
+					continue;
+				}
+
+				add_device (devices, dev, newdev, &nadded);
+				udev_device_unref (newdev);
+			}
+
+			closedir (dir);
+		} else if (errno != ENOENT) {
+			nih_warn ("%s: opendir: %s", slavespath,
+				  strerror (errno));
+		}
+
+		if (nadded > 0)
+			goto finish;
+
+		/* This device has no parents or slaves; we’ve reached the
+		 * physical device.
+		 */
+
+		dev_id = udev_device_get_sysattr_value (dev, "dev");
+		if (dev_id) {
+			nih_local NihListEntry *entry = NULL;
+
+			entry = NIH_MUST (nih_list_entry_new (results));
+			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
+
+			if (nih_hash_add_unique (results, &entry->entry)) {
+				nih_debug ("results: %s -> %s",
+					   mnt->mountpoint, dev_id);
+			}
+		} else {
+			nih_warn ("%s: failed to get sysattr 'dev'", syspath);
+		}
+
+finish:
+		nih_free (entry);
+	}
+}
+
 /* Returns: TRUE if the devices were successfully locked; FALSE if something
  * else had already locked one or more of them.
  */
@@ -1817,7 +1828,12 @@ int
 fsck_lock (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
-	nih_assert (mnt->physical_dev_ids != NULL);
+
+	/* No underlying device -> always check */
+	if (! mnt->udev_device)
+		return TRUE;
+
+	update_mount_dev_ids (mnt);
 
 	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
 		char *dev_id = ((NihListEntry *)iter)->str;
@@ -1845,7 +1861,9 @@ void
 fsck_unlock (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
-	nih_assert (mnt->physical_dev_ids != NULL);
+
+	if (! mnt->physical_dev_ids)
+		return;
 
 	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
 		char *        dev_id = ((NihListEntry *)iter)->str;
@@ -1868,22 +1886,26 @@ queue_fsck (Mount *mnt)
 	nih_assert (mnt != NULL);
 
 	if (mnt->ready) {
-		nih_debug ("%s: already ready", mnt->mountpoint);
+		nih_debug ("%s: already ready",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		try_mount (mnt, FALSE);
 		return;
 	} else if (! mnt->check
 		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
-		nih_debug ("%s: no check required", mnt->mountpoint);
+		nih_debug ("%s: no check required",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		mnt->ready = TRUE;
 		try_mount (mnt, FALSE);
 		return;
 	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
-		nih_debug ("%s: mounted filesystem", mnt->mountpoint);
+		nih_debug ("%s: mounted filesystem",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		mnt->ready = TRUE;
 		try_mount (mnt, FALSE);
 		return;
 	} else if (mnt->fsck_pid > 0) {
-		nih_debug ("%s: already checking", mnt->mountpoint);
+		nih_debug ("%s: already checking",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		return;
 	}
 
@@ -1924,8 +1946,6 @@ run_fsck (Mount *mnt)
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->device != NULL);
 	nih_assert (mnt->type != NULL);
-
-	update_mount_dev_ids (mnt);
 
 	if (! fsck_lock (mnt))
 		/* Another instance has already locked one or more of the
