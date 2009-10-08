@@ -106,6 +106,7 @@ struct mount {
 	NihList             deps;
 
 	MountHook           hook;
+	int                 triggers_done;
 };
 
 typedef struct filesystem {
@@ -433,6 +434,8 @@ new_mount (const char *mountpoint,
 	nih_list_init (&mnt->deps);
 
 	mnt->hook = hook;
+
+	mnt->triggers_done = FALSE;
 
 	nih_alloc_set_destructor (mnt, nih_list_destroy);
 	nih_list_add (mounts, &mnt->entry);
@@ -1182,18 +1185,18 @@ void
 mounted (Mount *mnt,
 	 int    try_more)
 {
-	int first_mount = FALSE;
+	int trigger;
 
 	nih_assert (mnt != NULL);
 
 	nih_debug ("%s", mnt->mountpoint);
 
-	if (! mnt->mounted) {
-		first_mount = TRUE;
-		mnt->mounted = TRUE;
-	}
+	trigger = ! mnt->triggers_done;
+	mnt->triggers_done = TRUE;
 
-	if (mnt->hook && first_mount) {
+	mnt->mounted = TRUE;
+
+	if (mnt->hook && trigger) {
 		if (mnt->hook (mnt) < 0) {
 			delayed_exit (EXIT_ERROR);
 			return;
@@ -1211,7 +1214,7 @@ mounted (Mount *mnt,
 		write_mtab ();
 
 	/* Does mounting this filesystem mean that we trigger a new event? */
-	if (first_mount) {
+	if (trigger) {
 		switch (mnt->tag) {
 		case TAG_LOCAL:
 			if (++num_local_mounted == num_local) {
