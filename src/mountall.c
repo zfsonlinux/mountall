@@ -405,7 +405,7 @@ new_mount (const char *mountpoint,
 	mnt->device = device ? NIH_MUST (nih_strdup (mounts, device)) : NULL;
 	mnt->udev_device = NULL;
 	mnt->physical_dev_ids = NULL;
-	mnt->physical_dev_ids_needed = FALSE;
+	mnt->physical_dev_ids_needed = TRUE;
 	mnt->fsck_pid = -1;
 	mnt->ready = FALSE;
 
@@ -1716,7 +1716,6 @@ update_physical_dev_ids (Mount *mnt)
 	NihHash *          results;
 
 	nih_assert (mnt != NULL);
-	nih_assert (mnt->udev_device != NULL);
 
 	if (! mnt->physical_dev_ids_needed)
 		return;
@@ -1733,7 +1732,26 @@ update_physical_dev_ids (Mount *mnt)
 	mnt->physical_dev_ids = results;
 
 	devices = NIH_MUST (nih_list_new (NULL));
-	add_device (devices, NULL, mnt->udev_device, NULL);
+
+	if (mnt->udev_device) {
+		add_device (devices, NULL, mnt->udev_device, NULL);
+	} else {
+		struct stat         sb;
+		struct udev_device *dev;
+
+		/* Is it a loop file? */
+
+		if ((stat (mnt->device, &sb) == 0)
+		    && S_ISREG (sb.st_mode)
+		    && (dev = udev_device_new_from_devnum (udev, 'b',
+							   sb.st_dev))) {
+			add_device (devices, NULL, dev, NULL);
+			udev_device_unref (dev);
+		} else {
+			nih_debug ("%s: couldn't resolve physical devices",
+				   mnt->device);
+		}
+	}
 
 	while (! NIH_LIST_EMPTY (devices)) {
 		NihListEntry *      entry;
@@ -1835,10 +1853,6 @@ int
 fsck_lock (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
-
-	/* No underlying device -> always check */
-	if (! mnt->udev_device)
-		return TRUE;
 
 	update_physical_dev_ids (mnt);
 
