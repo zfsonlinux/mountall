@@ -1944,6 +1944,15 @@ queue_fsck (Mount *mnt)
 		mnt->ready = TRUE;
 		try_mount (mnt, FALSE);
 		return;
+	} else if ((! mnt->device)
+		   || mnt->nodev
+		   || (! mnt->type)
+		   || (! strcmp (mnt->type, "none"))) {
+		nih_debug ("%s: no device to check",
+			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
+		return;
 	} else if (mnt->mounted && (! has_option (mnt, "ro", TRUE))) {
 		nih_debug ("%s: mounted filesystem",
 			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
