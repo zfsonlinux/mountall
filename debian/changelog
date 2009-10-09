@@ -46,6 +46,8 @@ mountall (0.2.0) UNRELEASED; urgency=low
   * Don't repeat attempts to mount a filesystem without having first
     succeded to mount another.
   * Still restart mountall even if the recovery shell fails.
+  * Don't queue filesystem check when device is "none", or missing, or the
+    filesystem is marked nodev.
 
  -- Scott James Remnant <scott@ubuntu.com>  Thu, 08 Oct 2009 00:54:40 +0100
 
