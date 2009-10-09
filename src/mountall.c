@@ -330,7 +330,7 @@ int written_mtab = FALSE;
  * Rather than exit immediately in case of error, we delay the exit until
  * any background processes (fsck, mount, etc.) have finished.
  **/
-int exit_code = EXIT_OK;
+int exit_code = -1;
 
 
 /**
@@ -1309,7 +1309,7 @@ try_mounts (void)
 	}
 
 	if (all)
-		nih_main_loop_exit (0);
+		delayed_exit (EXIT_OK);
 }
 
 void
@@ -1505,7 +1505,7 @@ spawn_child_handler (Process *      proc,
 	nih_free (proc);
 
 	/* Exit now if there's a delayed exit */
-	delayed_exit (EXIT_OK);
+	delayed_exit (-1);
 }
 
 
@@ -2877,8 +2877,8 @@ delayed_exit (int code)
 {
 	exit_code = nih_max (exit_code, code);
 
-	if (exit_code && NIH_LIST_EMPTY (procs)) {
+	if ((exit_code >= EXIT_OK) && NIH_LIST_EMPTY (procs)) {
 		nih_main_unlink_pidfile ();
-		exit (exit_code);
+		nih_main_loop_exit (exit_code);
 	}
 }
