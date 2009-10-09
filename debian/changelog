@@ -1,4 +1,4 @@
-mountall (0.2.0) UNRELEASED; urgency=low
+mountall (0.2.0) karmic; urgency=low
 
   [ Colin Watson ]
   * Always check the root filesystem if --force-fsck is used, regardless of
@@ -51,7 +51,7 @@ mountall (0.2.0) UNRELEASED; urgency=low
   * Generate a "mount" event before mounting a filesystem, and wait for its
     effects to complete.
 
- -- Scott James Remnant <scott@ubuntu.com>  Thu, 08 Oct 2009 00:54:40 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Fri, 09 Oct 2009 16:50:46 +0100
 
 mountall (0.1.8) karmic; urgency=low
 
