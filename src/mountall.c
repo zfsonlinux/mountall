@@ -1169,14 +1169,17 @@ mount_policy (void)
 			mnt->tag = TAG_LOCAL;
 			num_local++;
 			nih_debug ("%s is local (root)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_OTHER)) {
+		} else if (mount_parent && (mount_parent->tag == TAG_OTHER)
+			   && strcmp (mount_parent->mountpoint, "/")) {
 			mnt->tag = TAG_OTHER;
 			nih_debug ("%s is other (inherited)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)) {
+		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)
+			   && strcmp (mount_parent->mountpoint, "/")) {
 			mnt->tag = TAG_LOCAL;
 			num_local++;
 			nih_debug ("%s is local (inherited)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_REMOTE)) {
+		} else if (mount_parent && (mount_parent->tag == TAG_REMOTE)
+			   && strcmp (mount_parent->mountpoint, "/")) {
 			mnt->tag = TAG_REMOTE;
 			num_remote++;
 			nih_debug ("%s is remote (inherited)", mnt->mountpoint);
