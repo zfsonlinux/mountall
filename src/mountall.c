@@ -1333,7 +1333,7 @@ try_mount (Mount *mnt,
 		NihListEntry *dep_entry = (NihListEntry *)dep_iter;
 		Mount *       dep = (Mount *)dep_entry->data;
 
-		if (! dep->mounted) {
+		if ((! dep->mounted) || needs_remount (dep)) {
 			nih_debug ("%s waiting for %s",
 				   is_swap (mnt) ? mnt->device : mnt->mountpoint,
 				   dep->mountpoint);
