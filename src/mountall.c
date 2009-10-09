@@ -281,18 +281,56 @@ size_t num_virtual_mounted = 0;
 size_t num_swap = 0;
 size_t num_swap_mounted = 0;
 
+/**
+ * filesystems:
+ *
+ * Array of filesystem information parsed from /proc/filesystems, primarily
+ * used to eliminate arch-specific filesystems that don't exist when we
+ * start and figure out which filesystems don't have devices.
+ **/
 Filesystem *filesystems = NULL;
 size_t num_filesystems = 0;
 
+/**
+ * fsck_queue:
+ *
+ * Rather than check filesystems immediately, we lock out devices so that
+ * we only thrash any given disk once at a time.  This list holds the queue
+ * of mounts to be checked, each entry is an NihListEntry with the data item
+ * pointing to the Mount.
+ **/
+NihList *fsck_queue = NULL;
+
+/**
+ * fsck_locks:
+ *
+ * This is the hash table of held fsck device locks, each entry is an
+ * NihListEntry with the device id in the str member.
+ **/
+NihHash *fsck_locks = NULL;
+
+/**
+ * procs:
+ *
+ * List of processes we're currently waiting to complete, each entry in
+ * the list is a Process structure.
+ **/
 NihList *procs = NULL;
 
+/**
+ * written_mtab:
+ *
+ * TRUE once we've successfully written /etc/mtab.
+ **/
 int written_mtab = FALSE;
 
+/**
+ * exit_code:
+ *
+ * Rather than exit immediately in case of error, we delay the exit until
+ * any background processes (fsck, mount, etc.) have finished.
+ **/
 int exit_code = EXIT_OK;
-
-
-static NihList *fsck_queue = NULL;
-static NihHash *fsck_locks = NULL;
 
 
 /**
@@ -1910,7 +1948,7 @@ queue_fsck (Mount *mnt)
 
 	NIH_LIST_FOREACH (fsck_queue, iter) {
 		NihListEntry *entry = (NihListEntry *)iter;
-		Mount *qmnt = (Mount *)entry->data;
+		Mount *       qmnt = (Mount *)entry->data;
 
 		if (mnt != qmnt)
 			continue;
@@ -1935,7 +1973,7 @@ run_fsck_queue (void)
 {
 	NIH_LIST_FOREACH_SAFE (fsck_queue, iter) {
 		NihListEntry *entry = (NihListEntry *)iter;
-		Mount *mnt = (Mount *)entry->data;
+		Mount *       mnt = (Mount *)entry->data;
 
 		if (run_fsck (mnt)) {
 			nih_free (entry);
@@ -2715,9 +2753,9 @@ main (int   argc,
 				    udev_monitor));
 
 	mounts = NIH_MUST (nih_list_new (NULL));
-	procs = NIH_MUST (nih_list_new (NULL));
 	fsck_queue = NIH_MUST (nih_list_new (NULL));
 	fsck_locks = NIH_MUST (nih_hash_string_new (NULL, 10));
+	procs = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
