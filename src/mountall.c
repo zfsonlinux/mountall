@@ -187,12 +187,11 @@ void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     NihIoWatch *watch, NihIoEvents events);
 void   udev_catchup         (void);
 
-void   usr1_handler         (void *data, NihSignal *signal);
-
 int    dev_hook             (Mount *mnt);
 int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
 
+void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
 
 struct {
@@ -310,13 +309,11 @@ static NihHash *fsck_locks = NULL;
  **/
 static NihDBusProxy *upstart = NULL;
 
-
 /**
  * udev:
  *
  * libudev context.
  **/
-
 static struct udev *udev = NULL;
 
 
@@ -1657,8 +1654,6 @@ run_swapon_finished (Mount *mnt,
 }
 
 
-/* destroy_device and add_device are for update_physical_dev_ids only. */
-
 static void
 destroy_device (NihListEntry *entry)
 {
@@ -1679,17 +1674,17 @@ add_device (NihList *           devices,
 	    struct udev_device *newdev,
 	    size_t *            nadded)
 {
-	NihListEntry *new_entry;
+	NihListEntry *entry;
 
 	nih_assert (devices != NULL);
 	nih_assert (newdev != NULL);
 
 	udev_device_ref (newdev);
 
-	new_entry = NIH_MUST (nih_list_entry_new (devices));
-	new_entry->data = newdev;
-	nih_alloc_set_destructor (new_entry, destroy_device);
-	nih_list_add (devices, &new_entry->entry);
+	entry = NIH_MUST (nih_list_entry_new (devices));
+	entry->data = newdev;
+	nih_alloc_set_destructor (entry, destroy_device);
+	nih_list_add (devices, &entry->entry);
 
 	if (nadded)
 		(*nadded)++;
@@ -1704,7 +1699,6 @@ static void
 update_physical_dev_ids (Mount *mnt)
 {
 	nih_local NihList *devices = NULL;
-	NihHash *          results;
 
 	nih_assert (mnt != NULL);
 
@@ -1719,8 +1713,7 @@ update_physical_dev_ids (Mount *mnt)
 			   mnt->mountpoint);
 	}
 
-	results = NIH_MUST (nih_hash_string_new (mnt, 10));
-	mnt->physical_dev_ids = results;
+	mnt->physical_dev_ids = NIH_MUST (nih_hash_string_new (mnt, 10));
 
 	devices = NIH_MUST (nih_list_new (NULL));
 
@@ -1821,10 +1814,11 @@ update_physical_dev_ids (Mount *mnt)
 		if (dev_id) {
 			nih_local NihListEntry *entry = NULL;
 
-			entry = NIH_MUST (nih_list_entry_new (results));
+			entry = NIH_MUST (nih_list_entry_new (mnt->physical_dev_ids));
 			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
 
-			if (nih_hash_add_unique (results, &entry->entry)) {
+			if (nih_hash_add_unique (mnt->physical_dev_ids,
+						 &entry->entry)) {
 				nih_debug ("results: %s -> %s",
 					   mnt->mountpoint, dev_id);
 			}
@@ -2351,29 +2345,14 @@ udev_catchup (void)
 }
 
 
-void
-usr1_handler (void *     data,
-	      NihSignal *signal)
+static int
+dev_hook_walk (const char *       fpath,
+	       const struct stat *sb,
+	       int                typeflag,
+	       struct FTW *       ftwbuf)
 {
-	nih_debug ("Received SIGUSR1 (network device up)");
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		if (is_remote (mnt)
-		    && ((! mnt->mounted) || needs_remount (mnt)))
-			try_mount (mnt, TRUE);
-	}
-}
-
-
-int dev_hook_walk (const char *       fpath,
-		   const struct stat *sb,
-		   int                typeflag,
-		   struct FTW *       ftwbuf)
-{
-	Mount * mnt = nftw_hook_args.mnt;
-	char dest[PATH_MAX];
+	Mount *mnt = nftw_hook_args.mnt;
+	char   dest[PATH_MAX];
 
 	strcpy (dest, mnt->mountpoint);
 	strcat (dest, fpath + 17);
@@ -2401,7 +2380,6 @@ int dev_hook_walk (const char *       fpath,
 	return FTW_CONTINUE;
 }
 
-
 int
 dev_hook (Mount *mnt)
 {
@@ -2417,12 +2395,14 @@ dev_hook (Mount *mnt)
 	return 0;
 }
 
-int tmp_hook_walk (const char *       fpath,
-		   const struct stat *sb,
-		   int                typeflag,
-		   struct FTW *       ftwbuf)
+
+static int
+tmp_hook_walk (const char *       fpath,
+	       const struct stat *sb,
+	       int                typeflag,
+	       struct FTW *       ftwbuf)
 {
-	Mount * mnt = nftw_hook_args.mnt;
+	Mount *     mnt = nftw_hook_args.mnt;
 	const char *name = fpath + ftwbuf->base;
 
 	if (! ftwbuf->level)
@@ -2495,62 +2475,63 @@ tmp_hook (Mount *mnt)
 	return 0;
 }
 
-	int var_run_hook_walk (const char *       fpath,
-			       const struct stat *sb,
-			       int                typeflag,
-			       struct FTW *       ftwbuf)
-	{
-		Mount * mnt = nftw_hook_args.mnt;
-		char dest[PATH_MAX];
 
-		strcpy (dest, mnt->mountpoint);
-		strcat (dest, fpath + 22);
+static int
+var_run_hook_walk (const char *       fpath,
+		   const struct stat *sb,
+		   int                typeflag,
+		   struct FTW *       ftwbuf)
+{
+	Mount * mnt = nftw_hook_args.mnt;
+	char dest[PATH_MAX];
 
-		if (S_ISDIR (sb->st_mode)) {
-			if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
-			    && (errno != EEXIST))
-				nih_warn ("%s: %s", dest, strerror (errno));
-		} else if (S_ISLNK (sb->st_mode)) {
-			char target[PATH_MAX];
-			ssize_t len;
+	strcpy (dest, mnt->mountpoint);
+	strcat (dest, fpath + 22);
 
-			len = readlink (fpath, target, sizeof target);
-			target[len] = '\0';
+	if (S_ISDIR (sb->st_mode)) {
+		if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
+		    && (errno != EEXIST))
+			nih_warn ("%s: %s", dest, strerror (errno));
+	} else if (S_ISLNK (sb->st_mode)) {
+		char target[PATH_MAX];
+		ssize_t len;
 
-			if ((symlink (target, dest) < 0)
-			    && (errno != EEXIST))
-				nih_warn ("%s: %s", dest, strerror (errno));
-		} else {
-			int     in_fd;
-			int     out_fd;
-			char    buf[4096];
-			ssize_t len;
+		len = readlink (fpath, target, sizeof target);
+		target[len] = '\0';
 
-			in_fd = open (fpath, O_RDONLY);
-			if (in_fd < 0) {
-				nih_warn ("%s: %s", fpath, strerror (errno));
-				return FTW_CONTINUE;
-			}
+		if ((symlink (target, dest) < 0)
+		    && (errno != EEXIST))
+			nih_warn ("%s: %s", dest, strerror (errno));
+	} else {
+		int     in_fd;
+		int     out_fd;
+		char    buf[4096];
+		ssize_t len;
 
-			out_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC,
-				       0644);
-			if (out_fd < 0) {
-				nih_warn ("%s: %s", dest, strerror (errno));
-				close (in_fd);
-				return FTW_CONTINUE;
-			}
-
-			while ((len = read (in_fd, buf, sizeof buf)) > 0)
-				write (out_fd, buf, len);
-
-			close (in_fd);
-			if (close (out_fd) < 0)
-				nih_warn ("%s: %s", dest, strerror (errno));
+		in_fd = open (fpath, O_RDONLY);
+		if (in_fd < 0) {
+			nih_warn ("%s: %s", fpath, strerror (errno));
+			return FTW_CONTINUE;
 		}
 
-		return FTW_CONTINUE;
+		out_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC,
+			       0644);
+		if (out_fd < 0) {
+			nih_warn ("%s: %s", dest, strerror (errno));
+			close (in_fd);
+			return FTW_CONTINUE;
+		}
+
+		while ((len = read (in_fd, buf, sizeof buf)) > 0)
+			write (out_fd, buf, len);
+
+		close (in_fd);
+		if (close (out_fd) < 0)
+			nih_warn ("%s: %s", dest, strerror (errno));
 	}
 
+	return FTW_CONTINUE;
+}
 
 int
 var_run_hook (Mount *mnt)
@@ -2835,6 +2816,21 @@ main (int   argc,
 	nih_main_unlink_pidfile ();
 
 	return ret;
+}
+
+void
+usr1_handler (void *     data,
+	      NihSignal *signal)
+{
+	nih_debug ("Received SIGUSR1 (network device up)");
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (is_remote (mnt)
+		    && ((! mnt->mounted) || needs_remount (mnt)))
+			try_mount (mnt, TRUE);
+	}
 }
 
 void
