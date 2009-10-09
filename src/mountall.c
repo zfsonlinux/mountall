@@ -1214,18 +1214,13 @@ void
 mounted (Mount *mnt,
 	 int    try_more)
 {
-	int first_mount = FALSE;
-
 	nih_assert (mnt != NULL);
 
 	nih_debug ("%s", mnt->mountpoint);
 
-	if (! mnt->mounted) {
-		first_mount = TRUE;
-		mnt->mounted = TRUE;
-	}
+	mnt->mounted = TRUE;
 
-	if (mnt->hook && first_mount) {
+	if (mnt->hook) {
 		if (mnt->hook (mnt) < 0) {
 			delayed_exit (EXIT_ERROR);
 			return;
@@ -1243,61 +1238,59 @@ mounted (Mount *mnt,
 		write_mtab ();
 
 	/* Does mounting this filesystem mean that we trigger a new event? */
-	if (first_mount) {
-		switch (mnt->tag) {
-		case TAG_LOCAL:
-			if (++num_local_mounted == num_local) {
-				nih_info ("local finished");
-				emit_event ("local-filesystems");
+	switch (mnt->tag) {
+	case TAG_LOCAL:
+		if (++num_local_mounted == num_local) {
+			nih_info ("local finished");
+			emit_event ("local-filesystems");
 
-				if ((num_remote_mounted == num_remote)
-				    && (num_virtual_mounted == num_virtual)) {
-					nih_info ("fhs mounted");
-					emit_event ("filesystem");
-				}
+			if ((num_remote_mounted == num_remote)
+			    && (num_virtual_mounted == num_virtual)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
 			}
-			break;
-		case TAG_REMOTE:
-			if (++num_remote_mounted == num_remote) {
-				nih_info ("remote finished");
-				emit_event ("remote-filesystems");
-
-				if ((num_local_mounted == num_local)
-				    && (num_virtual_mounted == num_virtual)) {
-					nih_info ("fhs mounted");
-					emit_event ("filesystem");
-				}
-			}
-			break;
-		case TAG_VIRTUAL:
-			if (++num_virtual_mounted == num_virtual) {
-				nih_info ("virtual finished");
-				emit_event ("virtual-filesystems");
-
-				if ((num_local_mounted == num_local)
-				    && (num_remote_mounted == num_remote)) {
-					nih_info ("fhs mounted");
-					emit_event ("filesystem");
-				}
-			}
-			break;
-		case TAG_SWAP:
-			if (++num_swap_mounted == num_swap) {
-				nih_info ("swap finished");
-				emit_event ("all-swaps");
-			}
-			break;
-		default:
-			/* other ignored */
-			;
 		}
+		break;
+	case TAG_REMOTE:
+		if (++num_remote_mounted == num_remote) {
+			nih_info ("remote finished");
+			emit_event ("remote-filesystems");
 
-		nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
-			   num_local_mounted, num_local,
-			   num_remote_mounted, num_remote,
-			   num_virtual_mounted, num_virtual,
-			   num_swap_mounted, num_swap);
+			if ((num_local_mounted == num_local)
+			    && (num_virtual_mounted == num_virtual)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
+			}
+		}
+		break;
+	case TAG_VIRTUAL:
+		if (++num_virtual_mounted == num_virtual) {
+			nih_info ("virtual finished");
+			emit_event ("virtual-filesystems");
+
+			if ((num_local_mounted == num_local)
+			    && (num_remote_mounted == num_remote)) {
+				nih_info ("fhs mounted");
+				emit_event ("filesystem");
+			}
+		}
+		break;
+	case TAG_SWAP:
+		if (++num_swap_mounted == num_swap) {
+			nih_info ("swap finished");
+			emit_event ("all-swaps");
+		}
+		break;
+	default:
+		/* other ignored */
+		;
 	}
+
+	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
+		   num_local_mounted, num_local,
+		   num_remote_mounted, num_remote,
+		   num_virtual_mounted, num_virtual,
+		   num_swap_mounted, num_swap);
 
 	/* Try mounting something else */
 	if (try_more)
@@ -1539,7 +1532,6 @@ run_mount (Mount *mnt,
 			nih_info ("remounting %s", mnt->mountpoint);
 		} else {
 			nih_debug ("%s: already mounted", mnt->mountpoint);
-			mounted (mnt, TRUE);
 			return;
 		}
 	} else if (! mnt->type) {
@@ -1655,7 +1647,6 @@ run_swapon (Mount *mnt)
 
 	if (mnt->mounted) {
 		nih_debug ("%s: already activated", mnt->device);
-		mounted (mnt, TRUE);
 		return;
 	} else if (mnt->mount_pid > 0) {
 		nih_debug ("%s: already activating", mnt->device);
