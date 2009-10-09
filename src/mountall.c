@@ -151,7 +151,7 @@ void   parse_filesystems    (void);
 
 void   mount_policy         (void);
 
-void   mounted              (Mount *mnt, int try_more);
+void   mounted              (Mount *mnt);
 void   trigger_events       (void);
 
 void   try_mounts           (void);
@@ -280,6 +280,14 @@ size_t num_virtual = 0;
 size_t num_virtual_mounted = 0;
 size_t num_swap = 0;
 size_t num_swap_mounted = 0;
+
+/**
+ * newly_mounted:
+ *
+ * Set to TRUE if we've successfully mounted something, informs the main loop
+ * to try and mount non-mounted things again.
+ **/
+int newly_mounted = FALSE;
 
 /**
  * filesystems:
@@ -1199,22 +1207,21 @@ mount_policy (void)
 		/* If it's already mounted, keep count of events and run hooks
 		 * and such, unless we still need to remount it.
 		 */
-		if (mnt->mounted && (! needs_remount (mnt))) {
-			mnt->mounted = FALSE;
-			mounted (mnt, FALSE);
-		}
+		if (mnt->mounted && (! needs_remount (mnt)))
+			mounted (mnt);
 	}
 }
 
 void
-mounted (Mount *mnt,
-	 int    try_more)
+mounted (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
 	nih_debug ("%s", mnt->mountpoint);
 
 	mnt->mounted = TRUE;
+	newly_mounted = TRUE;
+	nih_main_loop_interrupt ();
 
 	if (mnt->hook) {
 		if (mnt->hook (mnt) < 0) {
@@ -1230,7 +1237,7 @@ mounted (Mount *mnt,
 		nih_unref (mnt->mount_opts, mounts);
 	mnt->mount_opts = NULL;
 
-	if ((! written_mtab) && try_more)
+	if ((! written_mtab))
 		write_mtab ();
 
 	/* Does mounting this filesystem mean that we trigger a new event? */
@@ -1287,10 +1294,6 @@ mounted (Mount *mnt,
 		   num_remote_mounted, num_remote,
 		   num_virtual_mounted, num_virtual,
 		   num_swap_mounted, num_swap);
-
-	/* Try mounting something else */
-	if (try_more)
-		try_mounts ();
 }
 
 
@@ -1299,17 +1302,21 @@ try_mounts (void)
 {
 	int all = TRUE;
 
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
+	while (newly_mounted) {
+		newly_mounted = FALSE;
 
-		if ((! mnt->mounted) || needs_remount (mnt)) {
-			all = FALSE;
-			try_mount (mnt, FALSE);
+		NIH_LIST_FOREACH (mounts, iter) {
+			Mount *mnt = (Mount *)iter;
+
+			if ((! mnt->mounted) || needs_remount (mnt)) {
+				all = FALSE;
+				try_mount (mnt, FALSE);
+			}
 		}
-	}
 
-	if (all)
-		delayed_exit (EXIT_OK);
+		if (all)
+			delayed_exit (EXIT_OK);
+	}
 }
 
 void
@@ -1532,7 +1539,7 @@ run_mount (Mount *mnt,
 		}
 	} else if (! mnt->type) {
 		nih_debug ("%s: hook", mnt->mountpoint);
-		mounted (mnt, TRUE);
+		mounted (mnt);
 		return;
 	} else {
 		nih_info ("mounting %s", mnt->mountpoint);
@@ -1627,7 +1634,7 @@ run_mount_finished (Mount *mnt,
 
 	if (mnt->has_showthrough)
 		mount_showthrough (mnt);
-	mounted (mnt, TRUE);
+	mounted (mnt);
 }
 
 
@@ -1681,7 +1688,7 @@ run_swapon_finished (Mount *mnt,
 	if (status)
 		nih_warn ("Problem activating swap: %s", mnt->device);
 
-	mounted (mnt, TRUE);
+	mounted (mnt);
 }
 
 
@@ -2844,8 +2851,11 @@ main (int   argc,
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
 
-	/* See what we can mount straight away */
+	/* See what we can mount straight away, and then schedule the same
+	 * function to be run each time through the main loop.
+	 */
 	try_mounts ();
+	NIH_MUST (nih_main_loop_add_func (NULL, (NihMainLoopCb)try_mounts, NULL));
 
 	/* Catch up with udev */
 	udev_catchup ();
