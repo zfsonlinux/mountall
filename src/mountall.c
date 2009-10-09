@@ -194,13 +194,6 @@ int    var_run_hook         (Mount *mnt);
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
 
-struct {
-	/* com mon */
-	Mount *mnt;
-	/* tmp_hook */
-	int    purge;
-	time_t barrier;
-} nftw_hook_args;
 
 static const struct {
 	const char *mountpoint;
@@ -2344,6 +2337,14 @@ udev_catchup (void)
 	}
 }
 
+
+struct {
+	/* common */
+	Mount *mnt;
+	/* tmp_hook */
+	int    purge;
+	time_t barrier;
+} nftw_hook_args;
 
 static int
 dev_hook_walk (const char *       fpath,
