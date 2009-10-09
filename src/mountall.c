@@ -185,7 +185,7 @@ void   emit_event_error     (void *data, NihDBusMessage *message);
 
 void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     NihIoWatch *watch, NihIoEvents events);
-void   udev_catchup         (struct udev *udev);
+void   udev_catchup         (void);
 
 void   usr1_handler         (void *data, NihSignal *signal);
 
@@ -309,6 +309,15 @@ static NihHash *fsck_locks = NULL;
  * Proxy to Upstart daemon.
  **/
 static NihDBusProxy *upstart = NULL;
+
+
+/**
+ * udev:
+ *
+ * libudev context.
+ **/
+
+static struct udev *udev = NULL;
 
 
 /**
@@ -1696,7 +1705,6 @@ update_physical_dev_ids (Mount *mnt)
 {
 	nih_local NihList *devices = NULL;
 	NihHash *          results;
-	struct udev *      udev;
 
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->udev_device != NULL);
@@ -1714,8 +1722,6 @@ update_physical_dev_ids (Mount *mnt)
 
 	results = NIH_MUST (nih_hash_string_new (mnt, 10));
 	mnt->physical_dev_ids = results;
-
-	nih_assert (udev = udev_device_get_udev (mnt->udev_device));
 
 	devices = NIH_MUST (nih_list_new (NULL));
 	add_device (devices, NULL, mnt->udev_device, NULL);
@@ -2290,7 +2296,7 @@ udev_monitor_watcher (struct udev_monitor *udev_monitor,
 }
 
 void
-udev_catchup (struct udev *udev)
+udev_catchup (void)
 {
 	struct udev_enumerate * udev_enumerate;
 	struct udev_list_entry *device_path;
@@ -2644,7 +2650,6 @@ main (int   argc,
 {
 	char **              args;
 	DBusConnection *     connection;
-	struct udev *        udev;
 	struct udev_monitor *udev_monitor;
 	Mount *              root;
 	int                  ret;
@@ -2797,7 +2802,7 @@ main (int   argc,
 	try_mounts ();
 
 	/* Catch up with udev */
-	udev_catchup (udev);
+	udev_catchup ();
 
 	ret = nih_main_loop ();
 
