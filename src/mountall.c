@@ -1175,7 +1175,8 @@ mount_policy (void)
 			mnt->tag = TAG_OTHER;
 			nih_debug ("%s is other (inherited)", mnt->mountpoint);
 		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)
-			   && strcmp (mount_parent->mountpoint, "/")) {
+			   && strcmp (mount_parent->mountpoint, "/")
+		           && !is_remote (mnt)) {
 			mnt->tag = TAG_LOCAL;
 			num_local++;
 			nih_debug ("%s is local (inherited)", mnt->mountpoint);

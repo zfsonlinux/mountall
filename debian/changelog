@@ -1,3 +1,10 @@
+mountall (0.2.1) UNRELEASED; urgency=low
+
+  * Make mountall recognize that *remote* filesystems are still remote, given
+    that their parent fs is almost always local.  LP: #447654.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Fri, 09 Oct 2009 17:38:07 -0700
+
 mountall (0.2.0) karmic; urgency=low
 
   [ Colin Watson ]
