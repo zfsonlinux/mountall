@@ -100,7 +100,6 @@ struct mount {
 	int                 check;
 
 	Tag                 tag;
-	int                 arch_specific;
 	int                 has_showthrough;
 	Mount *             showthrough;
 	NihList             deps;
@@ -203,23 +202,22 @@ static const struct {
 	const char *type;
 	const char *opts;
 	MountHook   hook;
-	int         arch_specific;
 } builtins[] = {
-	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL,         FALSE },
-	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL,         FALSE },
-	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid",             NULL,         FALSE },
-	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL,         FALSE },
-	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     NULL,                              NULL,         FALSE },
-	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     NULL,                              NULL,         FALSE },
-	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  NULL,                              NULL,         FALSE },
-	{ "/spu",                     NULL,        FALSE, "spufs",       "gid=spu",                         NULL,         TRUE  },
-	{ "/dev",                     NULL,        FALSE, "tmpfs",       "mode=0755",                       dev_hook,     FALSE },
-	{ "/dev/pts",                 NULL,        FALSE, "devpts",      "noexec,nosuid,gid=tty,mode=0620", NULL,         FALSE },
-	{ "/dev/shm",                 NULL,        FALSE, "tmpfs",       "nosuid,nodev",                    NULL,         FALSE },
-	{ "/tmp",                     NULL,        FALSE, NULL,          NULL,                              tmp_hook,     FALSE },
-	{ "/var/run",                 NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,showthrough",    var_run_hook, FALSE },
-	{ "/var/lock",                NULL,        FALSE, "tmpfs",       "nodev,noexec,nosuid,showthrough", NULL,         FALSE },
-	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid",                NULL,         FALSE },
+	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL         },
+	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL         },
+	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid",             NULL         },
+	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL         },
+	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     NULL,                              NULL         },
+	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     NULL,                              NULL         },
+	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  NULL,                              NULL         },
+	{ "/spu",                     NULL,        FALSE, "spufs",       "gid=spu,optional",                NULL         },
+	{ "/dev",                     NULL,        FALSE, "tmpfs",       "mode=0755",                       dev_hook     },
+	{ "/dev/pts",                 NULL,        FALSE, "devpts",      "noexec,nosuid,gid=tty,mode=0620", NULL         },
+	{ "/dev/shm",                 NULL,        FALSE, "tmpfs",       "nosuid,nodev",                    NULL         },
+	{ "/tmp",                     NULL,        FALSE, NULL,          NULL,                              tmp_hook     },
+	{ "/var/run",                 NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,showthrough",    var_run_hook },
+	{ "/var/lock",                NULL,        FALSE, "tmpfs",       "nodev,noexec,nosuid,showthrough", NULL         },
+	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid",                NULL         },
 	{ NULL }
 }, *builtin;
 
@@ -463,7 +461,6 @@ new_mount (const char *mountpoint,
 	mnt->check = check;
 
 	mnt->tag = TAG_OTHER;
-	mnt->arch_specific = FALSE;
 	mnt->has_showthrough = FALSE;
 	mnt->showthrough = NULL;
 	nih_list_init (&mnt->deps);
@@ -1023,10 +1020,10 @@ mount_policy (void)
 			}
 
 			/* If there's no device spec for this filesystem,
-			 * and it's arch-specific, it's a built-in that we
-			 * might not work on this architecture, so ignore it.
+			 * and it's optional, we ignore it.
 			 */
-			if ((! mnt->device) && mnt->arch_specific
+			if ((! mnt->device)
+			    && has_option (mnt, "optional", FALSE)
 			    && (j == num_filesystems)) {
 				nih_debug ("%s: dropping unknown filesystem",
 					   mnt->mountpoint);
@@ -2863,13 +2860,9 @@ main (int   argc,
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
 	 * we need to do.
 	 */
-	for (builtin = builtins; builtin->mountpoint; builtin++) {
-		Mount *mnt;
-
-		mnt = new_mount (builtin->mountpoint, builtin->device, builtin->check,
-				 builtin->type, builtin->opts, builtin->hook);
-		mnt->arch_specific = builtin->arch_specific;
-	}
+	for (builtin = builtins; builtin->mountpoint; builtin++)
+		new_mount (builtin->mountpoint, builtin->device, builtin->check,
+			   builtin->type, builtin->opts, builtin->hook);
 
 	parse_fstab ();
 	parse_mountinfo ();
