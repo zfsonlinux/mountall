@@ -1183,21 +1183,6 @@ mount_policy (void)
 			mnt->tag = TAG_LOCAL;
 			num_local++;
 			nih_debug ("%s is local (root)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_OTHER)
-			   && strcmp (mount_parent->mountpoint, "/")) {
-			mnt->tag = TAG_OTHER;
-			nih_debug ("%s is other (inherited)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_LOCAL)
-			   && strcmp (mount_parent->mountpoint, "/")
-		           && !is_remote (mnt)) {
-			mnt->tag = TAG_LOCAL;
-			num_local++;
-			nih_debug ("%s is local (inherited)", mnt->mountpoint);
-		} else if (mount_parent && (mount_parent->tag == TAG_REMOTE)
-			   && strcmp (mount_parent->mountpoint, "/")) {
-			mnt->tag = TAG_REMOTE;
-			num_remote++;
-			nih_debug ("%s is remote (inherited)", mnt->mountpoint);
 		} else if (is_fhs (mnt)) {
 			if (is_remote (mnt)) {
 				mnt->tag = TAG_REMOTE;
@@ -1206,9 +1191,29 @@ mount_policy (void)
 			} else if (mnt->nodev
 				   && ((! mnt->type)
 				       || strcmp (mnt->type, "fuse"))) {
-				mnt->tag = TAG_VIRTUAL;
-				num_virtual++;
-				nih_debug ("%s is virtual", mnt->mountpoint);
+				if (mount_parent
+				    && strcmp (mount_parent->mountpoint, "/")
+				    && (mount_parent->tag == TAG_REMOTE)) {
+					mnt->tag = TAG_REMOTE;
+					num_remote++;
+					nih_debug ("%s is remote (inherited)", mnt->mountpoint);
+				} else if (mount_parent
+				    && strcmp (mount_parent->mountpoint, "/")
+				    && (mount_parent->tag == TAG_LOCAL)) {
+					mnt->tag = TAG_LOCAL;
+					num_local++;
+					nih_debug ("%s is local (inherited)", mnt->mountpoint);
+				} else {
+					mnt->tag = TAG_VIRTUAL;
+					num_virtual++;
+					nih_debug ("%s is virtual", mnt->mountpoint);
+				}
+			} else if (mount_parent
+				   && strcmp (mount_parent->mountpoint, "/")
+				   && (mount_parent->tag == TAG_REMOTE)) {
+				mnt->tag = TAG_REMOTE;
+				num_remote++;
+				nih_debug ("%s is remote (inherited)", mnt->mountpoint);
 			} else {
 				mnt->tag = TAG_LOCAL;
 				num_local++;
