@@ -935,6 +935,12 @@ is_fhs (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
 
+	if (has_option (mnt, "bootwait", FALSE)) {
+		return TRUE;
+	} else if (has_option (mnt, "nobootwait", FALSE)) {
+		return FALSE;
+	}
+
 	for (const char * const *path = fhs; path && *path; path++)
 		if (! strcmp (*path, mnt->mountpoint))
 			return TRUE;

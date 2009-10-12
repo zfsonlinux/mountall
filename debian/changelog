@@ -6,6 +6,10 @@ mountall (0.2.2) UNRELEASED; urgency=low
 
   [ Scott James Remnant ]
   * Removed /srv from the list of "essential" mountpoints.  LP: #448267.
+  * Allow overriding of the above list by using the "bootwait" and
+    "nobootwait" fstab options, e.g.
+
+    LABEL=foo /home ext4 nobootwait 0 0
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
 
