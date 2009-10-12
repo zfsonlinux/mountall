@@ -821,7 +821,7 @@ parse_mountinfo (void)
 		if (! device)
 			continue;
 		if ((! strcmp (device, "/dev/root"))
-		    (! strcmp (device, "none")))
+		    || (! strcmp (device, "none")))
 			device = NULL;
 
 		/* superblock opts */
