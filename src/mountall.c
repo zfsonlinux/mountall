@@ -235,7 +235,6 @@ static const char *fhs[] = {
 	"/proc",			/* Linux appendix */
 	"/proc/sys/fs/binfmt_misc",	/* Built-in */
 	"/spu",				/* Built-in */
-	"/srv",
 	"/sys",				/* Not in FHS yet */
 	"/sys/fs/fuse/connections",	/* Built-in */
 	"/sys/kernel/debug",		/* Built-in */
