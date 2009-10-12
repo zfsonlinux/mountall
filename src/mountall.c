@@ -205,11 +205,11 @@ static const struct {
 } builtins[] = {
 	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL         },
 	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL         },
-	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid",             NULL         },
+	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid,optional",    NULL         },
 	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL         },
-	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     NULL,                              NULL         },
-	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     NULL,                              NULL         },
-	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  NULL,                              NULL         },
+	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     "optional",                        NULL         },
+	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     "optional",                        NULL         },
+	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  "optional",                        NULL         },
 	{ "/spu",                     NULL,        FALSE, "spufs",       "gid=spu,optional",                NULL         },
 	{ "/dev",                     NULL,        FALSE, "tmpfs",       "mode=0755",                       dev_hook     },
 	{ "/dev/pts",                 NULL,        FALSE, "devpts",      "noexec,nosuid,gid=tty,mode=0620", NULL         },
@@ -217,7 +217,7 @@ static const struct {
 	{ "/tmp",                     NULL,        FALSE, NULL,          NULL,                              tmp_hook     },
 	{ "/var/run",                 NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,showthrough",    var_run_hook },
 	{ "/var/lock",                NULL,        FALSE, "tmpfs",       "nodev,noexec,nosuid,showthrough", NULL         },
-	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid",                NULL         },
+	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,optional",       NULL         },
 	{ NULL }
 }, *builtin;
 

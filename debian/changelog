@@ -26,6 +26,8 @@ mountall (0.2.2) UNRELEASED; urgency=low
 
   * Replace previous hardcoded "arch specific" flag for /spu with an
     "optional" fstab mount option.
+  * Made binfmt_misc,fusectl, debugfs, securityfs and /lib/init/rw optional
+    as well.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
 
