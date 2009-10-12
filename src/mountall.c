@@ -1588,7 +1588,9 @@ run_mount (Mount *mnt,
 	if (mnt->opts) {
 		nih_local char *opts = NULL;
 
-		opts = cut_options (NULL, mnt, "showthrough", NULL);
+		opts = cut_options (NULL, mnt, "showthrough", "bootwait",
+				    "nobootwait", "optional",
+				    NULL);
 		if (mnt->mounted && (! fake)) {
 			char *tmp;
 
