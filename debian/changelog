@@ -4,6 +4,10 @@ mountall (0.2.2) UNRELEASED; urgency=low
   * Don't emit the local-filesystem signal until after virtual filesystems
     are also done mounting.  LP: #448981.
 
+  [ Robert Gerlach ]
+  * Fix segfault when root filesystem missing from fstab, or listed
+    as /dev/root.  LP: #448323.
+
   [ Scott James Remnant ]
   * Removed /srv from the list of "essential" mountpoints.  LP: #448267.
   * Allow overriding of the above list by using the "bootwait" and
