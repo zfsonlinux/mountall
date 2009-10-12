@@ -1279,7 +1279,7 @@ mounted (Mount *mnt)
 			if (num_local_mounted == num_local) {
 				nih_info ("local finished");
 				emit_event ("local-filesystems");
-				
+
 				if (num_remote_mounted == num_remote) {
 					nih_info ("fhs mounted");
 					emit_event ("filesystem");
