@@ -28,6 +28,8 @@ mountall (0.2.2) UNRELEASED; urgency=low
     "optional" fstab mount option.
   * Made binfmt_misc,fusectl, debugfs, securityfs and /lib/init/rw optional
     as well.
+  * Check whether the mountpoint of optional fstab entries exists before
+    trying to mount, and skip over that if it doesn't.  LP: #447525.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
 
