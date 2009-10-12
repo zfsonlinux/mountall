@@ -1973,6 +1973,7 @@ queue_fsck (Mount *mnt)
 	} else if ((! mnt->device)
 		   || mnt->nodev
 		   || (! mnt->type)
+		   || (! strcmp (mnt->device, "none"))
 		   || (! strcmp (mnt->type, "none"))) {
 		nih_debug ("%s: no device to check",
 			   is_swap (mnt) ? mnt->device : mnt->mountpoint);

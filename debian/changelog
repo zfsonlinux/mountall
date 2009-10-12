@@ -8,6 +8,9 @@ mountall (0.2.2) UNRELEASED; urgency=low
   * Fix segfault when root filesystem missing from fstab, or listed
     as /dev/root.  LP: #448323.
 
+  [ Johan Kiviniemi ]
+  * Don’t queue filesystem check when either device or type is "none".
+
   [ Scott James Remnant ]
   * Removed /srv from the list of "essential" mountpoints.  LP: #448267.
   * Allow overriding of the above list by using the "bootwait" and
