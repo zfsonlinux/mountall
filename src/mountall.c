@@ -1571,6 +1571,22 @@ run_mount (Mount *mnt,
 		nih_info ("mounting %s", mnt->mountpoint);
 	}
 
+	/* If this is optional, the mountpoint might not exist
+	 * (don't check otherwise, let mount worry about it - since some
+	 *  fuse module might make them :p)
+	 */
+	if (has_option (mnt, "optional", FALSE)) {
+		struct stat statbuf;
+
+		if ((stat (mnt->mountpoint, &statbuf) < 0)
+		    && (errno == ENOENT)) {
+			nih_debug ("%s: mountpoint doesn't exist, ignoring",
+				   mnt->mountpoint);
+			mounted (mnt);
+			return;
+		}
+	}
+
 	args = NIH_MUST (nih_str_array_new (NULL));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
 	if (fake) {
