@@ -712,6 +712,26 @@ parse_fstab (void)
 	endmntent (fstab);
 }
 
+static void
+mount_proc (void)
+{
+	Mount *mnt;
+
+	nih_debug ("mounting /proc");
+	if (mount ("none", "/proc", "proc",
+		   MS_NODEV | MS_NOEXEC | MS_NOSUID, NULL) < 0) {
+		nih_fatal ("%s: %s: %s", "/proc",
+			   _("unable to mount"),
+			   strerror (errno));
+		delayed_exit (EXIT_MOUNT);
+		return;
+	}
+
+	mnt = find_mount ("/proc");
+	if (mnt)
+		mnt->mounted = TRUE;
+}
+
 void
 parse_mountinfo (void)
 {
@@ -723,22 +743,7 @@ parse_mountinfo (void)
 
 	mountinfo = fopen ("/proc/self/mountinfo", "r");
 	if ((! mountinfo) && (errno == ENOENT)) {
-		Mount *mnt;
-
-		nih_debug ("mounting /proc");
-		if (mount ("none", "/proc", "proc",
-			   MS_NODEV | MS_NOEXEC | MS_NOSUID, NULL) < 0) {
-			nih_fatal ("%s: %s: %s", "/proc",
-				   _("unable to mount"),
-				   strerror (errno));
-			delayed_exit (EXIT_MOUNT);
-			return;
-		}
-
-		mnt = find_mount ("/proc");
-		if (mnt)
-			mnt->mounted = TRUE;
-
+		mount_proc ();
 		mountinfo = fopen ("/proc/self/mountinfo", "r");
 	}
 	if (! mountinfo) {
@@ -861,6 +866,10 @@ parse_filesystems (void)
 	nih_debug ("reading filesystems");
 
 	fs = fopen ("/proc/filesystems", "r");
+	if ((! fs) && (errno == ENOENT)) {
+		mount_proc ();
+		fs = fopen ("/proc/filesystems", "r");
+	}
 	if (! fs) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			   strerror (errno));

@@ -11,6 +11,8 @@ mountall (0.2.2) UNRELEASED; urgency=low
 
     LABEL=foo /home ext4 nobootwait 0 0
 
+  * Mount /proc before attempting to parse /proc/filesystems.  LP: #447947.
+
  -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
 
 mountall (0.2.1) karmic; urgency=low
