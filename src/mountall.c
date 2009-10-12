@@ -820,9 +820,8 @@ parse_mountinfo (void)
 		device = strtok_r (NULL, " \t\n", &saveptr);
 		if (! device)
 			continue;
-		if (! strcmp (device, "/dev/root"))
-			device = NULL;
-		if (! strcmp (device, "none"))
+		if ((! strcmp (device, "/dev/root"))
+		    (! strcmp (device, "none")))
 			device = NULL;
 
 		/* superblock opts */
