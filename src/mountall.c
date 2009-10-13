@@ -103,6 +103,7 @@ struct mount {
 	int                 has_showthrough;
 	Mount *             showthrough;
 	NihList             deps;
+	int                 again;
 
 	MountHook           hook;
 };
@@ -464,6 +465,7 @@ new_mount (const char *mountpoint,
 	mnt->has_showthrough = FALSE;
 	mnt->showthrough = NULL;
 	nih_list_init (&mnt->deps);
+	mnt->again = FALSE;
 
 	mnt->hook = hook;
 
@@ -1583,6 +1585,7 @@ run_mount (Mount *mnt,
 		nih_debug ("mtab %s", mnt->mountpoint);
 	} else if (mnt->mount_pid > 0) {
 		nih_debug ("%s: already mounting", mnt->mountpoint);
+		mnt->again = TRUE;
 		return;
 	} else if (mnt->mounted) {
 		if (needs_remount (mnt)) {
@@ -1696,6 +1699,13 @@ run_mount_finished (Mount *mnt,
 	mnt->mount_pid = -1;
 
 	if (status) {
+		if (mnt->again) {
+			nih_debug ("%s: trying again", mnt->mountpoint);
+			mnt->again = FALSE;
+			try_mount (mnt, TRUE);
+			return;
+		}
+
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
