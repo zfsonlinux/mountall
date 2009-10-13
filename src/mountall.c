@@ -709,6 +709,19 @@ parse_fstab (void)
 	endmntent (fstab);
 }
 
+static int
+needs_remount (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	if (mnt->mounted && has_option (mnt, "ro", TRUE)
+	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
 static void
 mount_proc (void)
 {
@@ -729,26 +742,16 @@ mount_proc (void)
 		mnt->mounted = TRUE;
 }
 
-void
-parse_mountinfo (void)
+static void
+parse_mountinfo_file (FILE *mountinfo,
+		      int   reparsed)
 {
-	FILE *          mountinfo;
 	nih_local char *buf = NULL;
 	size_t          bufsz;
 
-	nih_debug ("updating mounts");
+	nih_assert (mountinfo != NULL);
 
-	mountinfo = fopen ("/proc/self/mountinfo", "r");
-	if ((! mountinfo) && (errno == ENOENT)) {
-		mount_proc ();
-		mountinfo = fopen ("/proc/self/mountinfo", "r");
-	}
-	if (! mountinfo) {
-		nih_fatal ("%s: %s", "/proc/self/mountinfo",
-			   strerror (errno));
-		delayed_exit (EXIT_MOUNT);
-		return;
-	}
+	nih_debug ("updating mounts");
 
 	bufsz = 4096;
 	buf = NIH_MUST (nih_alloc (NULL, bufsz));
@@ -841,14 +844,50 @@ parse_mountinfo (void)
 		mnt->mounted = TRUE;
 		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
 							 mount_opts, super_opts));
+		if (reparsed && mnt->mounted && (! needs_remount (mnt)))
+			mounted (mnt);
 	}
+}
 
-	if (fclose (mountinfo) < 0) {
+static void
+mountinfo_watcher (void *      data,
+		   NihIoWatch *watch,
+		   NihIoEvents events)
+{
+	FILE *mountinfo;
+
+	nih_assert (watch != NULL);
+	nih_assert (events > 0);
+
+	nih_assert (mountinfo = fdopen (watch->fd, "r"));
+	rewind (mountinfo);
+
+	nih_debug ("mountinfo changed, reparsing");
+
+	parse_mountinfo_file (mountinfo, TRUE);
+}
+
+void
+parse_mountinfo (void)
+{
+	FILE *mountinfo;
+
+	mountinfo = fopen ("/proc/self/mountinfo", "r");
+	if ((! mountinfo) && (errno == ENOENT)) {
+		mount_proc ();
+		mountinfo = fopen ("/proc/self/mountinfo", "r");
+	}
+	if (! mountinfo) {
 		nih_fatal ("%s: %s", "/proc/self/mountinfo",
 			   strerror (errno));
-		delayed_exit (EXIT_ERROR);
+		delayed_exit (EXIT_MOUNT);
 		return;
 	}
+
+	parse_mountinfo_file (mountinfo, FALSE);
+
+	NIH_MUST (nih_io_add_watch (NULL, fileno (mountinfo), NIH_IO_EXCEPT,
+				    mountinfo_watcher, NULL));
 }
 
 
@@ -982,19 +1021,6 @@ is_remote (Mount *mnt)
 		return FALSE;
 	} else {
 		return TRUE;
-	}
-}
-
-static int
-needs_remount (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (mnt->mounted && has_option (mnt, "ro", TRUE)
-	    && mnt->opts && (! has_option (mnt, "ro", FALSE))) {
-		return TRUE;
-	} else {
-		return FALSE;
 	}
 }
 
