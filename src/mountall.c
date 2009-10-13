@@ -845,7 +845,7 @@ parse_mountinfo_file (FILE *mountinfo,
 
 		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
 							 mount_opts, super_opts));
-		if (reparsed && mnt->mounted && (! needs_remount (mnt))) {
+		if (reparsed && (! mnt->mounted)) {
 			mounted (mnt);
 		} else {
 			mnt->mounted = TRUE;
