@@ -1,4 +1,4 @@
-mountall (0.2.2) UNRELEASED; urgency=low
+mountall (0.2.2) karmic; urgency=low
 
   [ Steve Langasek ]
   * Don't emit the local-filesystem signal until after virtual filesystems
@@ -38,7 +38,7 @@ mountall (0.2.2) UNRELEASED; urgency=low
   * Try mounts again if another network device comes up while we were
     waiting.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 13 Oct 2009 02:17:47 +0100
 
 mountall (0.2.1) karmic; urgency=low
 
