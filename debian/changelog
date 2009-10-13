@@ -31,6 +31,11 @@ mountall (0.2.2) UNRELEASED; urgency=low
   * Check whether the mountpoint of optional fstab entries exists before
     trying to mount, and skip over that if it doesn't.  LP: #447525.
 
+  * Keep /proc/self/mountinfo open, if it changes while we're running,
+    update the knowledge of the mount table and what's mounted.  That
+    way if something else mounts it while mountall running, you'll still
+    get events and mountall will still exit.
+
  -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 11 Oct 2009 23:07:55 -0700
 
 mountall (0.2.1) karmic; urgency=low
