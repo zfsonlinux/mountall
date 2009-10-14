@@ -1622,6 +1622,13 @@ run_mount (Mount *mnt,
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "mount"));
 	if (fake) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-f"));
+		/* Broken mount helpers that don't support -f, so just bypass
+		 * them; no custom mtab for you!
+		 */
+		if ((! strcmp (mnt->type, "ecryptfs"))
+		    || (! strcmp (mnt->type, "aufs")))
+			NIH_MUST (nih_str_array_add (&args, NULL, &args_len,
+						     "-i"));
 	} else if ((! written_mtab)
 		   && strcmp (mnt->type, "ntfs")
 		   && strcmp (mnt->type, "ntfs-3g")) {
