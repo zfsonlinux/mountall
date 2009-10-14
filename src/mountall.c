@@ -2179,6 +2179,8 @@ write_mtab (void)
 	    || (close (mtab) < 0))
 		return;
 
+	unlink (_PATH_MOUNTED "~");
+
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 

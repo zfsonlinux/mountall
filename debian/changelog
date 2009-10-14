@@ -6,6 +6,8 @@ mountall (0.2.2ubuntu1) UNRELEASED; urgency=low
     /etc/mtab; these helpers are broken and do not support the -f argument.
     This means your passphrase may end up in /etc/mtab, blame them not me.
     LP: #431954, #443080.
+  * Unlink /etc/mtab~ after creating/truncating /etc/mtab and before writing
+    mtab entries.  LP: #431865.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 14 Oct 2009 05:11:16 +0100
 
