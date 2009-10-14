@@ -1,3 +1,10 @@
+mountall (0.2.2ubuntu1) UNRELEASED; urgency=low
+
+  * Hide error removing /forcefsck, people mis-report this as a bug and
+    don't tell us the error above it.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 14 Oct 2009 05:11:16 +0100
+
 mountall (0.2.2) karmic; urgency=low
 
   [ Steve Langasek ]
