@@ -103,6 +103,7 @@ struct mount {
 	NihHash *           physical_dev_ids;
 	int                 physical_dev_ids_needed;
 	pid_t               fsck_pid;
+	int                 fsck_progress;
 	int                 ready;
 
 	char *              type;
@@ -211,6 +212,8 @@ void   stop_usplash         (void);
 void   usplash_write        (const char *format, ...);
 
 void   boredom              (void *data, NihTimer *timer);
+void   fsck_reader          (Mount *mnt, NihIo *io,
+			     const char *buf, size_t len);
 
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
@@ -490,6 +493,7 @@ new_mount (const char *mountpoint,
 	mnt->physical_dev_ids = NULL;
 	mnt->physical_dev_ids_needed = TRUE;
 	mnt->fsck_pid = -1;
+	mnt->fsck_progress = -1;
 	mnt->ready = FALSE;
 
 	if (mnt->device) {
@@ -2157,6 +2161,8 @@ run_fsck (Mount *mnt)
 {
 	nih_local char **args = NULL;
 	size_t           args_len = 0;
+	int              fds[2];
+	int              flags;
 
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->device != NULL);
@@ -2170,6 +2176,20 @@ run_fsck (Mount *mnt)
 
 	nih_info ("checking %s", mnt->mountpoint);
 
+	/* Create a pipe to receive progress indication */
+	NIH_ZERO (pipe2 (fds, O_CLOEXEC));
+
+	flags = fcntl (fds[1], F_GETFD);
+	if ((flags < 0)
+	    || (fcntl (fds[1], F_SETFD, flags &~ FD_CLOEXEC) < 0)
+	    || (! NIH_SHOULD (nih_io_reopen (NULL, fds[0], NIH_IO_STREAM,
+					     (NihIoReader)fsck_reader,
+					     NULL, NULL, mnt)))) {
+		close (fds[0]);
+		close (fds[1]);
+		fds[0] = fds[1] = -1;
+	}
+
 	args = NIH_MUST (nih_str_array_new (NULL));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "fsck"));
 	if (fsck_fix) {
@@ -2177,13 +2197,27 @@ run_fsck (Mount *mnt)
 	} else {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
 	}
+	if (fds[1] >= 0) {
+		nih_local char *arg = NULL;
+
+		arg = NIH_MUST (nih_sprintf (NULL, "-C%d", fds[1]));
+		NIH_MUST (nih_str_array_addp (&args, NULL, &args_len, arg));
+	}
 	if (force_fsck)
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-f"));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-t"));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->type));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device));
 
+	mnt->fsck_progress = -1;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
+
+	/* Close writing end, reading end is left open inside the NihIo
+	 * structure watching it until the remote end is closed by fsck
+	 * finishing.
+	 */
+	if (fds[1] >= 0)
+		close (fds[1]);
 
 	/* Cancel the boredom timer while an fsck is running */
 	if (boredom_timer)
@@ -2202,6 +2236,7 @@ run_fsck_finished (Mount *mnt,
 	nih_assert (mnt->fsck_pid == pid);
 
 	mnt->fsck_pid = -1;
+	mnt->fsck_progress = -1;
 
 	/* Refresh the boredom timer now we've finished trying to fsck */
 	if (boredom_timer)
@@ -3153,6 +3188,52 @@ boredom (void *    data,
 	}
 
 	boredom_timer = NULL;
+}
+
+void
+fsck_reader (Mount *     mnt,
+	     NihIo *     io,
+	     const char *buf,
+	     size_t      len)
+{
+	nih_assert (mnt != NULL);
+	nih_assert (io != NULL);
+	nih_assert (buf != NULL);
+
+	for (;;) {
+		int pass;
+		int cur;
+		int max;
+
+		nih_local char *line = NULL;
+
+		line = nih_io_get (NULL, io, "\n");
+		if ((! line) || (! *line))
+			break;
+
+		if (sscanf (line, "%d %d %d", &pass, &cur, &max) < 3)
+			continue;
+
+		switch (pass) {
+		case 1:
+			mnt->fsck_progress = (cur * 70) / max;
+			break;
+		case 2:
+			mnt->fsck_progress = 70 + (cur * 20) / max;
+			break;
+		case 3:
+			mnt->fsck_progress = 90 + (cur * 2) / max;
+			break;
+		case 4:
+			mnt->fsck_progress = 92 + (cur * 3) / max;
+			break;
+		case 5:
+			mnt->fsck_progress = 95 + (cur * 5) / max;
+			break;
+		default:
+			nih_assert_not_reached ();
+		}
+	}
 }
 
 
