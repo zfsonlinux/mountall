@@ -65,6 +65,7 @@
 
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
+#include "com.ubuntu.Upstart.Job.h"
 
 
 typedef enum {
@@ -192,6 +193,8 @@ void   udev_catchup         (void);
 int    dev_hook             (Mount *mnt);
 int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
+
+void   track_usplash        (void);
 
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
@@ -340,6 +343,20 @@ int written_mtab = FALSE;
  **/
 int exit_code = -1;
 
+/**
+ * splash:
+ *
+ * Whether we should start usplash.
+ **/
+int splash = FALSE;
+
+/**
+ * splash_running:
+ *
+ * Whether usplash is running
+ **/
+int splash_running = FALSE;
+
 
 /**
  * upstart:
@@ -347,6 +364,13 @@ int exit_code = -1;
  * Proxy to Upstart daemon.
  **/
 static NihDBusProxy *upstart = NULL;
+
+/**
+ * usplash:
+ *
+ * Proxy to Usplash job.
+ **/
+static NihDBusProxy *usplash = NULL;
 
 /**
  * udev:
@@ -2814,6 +2838,129 @@ var_run_hook (Mount *mnt)
 }
 
 
+static void
+usplash_instance_added (void *          data,
+			NihDBusMessage *message,
+			const char *    interface)
+{
+	nih_debug ("usplash started");
+	splash_running = TRUE;
+}
+
+static void
+usplash_instance_removed (void *          data,
+			  NihDBusMessage *message,
+			  const char *    interface)
+{
+	nih_debug ("usplash stopped");
+	splash_running = FALSE;
+}
+
+void
+track_usplash (void)
+{
+	FILE *          cmdline;
+	char            line[4096];
+	char *          tok;
+	nih_local char *usplash_path;
+	nih_local char *path;
+
+	/* Make sure splash is enabled on the kernel command-line */
+	cmdline = fopen ("/proc/cmdline", "r");
+	if (! cmdline)
+		return;
+
+	fgets (line, sizeof line, cmdline);
+	for (tok = strtok (line, " \t\r\n"); tok; tok = strtok (NULL, " \t\r\n")) {
+		if (! strcmp (tok, "splash"))
+			splash = TRUE;
+		if (! strcmp (tok, "nosplash"))
+			splash = FALSE;
+	}
+	fclose (cmdline);
+
+	if (! splash) {
+		nih_debug ("will not start usplash");
+		return;
+	}
+
+	/* Get the usplash job, of course it might not be installed! */
+	if (upstart_get_job_by_name_sync (NULL, upstart, "usplash",
+					  &usplash_path) < 0) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_debug ("unable to find usplash job: %s", err->message);
+		nih_free (err);
+
+		splash = FALSE;
+		return;
+	}
+
+	usplash = NIH_SHOULD (nih_dbus_proxy_new (NULL, upstart->connection,
+						  NULL, usplash_path,
+						  NULL, NULL));
+	if (! usplash) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_warn ("%s: %s", _("Unable to create proxy to usplash"),
+			  err->message);
+		nih_free (err);
+
+		splash = FALSE;
+		return;
+	}
+
+	/* Hook up signals so we can watch the instances going away and
+	 * coming back.  Not ideal, but as good as 0.6 will give us.
+	 */
+	if (! NIH_SHOULD (nih_dbus_proxy_connect (usplash, &job_class_com_ubuntu_Upstart0_6_Job,
+						  "InstanceAdded",
+						  (NihDBusSignalHandler)usplash_instance_added, NULL))) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_warn ("%s: %s", _("Unable to hook usplash InstanceAdded"),
+			  err->message);
+		nih_free (err);
+
+		nih_free (usplash);
+		usplash = NULL;
+		return;
+	}
+
+	if (! NIH_SHOULD (nih_dbus_proxy_connect (usplash, &job_class_com_ubuntu_Upstart0_6_Job,
+						  "InstanceRemoved",
+						  (NihDBusSignalHandler)usplash_instance_removed, NULL))) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_warn ("%s: %s", _("Unable to hook usplash InstanceRemoved"),
+			  err->message);
+		nih_free (err);
+
+		nih_free (usplash);
+		usplash = NULL;
+		return;
+	}
+
+	/* Now see if there is an instance */
+	if (job_class_get_instance_by_name_sync (NULL, usplash, "", &path) < 0) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_free (err);
+
+		nih_debug ("usplash is not running");
+		return;
+	}
+
+	splash_running = TRUE;
+	nih_debug ("usplash is running");
+}
+
+
 int
 tmptime_option (NihOption * option,
 		const char *arg)
@@ -2916,6 +3063,8 @@ main (int   argc,
 				    NIH_IO_READ,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
+
+	track_usplash ();
 
 	mounts = NIH_MUST (nih_list_new (NULL));
 	fsck_queue = NIH_MUST (nih_list_new (NULL));
