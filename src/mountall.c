@@ -77,6 +77,7 @@
 #define USPLASH_OUTFIFO "/dev/.initramfs/usplash_outfifo"
 
 #define BOREDOM_TIMEOUT 3
+#define FSCK_TIMEOUT    1
 
 
 typedef enum {
@@ -212,6 +213,7 @@ void   stop_usplash         (void);
 void   usplash_write        (const char *format, ...);
 
 void   boredom              (void *data, NihTimer *timer);
+void   fsck_progress        (void *data, NihTimer *timer);
 void   fsck_reader          (Mount *mnt, NihIo *io,
 			     const char *buf, size_t len);
 
@@ -382,6 +384,13 @@ int splash_running = FALSE;
  * Timer for displaying messages when we get bored of waiting.
  **/
 NihTimer *boredom_timer = NULL;
+
+/**
+ * fsck_timer:
+ *
+ * Timer for displaying regular updates on fsck progress.
+ **/
+NihTimer *fsck_timer = NULL;
 
 
 /**
@@ -3165,29 +3174,114 @@ void
 boredom (void *    data,
 	 NihTimer *timer)
 {
+	int bored = FALSE;
+
+	/* Make sure there's no fsck in progress, and that we're actually
+	 * waiting on something
+	 */
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->fsck_progress >= 0)
+			return;
+
+		if ((! mnt->mounted) || needs_remount (mnt)
+		    || (mnt->mount_pid > 0))
+			bored = TRUE;
+	}
+
+	if (! bored)
+		return;
+
+
+	/* Display something on the splash screen as well as the console */
 	start_usplash ();
+	usplash_write ("CLEAR");
+	usplash_write ("TIMEOUT 0");
+	usplash_write ("TEXT-URGENT One or more of the devices mountpoints listed in /etc/fstab cannot yet be mounted");
 
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
 		if ((! mnt->mounted) || needs_remount (mnt)) {
-			nih_message (_("Waiting for %s (%s)"),
+			nih_message (_("%s: waiting for %s"),
 				     is_swap (mnt) ? "swap" : mnt->mountpoint,
 				     mnt->device);
-			usplash_write ("TEXT-URGENT Waiting for %s (%s)",
+			usplash_write ("TEXT-URGENT %s: waiting for %s",
 				       is_swap (mnt) ? "swap" : mnt->mountpoint,
 				       mnt->device);
 		} else if (mnt->mount_pid > 0) {
-			nih_message (_("Waiting for %s (pid %d)"),
+			nih_message (_("%s: mounting (pid %d)"),
 				     is_swap (mnt) ? mnt->device : mnt->mountpoint,
 				     mnt->mount_pid);
-			usplash_write ("TEXT-URGENT Waiting for %s (pid %d)",
+			usplash_write ("TEXT-URGENT %s: mounting (pid %d)",
 				       is_swap (mnt) ? mnt->device : mnt->mountpoint,
 				       mnt->mount_pid);
 		}
 	}
 
 	boredom_timer = NULL;
+}
+
+void
+fsck_progress (void *    data,
+	       NihTimer *timer)
+{
+	static int displaying_progress = 0;
+	int        total_progress = 0;
+	int        num_fscks = 0;
+	int        blips = 0;
+	char       progress[61];
+
+	/* First make a pass through to update the console, this isn't
+	 * as pretty since we can only really display one progress bar.
+	 */
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->fsck_progress >= 0) {
+			num_fscks++;
+			total_progress += mnt->fsck_progress;
+		}
+	}
+
+	if (! num_fscks)
+		return;
+
+	if (! displaying_progress) {
+		printf ("Filesystem checks are in progress\n");
+		fflush (stdout);
+	}
+	displaying_progress = 1;
+
+	blips = (total_progress * 60) / (num_fscks * 100);
+
+	memset (progress, '#', blips);
+	memset (progress + blips, '-', 60-blips);
+	progress[61] = '\0';
+
+	printf ("[%s]\r", progress);
+	fflush (stdout);
+
+	if (! splash)
+		return;
+
+	/* Now we do something prettier for the splash screen */
+	start_usplash ();
+	usplash_write ("CLEAR");
+	usplash_write ("TIMEOUT 0");
+	usplash_write ("TEXT-URGENT Filesystem checks are in progress");
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->fsck_progress >= 0) {
+			usplash_write ("TEXT-URGENT %s (%s)",
+				       is_swap (mnt) ? "swap" : mnt->mountpoint,
+				       mnt->device);
+			usplash_write ("STATUS %d%%", mnt->fsck_progress);
+		}
+	}
 }
 
 void
@@ -3367,10 +3461,13 @@ main (int   argc,
 	mount_policy ();
 
 	/* Create a timer for displaying what we're waiting for after a
-	 * few seconds of inactivity.
+	 * few seconds of inactivity, and another for updates on fsck
+	 * progress.
 	 */
 	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, BOREDOM_TIMEOUT,
 							 boredom, NULL));
+	fsck_timer = NIH_MUST (nih_timer_add_periodic (NULL, FSCK_TIMEOUT,
+						       fsck_progress, NULL));
 
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
