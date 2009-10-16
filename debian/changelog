@@ -10,6 +10,8 @@ mountall (0.2.3) UNRELEASED; urgency=low
     mtab entries.  LP: #431865.
   * Stop the recovery shell if the user runs shutdown within it, so we
     don't run mountall again.  LP: #452196.
+  * If the root filesystem check fails, we'll need to reboot, so just have
+    the recovery shell script do that.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 14 Oct 2009 05:11:16 +0100
 
