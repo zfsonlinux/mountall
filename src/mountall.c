@@ -73,6 +73,12 @@
 #include "com.ubuntu.Upstart.Job.h"
 
 
+#define USPLASH_FIFO    "/dev/.initramfs/usplash_fifo"
+#define USPLASH_OUTFIFO "/dev/.initramfs/usplash_outfifo"
+
+#define BOREDOM_TIMEOUT 3
+
+
 typedef enum {
 	TAG_OTHER,
 	TAG_LOCAL,
@@ -1747,9 +1753,11 @@ run_mount_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
+	/* Refresh the boredom timer now we've finished trying to mount */
 	if (boredom_timer)
 		nih_free (boredom_timer);
-	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, BOREDOM_TIMEOUT,
+							 boredom, NULL));
 
 	if (status) {
 		if (mnt->again) {
@@ -1817,9 +1825,11 @@ run_swapon_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
+	/* Refresh the boredom timer now we've finished trying to swapon */
 	if (boredom_timer)
 		nih_free (boredom_timer);
-	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, BOREDOM_TIMEOUT,
+							 boredom, NULL));
 
 	/* Swapon doesn't return any useful status codes, so we just
 	 * carry on regardless if it failed.
@@ -2175,6 +2185,7 @@ run_fsck (Mount *mnt)
 
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
+	/* Cancel the boredom timer while an fsck is running */
 	if (boredom_timer)
 		nih_free (boredom_timer);
 	boredom_timer = NULL;
@@ -2192,9 +2203,11 @@ run_fsck_finished (Mount *mnt,
 
 	mnt->fsck_pid = -1;
 
+	/* Refresh the boredom timer now we've finished trying to fsck */
 	if (boredom_timer)
 		nih_free (boredom_timer);
-	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, BOREDOM_TIMEOUT,
+							 boredom, NULL));
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s",
@@ -3021,6 +3034,8 @@ start_usplash (void)
 
 	if (! splash)
 		return;
+	if (splash_running)
+		return;
 
 	env = NIH_MUST (nih_str_array_new (NULL));
 
@@ -3056,6 +3071,8 @@ stop_usplash (void)
 	int              error = FALSE;
 
 	if (! splash)
+		return;
+	if (! splash_running)
 		return;
 
 	env = NIH_MUST (nih_str_array_new (NULL));
@@ -3268,8 +3285,11 @@ main (int   argc,
 	/* Apply policy as to what waits for what, etc. */
 	mount_policy ();
 
-	/* Create a timer for displaying what we're waiting for */
-	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
+	/* Create a timer for displaying what we're waiting for after a
+	 * few seconds of inactivity.
+	 */
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, BOREDOM_TIMEOUT,
+							 boredom, NULL));
 
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
