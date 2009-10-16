@@ -3116,7 +3116,7 @@ usplash_write (const char *format, ...)
 	message = NIH_MUST (nih_vsprintf (NULL, format, args));
 	va_end (args);
 
-	fd = open ("/dev/.initramfs/usplash_fifo", O_WRONLY | O_NONBLOCK);
+	fd = open (USPLASH_FIFO, O_WRONLY | O_NONBLOCK);
 	if (fd < 0)
 		return;
 
