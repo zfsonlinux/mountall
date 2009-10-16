@@ -52,3 +52,7 @@ nih-dbus-tool
 src/mountall
 src/com.ubuntu.Upstart.c
 src/com.ubuntu.Upstart.h
+src/com.ubuntu.Upstart.Job.c
+src/com.ubuntu.Upstart.Job.h
+src/com.ubuntu.Upstart.Instance.c
+src/com.ubuntu.Upstart.Instance.h
