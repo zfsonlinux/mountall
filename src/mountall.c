@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <mntent.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -51,6 +52,8 @@
 #include <nih/alloc.h>
 #include <nih/string.h>
 #include <nih/list.h>
+#include <nih/hash.h>
+#include <nih/timer.h>
 #include <nih/signal.h>
 #include <nih/child.h>
 #include <nih/io.h>
@@ -58,10 +61,12 @@
 #include <nih/option.h>
 #include <nih/logging.h>
 #include <nih/error.h>
-#include <nih/hash.h>
+#include <nih/errors.h>
 
+#include <nih-dbus/dbus_error.h>
 #include <nih-dbus/dbus_connection.h>
 #include <nih-dbus/dbus_proxy.h>
+#include <nih-dbus/errors.h>
 
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
@@ -195,6 +200,11 @@ int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
 
 void   track_usplash        (void);
+void   start_usplash        (void);
+void   stop_usplash         (void);
+void   usplash_write        (const char *format, ...);
+
+void   boredom              (void *data, NihTimer *timer);
 
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
@@ -356,6 +366,13 @@ int splash = FALSE;
  * Whether usplash is running
  **/
 int splash_running = FALSE;
+
+/**
+ * boredom_timer:
+ *
+ * Timer for displaying messages when we get bored of waiting.
+ **/
+NihTimer *boredom_timer = NULL;
 
 
 /**
@@ -1730,6 +1747,10 @@ run_mount_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
+	if (boredom_timer)
+		nih_free (boredom_timer);
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
+
 	if (status) {
 		if (mnt->again) {
 			nih_debug ("%s: trying again", mnt->mountpoint);
@@ -1795,6 +1816,10 @@ run_swapon_finished (Mount *mnt,
 		    || (mnt->mount_pid == -1));
 
 	mnt->mount_pid = -1;
+
+	if (boredom_timer)
+		nih_free (boredom_timer);
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
 
 	/* Swapon doesn't return any useful status codes, so we just
 	 * carry on regardless if it failed.
@@ -2150,6 +2175,10 @@ run_fsck (Mount *mnt)
 
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
+	if (boredom_timer)
+		nih_free (boredom_timer);
+	boredom_timer = NULL;
+
 	return TRUE;
 }
 
@@ -2162,6 +2191,10 @@ run_fsck_finished (Mount *mnt,
 	nih_assert (mnt->fsck_pid == pid);
 
 	mnt->fsck_pid = -1;
+
+	if (boredom_timer)
+		nih_free (boredom_timer);
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s",
@@ -2927,6 +2960,7 @@ track_usplash (void)
 
 		nih_free (usplash);
 		usplash = NULL;
+		splash = FALSE;
 		return;
 	}
 
@@ -2942,6 +2976,7 @@ track_usplash (void)
 
 		nih_free (usplash);
 		usplash = NULL;
+		splash = FALSE;
 		return;
 	}
 
@@ -2958,6 +2993,149 @@ track_usplash (void)
 
 	splash_running = TRUE;
 	nih_debug ("usplash is running");
+}
+
+static void
+usplash_error (int *           error,
+	       NihDBusMessage *message)
+{
+	NihDBusError *dbus_err;
+
+	dbus_err = (NihDBusError *)nih_error_get ();
+	if ((dbus_err->number != NIH_DBUS_ERROR)
+	    || strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStarted")
+	    || strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStopped")) {
+		nih_warn ("%s", dbus_err->message);
+		*error = TRUE;
+	}
+	nih_free (dbus_err);
+}
+
+void
+start_usplash (void)
+{
+	DBusPendingCall *pending_call;
+	nih_local char **env = NULL;
+	size_t           env_len = 0;
+	int              error = FALSE;
+
+	if (! splash)
+		return;
+
+	env = NIH_MUST (nih_str_array_new (NULL));
+
+	pending_call = NIH_SHOULD (job_class_start (usplash, env, TRUE, NULL,
+						    (NihDBusErrorHandler)usplash_error, &error,
+						    NIH_DBUS_TIMEOUT_NEVER));
+	if (! pending_call) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_warn ("%s", err->message);
+		nih_free (err);
+
+		return;
+	}
+
+	dbus_pending_call_block (pending_call);
+
+	dbus_pending_call_unref (pending_call);
+
+	if (! error) {
+		splash_running = TRUE;
+		nih_debug ("usplash is now running");
+	}
+}
+
+void
+stop_usplash (void)
+{
+	DBusPendingCall *pending_call;
+	nih_local char **env = NULL;
+	size_t           env_len = 0;
+	int              error = FALSE;
+
+	if (! splash)
+		return;
+
+	env = NIH_MUST (nih_str_array_new (NULL));
+
+	pending_call = NIH_SHOULD (job_class_stop (usplash, env, TRUE, NULL,
+						   (NihDBusErrorHandler)usplash_error, &error,
+						   NIH_DBUS_TIMEOUT_NEVER));
+	if (! pending_call) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_warn ("%s", err->message);
+		nih_free (err);
+
+		return;
+	}
+
+	dbus_pending_call_block (pending_call);
+
+	dbus_pending_call_unref (pending_call);
+
+	if (! error) {
+		splash_running = FALSE;
+		nih_debug ("usplash is no longer running");
+	}
+}
+
+void
+usplash_write (const char *format, ...)
+{
+	va_list         args;
+	nih_local char *message = NULL;
+	int             fd;
+
+	if (! splash)
+		return;
+	if (! splash_running)
+		return;
+
+	va_start (args, format);
+	message = NIH_MUST (nih_vsprintf (NULL, format, args));
+	va_end (args);
+
+	fd = open ("/dev/.initramfs/usplash_fifo", O_WRONLY | O_NONBLOCK);
+	if (fd < 0)
+		return;
+
+	write (fd, message, strlen (message) + 1);
+
+	close (fd);
+}
+
+
+void
+boredom (void *    data,
+	 NihTimer *timer)
+{
+	start_usplash ();
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if ((! mnt->mounted) || needs_remount (mnt)) {
+			nih_message (_("Waiting for %s (%s)"),
+				     is_swap (mnt) ? "swap" : mnt->mountpoint,
+				     mnt->device);
+			usplash_write ("TEXT-URGENT Waiting for %s (%s)",
+				       is_swap (mnt) ? "swap" : mnt->mountpoint,
+				       mnt->device);
+		} else if (mnt->mount_pid > 0) {
+			nih_message (_("Waiting for %s (pid %d)"),
+				     is_swap (mnt) ? mnt->device : mnt->mountpoint,
+				     mnt->mount_pid);
+			usplash_write ("TEXT-URGENT Waiting for %s (pid %d)",
+				       is_swap (mnt) ? mnt->device : mnt->mountpoint,
+				       mnt->mount_pid);
+		}
+	}
+
+	boredom_timer = NULL;
 }
 
 
@@ -3089,6 +3267,9 @@ main (int   argc,
 
 	/* Apply policy as to what waits for what, etc. */
 	mount_policy ();
+
+	/* Create a timer for displaying what we're waiting for */
+	boredom_timer = NIH_MUST (nih_timer_add_timeout (NULL, 5, boredom, NULL));
 
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
