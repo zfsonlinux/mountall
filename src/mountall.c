@@ -126,6 +126,7 @@ enum exit {
 	EXIT_OK,	/* Ok */
 	EXIT_ERROR,	/* General/OS error */
 	EXIT_FSCK,	/* Filesystem check failed */
+	EXIT_ROOT_FSCK,	/* Filesystem check of root filesystem failed */
 	EXIT_MOUNT,	/* Failed to mount a filesystem */
 	EXIT_REBOOT,	/* Require a reboot */
 };
@@ -2146,8 +2147,13 @@ run_fsck_finished (Mount *mnt,
 	} else if (status & 4) {
 		nih_error ("Filesystem has errors: %s",
 			   mnt->mountpoint);
-		if (is_fhs (mnt))
-			delayed_exit (EXIT_FSCK);
+		if (is_fhs (mnt)) {
+			if (! strcmp (mnt->mountpoint, "/")) {
+				delayed_exit (EXIT_FSCK);
+			} else {
+				delayed_exit (EXIT_ROOT_FSCK);
+			}
+		}
 		return;
 	} else if (status & (8 | 16 | 128)) {
 		nih_fatal ("General fsck error");
