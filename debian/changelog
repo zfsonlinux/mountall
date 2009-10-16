@@ -1,4 +1,4 @@
-mountall (0.2.2ubuntu1) UNRELEASED; urgency=low
+mountall (0.2.3) UNRELEASED; urgency=low
 
   * Hide error removing /forcefsck, people mis-report this as a bug and
     don't tell us the error above it.
@@ -8,6 +8,8 @@ mountall (0.2.2ubuntu1) UNRELEASED; urgency=low
     LP: #431954, #443080.
   * Unlink /etc/mtab~ after creating/truncating /etc/mtab and before writing
     mtab entries.  LP: #431865.
+  * Stop the recovery shell if the user runs shutdown within it, so we
+    don't run mountall again.  LP: #452196.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 14 Oct 2009 05:11:16 +0100
 
