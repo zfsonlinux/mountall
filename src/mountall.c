@@ -46,6 +46,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fnmatch.h>
+#include <termios.h>
 #include <dirent.h>
 
 #include <nih/macros.h>
@@ -217,6 +218,10 @@ void   fsck_progress        (void *data, NihTimer *timer);
 void   fsck_reader          (Mount *mnt, NihIo *io,
 			     const char *buf, size_t len);
 
+void   escape_poll          (void *data, NihTimer *timer);
+void   escape_reader        (void *data, NihIo *io,
+			     const char *buf, size_t len);
+
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
 
@@ -365,6 +370,14 @@ int written_mtab = FALSE;
 int exit_code = -1;
 
 /**
+ * escape_aborts:
+ *
+ * When TRUE, pressing the escape key aborts rather than skips a filesystem
+ * check.
+ */
+int escape_aborts = FALSE;
+
+/**
  * splash:
  *
  * Whether we should start usplash.
@@ -379,6 +392,13 @@ int splash = FALSE;
 int splash_running = FALSE;
 
 /**
+ * splash_started:
+ *
+ * Whether we started usplash.
+ **/
+int splash_started = FALSE;
+
+/**
  * boredom_timer:
  *
  * Timer for displaying messages when we get bored of waiting.
@@ -391,6 +411,13 @@ NihTimer *boredom_timer = NULL;
  * Timer for displaying regular updates on fsck progress.
  **/
 NihTimer *fsck_timer = NULL;
+
+/**
+ * escape_timer:
+ *
+ * Timer for checking for the escape key from usplash.
+ **/
+NihTimer *escape_timer = NULL;
 
 
 /**
@@ -1609,10 +1636,7 @@ spawn_child_handler (Process *      proc,
 				   pid, status);
 		}
 
-		delayed_exit (EXIT_ERROR);
-
-		nih_free (proc);
-		return;
+		status <<= 8;
 	} else if (status) {
 		nih_warn ("%s %s [%d] terminated with status %d", proc->args[0],
 			  is_swap (proc->mnt) ? proc->mnt->device : proc->mnt->mountpoint,
@@ -2269,16 +2293,16 @@ run_fsck_finished (Mount *mnt,
 			}
 		}
 		return;
-	} else if (status & (8 | 16 | 128)) {
+	} else if ((status & 32) || (status == SIGTERM)) {
+		nih_info ("Filesytem check cancelled: %s",
+			  mnt->mountpoint);
+	} else if ((status & (8 | 16 | 128)) || (status > 255)) {
 		nih_fatal ("General fsck error");
 		if (is_fhs (mnt))
 			delayed_exit (EXIT_ERROR);
 		return;
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s",
-			  mnt->mountpoint);
-	} else if (status & 32) {
-		nih_info ("Filesytem check cancelled: %s",
 			  mnt->mountpoint);
 	}
 
@@ -2944,6 +2968,9 @@ usplash_instance_removed (void *          data,
 {
 	nih_debug ("usplash stopped");
 	splash_running = FALSE;
+
+	/* If usplash is ever stopped, we do not start it again */
+	splash = FALSE;
 }
 
 void
@@ -2954,6 +2981,9 @@ track_usplash (void)
 	char *          tok;
 	nih_local char *usplash_path;
 	nih_local char *path;
+
+	if (getenv ("NOSPLASH"))
+		return;
 
 	/* Make sure splash is enabled on the kernel command-line */
 	cmdline = fopen ("/proc/cmdline", "r");
@@ -3075,6 +3105,7 @@ start_usplash (void)
 	nih_local char **env = NULL;
 	size_t           env_len = 0;
 	int              error = FALSE;
+	int              fd;
 
 	if (! splash)
 		return;
@@ -3102,6 +3133,7 @@ start_usplash (void)
 
 	if (! error) {
 		splash_running = TRUE;
+		splash_started = TRUE;
 		nih_debug ("usplash is now running");
 	}
 }
@@ -3142,6 +3174,9 @@ stop_usplash (void)
 		splash_running = FALSE;
 		nih_debug ("usplash is no longer running");
 	}
+
+	/* If we ever stop usplash by hand, we never start it again */
+	splash = FALSE;
 }
 
 void
@@ -3175,6 +3210,9 @@ boredom (void *    data,
 	 NihTimer *timer)
 {
 	int bored = FALSE;
+	int fd;
+
+	boredom_timer = NULL;
 
 	/* Make sure there's no fsck in progress, and that we're actually
 	 * waiting on something
@@ -3182,23 +3220,31 @@ boredom (void *    data,
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (mnt->fsck_progress >= 0)
+		if ((mnt->fsck_pid > 0)
+		    && (mnt->fsck_progress >= 0)) {
+			nih_debug ("fsck in progress for %d", mnt->fsck_progress);
 			return;
+		}
 
 		if ((! mnt->mounted) || needs_remount (mnt)
 		    || (mnt->mount_pid > 0))
 			bored = TRUE;
 	}
 
-	if (! bored)
+	if (! bored) {
+		nih_debug ("Didn't find anything");
 		return;
+	}
+
+	escape_aborts = TRUE;
 
 
 	/* Display something on the splash screen as well as the console */
 	start_usplash ();
 	usplash_write ("CLEAR");
 	usplash_write ("TIMEOUT 0");
-	usplash_write ("TEXT-URGENT One or more of the devices mountpoints listed in /etc/fstab cannot yet be mounted");
+	usplash_write ("VERBOSE on");
+	usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted");
 
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
@@ -3207,20 +3253,23 @@ boredom (void *    data,
 			nih_message (_("%s: waiting for %s"),
 				     is_swap (mnt) ? "swap" : mnt->mountpoint,
 				     mnt->device);
-			usplash_write ("TEXT-URGENT %s: waiting for %s",
+			usplash_write ("TEXT %s: waiting for %s",
 				       is_swap (mnt) ? "swap" : mnt->mountpoint,
 				       mnt->device);
 		} else if (mnt->mount_pid > 0) {
 			nih_message (_("%s: mounting (pid %d)"),
 				     is_swap (mnt) ? mnt->device : mnt->mountpoint,
 				     mnt->mount_pid);
-			usplash_write ("TEXT-URGENT %s: mounting (pid %d)",
+			usplash_write ("TEXT %s: mounting (pid %d)",
 				       is_swap (mnt) ? mnt->device : mnt->mountpoint,
 				       mnt->mount_pid);
 		}
 	}
 
-	boredom_timer = NULL;
+	usplash_write ("TEXT Press ESC to enter a recovery shell");
+	usplash_write ("VERBOSE default");
+
+	escape_timer = NIH_MUST (nih_timer_add_periodic (NULL, 1, escape_poll, NULL));
 }
 
 void
@@ -3232,6 +3281,7 @@ fsck_progress (void *    data,
 	int        num_fscks = 0;
 	int        blips = 0;
 	char       progress[61];
+	int        fd;
 
 	/* First make a pass through to update the console, this isn't
 	 * as pretty since we can only really display one progress bar.
@@ -3239,7 +3289,8 @@ fsck_progress (void *    data,
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (mnt->fsck_progress >= 0) {
+		if ((mnt->fsck_pid > 0)
+		    && (mnt->fsck_progress >= 0)) {
 			num_fscks++;
 			total_progress += mnt->fsck_progress;
 		}
@@ -3247,6 +3298,8 @@ fsck_progress (void *    data,
 
 	if (! num_fscks)
 		return;
+
+	escape_aborts = FALSE;
 
 	if (! displaying_progress) {
 		printf ("Filesystem checks are in progress\n");
@@ -3266,22 +3319,34 @@ fsck_progress (void *    data,
 	if (! splash)
 		return;
 
+	/* We do our own escape checking */
+	if (escape_timer) {
+		nih_free (escape_timer);
+		escape_timer = NULL;
+	}
+
 	/* Now we do something prettier for the splash screen */
 	start_usplash ();
 	usplash_write ("CLEAR");
 	usplash_write ("TIMEOUT 0");
-	usplash_write ("TEXT-URGENT Filesystem checks are in progress");
+	usplash_write ("VERBOSE on");
+	usplash_write ("TEXT Filesystem checks are in progress");
 
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (mnt->fsck_progress >= 0) {
-			usplash_write ("TEXT-URGENT %s (%s)",
+		if ((mnt->fsck_pid > 0)
+		    && (mnt->fsck_progress >= 0)) {
+			usplash_write ("TEXT %s (%s)",
 				       is_swap (mnt) ? "swap" : mnt->mountpoint,
 				       mnt->device);
 			usplash_write ("STATUS %d%%", mnt->fsck_progress);
 		}
 	}
+
+	usplash_write ("TEXT Press ESC to skip");
+	usplash_write ("VERBOSE default");
+	escape_poll (NULL, NULL);
 }
 
 void
@@ -3326,6 +3391,76 @@ fsck_reader (Mount *     mnt,
 			break;
 		default:
 			nih_assert_not_reached ();
+		}
+	}
+}
+
+
+void
+escape_poll (void *    data,
+	     NihTimer *timer)
+{
+	int fd;
+
+	if (! splash)
+		return;
+	if (! splash_running)
+		return;
+
+	usplash_write ("INPUTCHAR");
+
+	fd = open (USPLASH_OUTFIFO, O_RDONLY);
+	if (fd < 0) {
+		if (timer)
+			nih_free (timer);
+		return;
+	}
+
+	if (! NIH_SHOULD (nih_io_reopen (NULL, fd, NIH_IO_STREAM,
+					 escape_reader, NULL, NULL, NULL))) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_free (err);
+
+		close (fd);
+	}
+}
+
+void
+escape_reader (void *      data,
+	       NihIo *     io,
+	       const char *buf,
+	       size_t      len)
+{
+	nih_local char *discard = NULL;
+	int             escape = FALSE;
+
+	nih_assert (io != NULL);
+	nih_assert (buf != NULL);
+
+	nih_debug ("Read %zu bytes from input stream", len);
+
+	escape = memchr (buf, '\x1b', len) ? TRUE : FALSE;
+	discard = nih_io_read (NULL, io, &len);
+
+	if (! escape) {
+		nih_debug ("no escape muahaha");
+		return;
+	}
+
+	nih_error ("CANCELLED");
+	if (escape_aborts) {
+		NIH_LIST_FOREACH (procs, iter) {
+			Process *proc = (Process *)iter;
+			kill (proc->pid, SIGTERM);
+		}
+		delayed_exit (EXIT_ERROR);
+	} else {
+		NIH_LIST_FOREACH (procs, iter) {
+			Process *proc = (Process *)iter;
+			if (proc->pid == proc->mnt->fsck_pid)
+				kill (proc->pid, SIGTERM);
 		}
 	}
 }
@@ -3381,6 +3516,7 @@ main (int   argc,
 	struct udev_monitor *udev_monitor;
 	Mount *              root;
 	int                  ret;
+	struct termios       termios;
 
 	nih_main_init (argv[0]);
 
@@ -3469,6 +3605,18 @@ main (int   argc,
 	fsck_timer = NIH_MUST (nih_timer_add_periodic (NULL, FSCK_TIMEOUT,
 						       fsck_progress, NULL));
 
+	/* Always check for Escape on standard input, for which the terminal
+	 * will need to be in non-canon mode.
+	 */
+	if (NIH_SHOULD (nih_io_reopen (NULL, STDIN_FILENO, NIH_IO_STREAM,
+				       (NihIoReader)escape_reader,
+				       NULL, NULL, NULL))) {
+		if (tcgetattr (STDIN_FILENO, &termios) == 0) {
+			termios.c_lflag &= ~ICANON;
+			tcsetattr (STDIN_FILENO, TCSANOW, &termios);
+		}
+	}
+
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
 	if (! root->mounted) {
@@ -3545,6 +3693,15 @@ main (int   argc,
 	ret = nih_main_loop ();
 
 	nih_main_unlink_pidfile ();
+
+	if (splash_started)
+		stop_usplash ();
+
+	/* Put it back in canonical mode */
+	if (tcgetattr (STDIN_FILENO, &termios) == 0) {
+		termios.c_lflag |= ICANON;
+		tcsetattr (STDIN_FILENO, TCSANOW, &termios);
+	}
 
 	return ret;
 }
