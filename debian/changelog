@@ -1,4 +1,11 @@
-mountall (0.2.3) UNRELEASED; urgency=low
+mountall (0.2.5) UNRELEASED; urgency=low
+
+  * Filesystem check progress reporting, including cancellation.  LP: 446596.
+  * When we're waiting for a mountpoint, if a few seconds of inactivity
+    passes, report what we're waiting for and allow Escape to drop you to
+    a recovery shell.
+  * Start usplash for filesystem check progress reporting or when we've
+    been waiting for more than a few seconds.  LP: #431184.
 
   * Hide error removing /forcefsck, people mis-report this as a bug and
     don't tell us the error above it.
