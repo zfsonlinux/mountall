@@ -2938,8 +2938,8 @@ track_usplash (void)
 	FILE *          cmdline;
 	char            line[4096];
 	char *          tok;
-	nih_local char *usplash_path;
-	nih_local char *path;
+	nih_local char *usplash_path = NULL;
+	nih_local char *path = NULL;
 
 	if (getenv ("NOSPLASH"))
 		return;
@@ -3062,9 +3062,7 @@ start_usplash (void)
 {
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
-	size_t           env_len = 0;
 	int              error = FALSE;
-	int              fd;
 
 	if (! splash)
 		return;
@@ -3102,7 +3100,6 @@ stop_usplash (void)
 {
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
-	size_t           env_len = 0;
 	int              error = FALSE;
 
 	if (! splash)
@@ -3666,7 +3663,8 @@ main (int   argc,
 	/* Terminal needs to be in non-canonical mode to be able to trap
 	 * Escape on the console.
 	 */
-	if (tcgetattr (STDIN_FILENO, &termios) == 0) {
+	if (isatty (STDIN_FILENO)
+	    && (tcgetattr (STDIN_FILENO, &termios) == 0)) {
 		termios.c_lflag &= ~ICANON;
 		tcsetattr (STDIN_FILENO, TCSANOW, &termios);
 	}
@@ -3679,7 +3677,8 @@ main (int   argc,
 		stop_usplash ();
 
 	/* Put it back in canonical mode */
-	if (tcgetattr (STDIN_FILENO, &termios) == 0) {
+	if (isatty (STDIN_FILENO)
+	    && (tcgetattr (STDIN_FILENO, &termios) == 0)) {
 		termios.c_lflag |= ICANON;
 		tcsetattr (STDIN_FILENO, TCSANOW, &termios);
 	}
