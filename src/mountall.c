@@ -3428,17 +3428,16 @@ escape_reader (void *      data,
 	nih_assert (io != NULL);
 	nih_assert (buf != NULL);
 
-	nih_debug ("Read %zu bytes from input stream", len);
-
 	escape = memchr (buf, '\x1b', len) ? TRUE : FALSE;
 	discard = nih_io_read (NULL, io, &len);
 
-	if (! escape) {
-		nih_debug ("no escape muahaha");
+	if (! escape)
 		return;
-	}
 
-	nih_error ("CANCELLED");
+	printf ("\n");
+	fflush (stdout);
+	nih_error ("Cancelled");
+
 	if (data) {
 		NIH_LIST_FOREACH (procs, iter) {
 			Process *proc = (Process *)iter;
