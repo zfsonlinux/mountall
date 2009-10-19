@@ -38,19 +38,16 @@ CHECK_VARS += CFLAGS="$(filter-out -fPIE,$(CFLAGS))"
 endif
 
 
-# Run the package configure script
-config.status: configure
+# Build the package
+build: build-stamp
+build-stamp:
+	dh_testdir
+
 	./configure $(confflags) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" \
 		--prefix=/usr \
 		--exec-prefix= \
 		--sysconfdir=/etc \
 		--localstatedir=/var/lib
-
-
-# Build the package
-build: build-stamp
-build-stamp: config.status
-	dh_testdir
 
 	$(MAKE)
 	touch $@
