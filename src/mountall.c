@@ -3217,8 +3217,8 @@ stdin_closed (void * data,
 	nih_assert (io != NULL);
 	nih_assert (io == stdin_io);
 
+	nih_free (stdin_io);
 	stdin_io = NULL;
-	nih_free (io);
 }
 
 static void
@@ -3228,8 +3228,8 @@ fifo_closed (void * data,
 	nih_assert (io != NULL);
 	nih_assert (io == fifo_io);
 
+	nih_free (fifo_io);
 	fifo_io = NULL;
-	nih_free (io);
 }
 
 void
