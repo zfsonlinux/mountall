@@ -3270,7 +3270,7 @@ progress_timer (void *    data,
 
 		memset (progress, '#', blips);
 		memset (progress + blips, '-', 60-blips);
-		progress[61] = '\0';
+		progress[60] = '\0';
 
 		printf ("[%s]\r", progress);
 		fflush (stdout);
