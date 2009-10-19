@@ -395,6 +395,9 @@ int splash_started = FALSE;
  **/
 int boredom_count = 0;
 
+NihIo *stdin_io = NULL;
+NihIo *fifo_io = NULL;
+
 
 /**
  * upstart:
@@ -3207,6 +3210,28 @@ fsck_reader (Mount *     mnt,
 	}
 }
 
+static void
+stdin_closed (void * data,
+	      NihIo *io)
+{
+	nih_assert (io != NULL);
+	nih_assert (io == stdin_io);
+
+	stdin_io = NULL;
+	nih_free (stdin_io);
+}
+
+static void
+fifo_closed (void * data,
+	     NihIo *io)
+{
+	nih_assert (io != NULL);
+	nih_assert (io == fifo_io);
+
+	fifo_io = NULL;
+	nih_free (fifo_io);
+}
+
 void
 progress_timer (void *    data,
 		NihTimer *timer)
@@ -3216,8 +3241,6 @@ progress_timer (void *    data,
 	int           total_progress = 0;
 	int           num_fscks = 0;
 	int           bored = FALSE;
-	static NihIo *stdin_io = NULL;
-	static NihIo *fifo_io = NULL;
 
 	/* First make a pass through the mounts to figure out whether any
 	 * fsck are in progress, or whether we're actually waiting on
@@ -3377,7 +3400,7 @@ progress_timer (void *    data,
 		stdin_io->data = (num_fscks ? (void *)0 : (void *)-1);
 	} else {
 		stdin_io = NIH_SHOULD (nih_io_reopen (NULL, STDIN_FILENO, NIH_IO_STREAM,
-						      escape_reader, NULL, NULL,
+						      escape_reader, stdin_closed, NULL,
 						      (num_fscks ? (void *)0 : (void *)-1)));
 		if (! stdin_io) {
 			NihError *err;
@@ -3393,6 +3416,7 @@ progress_timer (void *    data,
 	 */
 	if (fifo_io)
 		nih_free (fifo_io);
+	fifo_io = NULL;
 
 	if (splash) {
 		int fd;
@@ -3402,7 +3426,7 @@ progress_timer (void *    data,
 		fd = open (USPLASH_OUTFIFO, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (fd >= 0) {
 			fifo_io = NIH_SHOULD (nih_io_reopen (NULL, fd, NIH_IO_STREAM,
-							     escape_reader, NULL, NULL,
+							     escape_reader, fifo_closed, NULL,
 							     (num_fscks ? (void *)0 : (void *)-1)));
 			if (! fifo_io) {
 				NihError *err;
