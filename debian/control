@@ -11,6 +11,7 @@ Package: mountall
 Architecture: any
 Pre-Depends: ${shlibs:Depends}, ${misc:Depends}
 Replaces: upstart (<< 0.6.3-2)
+Breaks: usplash (<< 0.5.47)
 Description: filesystem mounting tool
  mountall mounts filesystems when the underlying block devices are
  ready, or when network interfaces come up, checking the filesystems

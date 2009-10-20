@@ -218,6 +218,7 @@ void   progress_timer       (void *data, NihTimer *timer);
 void   escape_reader        (void *data, NihIo *io,
 			     const char *buf, size_t len);
 
+void   int_handler          (void *data, NihSignal *signal);
 void   usr1_handler         (void *data, NihSignal *signal);
 void   delayed_exit         (int code);
 
@@ -395,8 +396,12 @@ int splash_started = FALSE;
  **/
 int boredom_count = 0;
 
-NihIo *stdin_io = NULL;
-NihIo *fifo_io = NULL;
+/**
+ * exit_on_escape:
+ *
+ * Whether we should exit when Escape or ^C are recevied.
+ **/
+int exit_on_escape = TRUE;
 
 
 /**
@@ -3210,28 +3215,6 @@ fsck_reader (Mount *     mnt,
 	}
 }
 
-static void
-stdin_closed (void * data,
-	      NihIo *io)
-{
-	nih_assert (io != NULL);
-	nih_assert (io == stdin_io);
-
-	nih_free (stdin_io);
-	stdin_io = NULL;
-}
-
-static void
-fifo_closed (void * data,
-	     NihIo *io)
-{
-	nih_assert (io != NULL);
-	nih_assert (io == fifo_io);
-
-	nih_free (fifo_io);
-	fifo_io = NULL;
-}
-
 void
 progress_timer (void *    data,
 		NihTimer *timer)
@@ -3267,9 +3250,6 @@ progress_timer (void *    data,
 
 	/* Clear anything on usplash right now */
 	usplash_write ("CLEAR");
-
-	nih_debug ("fscks %d bored %d / %d", num_fscks,
-		   boredom_count, BOREDOM_TIMEOUT);
 
 	if (num_fscks) {
 		int  blips = 0;
@@ -3315,6 +3295,9 @@ progress_timer (void *    data,
 
 		usplash_write ("TEXT Press ESC to cancel checks");
 		usplash_write ("VERBOSE default");
+
+		usplash_write ("ESCAPE %d", getpid ());
+		exit_on_escape = FALSE;
 
 	} else if (bored
 		   && (++boredom_count > BOREDOM_TIMEOUT)) {
@@ -3366,6 +3349,9 @@ progress_timer (void *    data,
 		usplash_write ("TEXT Press ESC to enter a recovery shell");
 		usplash_write ("VERBOSE default");
 
+		usplash_write ("ESCAPE %d", getpid ());
+		exit_on_escape = TRUE;
+
 	} else {
 		/* If we've just completed a filesystem check, we need to
 		 * clear the progress indicator.
@@ -3374,6 +3360,13 @@ progress_timer (void *    data,
 			printf ("\n\n");
 			fflush (stdout);
 		}
+		if (splash
+		    && (displaying_progress || displaying_bored)) {
+			usplash_write ("CLEAR");
+			usplash_write ("TIMEOUT 60");
+			usplash_write ("ESCAPE 0");
+		}
+
 		displaying_progress = 0;
 		displaying_bored = 0;
 
@@ -3381,88 +3374,22 @@ progress_timer (void *    data,
 		if (! bored)
 			boredom_count = 0;
 
-		/* Clear any escape checking */
-		if (stdin_io)
-			nih_free (stdin_io);
-		if (fifo_io)
-			nih_free (fifo_io);
-		stdin_io = fifo_io = NULL;
+		/* Return to exiting on escape/SIGINT */
+		exit_on_escape = TRUE;
 
-		/* No escape checking */
 		return;
 
-	}
-
-	/* Set up escape checking on the console, or update whether that will
-	 * exit or kill running fscks.
-	 */
-	if (stdin_io) {
-		stdin_io->data = (num_fscks ? (void *)0 : (void *)-1);
-	} else {
-		stdin_io = NIH_SHOULD (nih_io_reopen (NULL, STDIN_FILENO, NIH_IO_STREAM,
-						      escape_reader, stdin_closed, NULL,
-						      (num_fscks ? (void *)0 : (void *)-1)));
-		if (! stdin_io) {
-			NihError *err;
-
-			err = nih_error_get ();
-			nih_free (err);
-		}
-	}
-
-	/* Set up escape checking for usplash, we close multiple open
-	 * instances of the fifo reader rather than run out of file
-	 * descriptors.
-	 */
-	if (fifo_io)
-		nih_free (fifo_io);
-	fifo_io = NULL;
-
-	if (splash) {
-		int fd;
-
-		usplash_write ("INPUTCHAR");
-
-		fd = open (USPLASH_OUTFIFO, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-		if (fd >= 0) {
-			fifo_io = NIH_SHOULD (nih_io_reopen (NULL, fd, NIH_IO_STREAM,
-							     escape_reader, fifo_closed, NULL,
-							     (num_fscks ? (void *)0 : (void *)-1)));
-			if (! fifo_io) {
-				NihError *err;
-
-				err = nih_error_get ();
-				nih_free (err);
-
-				close (fd);
-			}
-		}
 	}
 }
 
-void
-escape_reader (void *      data,
-	       NihIo *     io,
-	       const char *buf,
-	       size_t      len)
+static void
+escape (void)
 {
-	nih_local char *discard = NULL;
-	int             escape = FALSE;
-
-	nih_assert (io != NULL);
-	nih_assert (buf != NULL);
-
-	escape = memchr (buf, '\x1b', len) ? TRUE : FALSE;
-	discard = nih_io_read (NULL, io, &len);
-
-	if (! escape)
-		return;
-
 	printf ("\n");
 	fflush (stdout);
 	nih_error ("Cancelled");
 
-	if (data) {
+	if (exit_on_escape) {
 		NIH_LIST_FOREACH (procs, iter) {
 			Process *proc = (Process *)iter;
 			kill (proc->pid, SIGTERM);
@@ -3475,6 +3402,22 @@ escape_reader (void *      data,
 				kill (proc->pid, SIGTERM);
 		}
 	}
+}
+
+void
+escape_reader (void *      data,
+	       NihIo *     io,
+	       const char *buf,
+	       size_t      len)
+{
+	nih_local char *discard = NULL;
+
+	nih_assert (io != NULL);
+	nih_assert (buf != NULL);
+
+	if (memchr (buf, '\x1b', len))
+		escape ();
+	discard = nih_io_read (NULL, io, &len);
 }
 
 
@@ -3582,6 +3525,14 @@ main (int   argc,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
 
+	if (! NIH_SHOULD (nih_io_reopen (NULL, STDIN_FILENO, NIH_IO_STREAM,
+					 escape_reader, NULL, NULL, NULL))) {
+		NihError *err;
+
+		err = nih_error_get ();
+		nih_free (err);
+	}
+
 	NIH_MUST (nih_timer_add_periodic (NULL, 1,
 					  progress_timer, NULL));
 	track_usplash ();
@@ -3659,20 +3610,21 @@ main (int   argc,
 		//nih_log_set_logger (nih_logger_syslog);
 
 		nih_signal_set_ignore (SIGHUP);
-
-		nih_signal_set_handler (SIGINT, nih_signal_handler);
-		NIH_MUST (nih_signal_add_handler (NULL, SIGINT, nih_main_term_signal, NULL));
 	}
 
 	nih_signal_set_handler (SIGCHLD, nih_signal_handler);
 
-	/* Handle TERM and INT signals gracefully */
+	/* Handle TERM signal gracefully */
 	nih_signal_set_handler (SIGTERM, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, nih_main_term_signal, NULL));
 
 	/* SIGUSR1 tells us that a network device came up */
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
+
+	/* SIGINT tells us to stop what we're doing */
+	nih_signal_set_handler (SIGINT, nih_signal_handler);
+	NIH_MUST (nih_signal_add_handler (NULL, SIGINT, int_handler, NULL));
 
 	/* See what we can mount straight away, and then schedule the same
 	 * function to be run each time through the main loop.
@@ -3707,6 +3659,15 @@ main (int   argc,
 	}
 
 	return ret;
+}
+
+void
+int_handler (void *     data,
+	     NihSignal *signal)
+{
+	nih_debug ("Received SIGINT");
+
+	escape ();
 }
 
 void
