@@ -1,3 +1,11 @@
+mountall (0.2.6) UNRELEASED; urgency=low
+
+  * Fix the bug where we never realise that we're down, because the
+    fact the filesystem is mounted is updated from /proc/self/mountinfo
+    rather than internally.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 00:18:04 +0100
+
 mountall (0.2.5) karmic; urgency=low
 
   * Filesystem check progress reporting, including cancellation.  LP: 446596.
