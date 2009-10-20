@@ -1439,10 +1439,10 @@ try_mounts (void)
 				try_mount (mnt, FALSE);
 			}
 		}
-
-		if (all)
-			delayed_exit (EXIT_OK);
 	}
+
+	if (all)
+		delayed_exit (EXIT_OK);
 }
 
 void
