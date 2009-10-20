@@ -2254,9 +2254,9 @@ run_fsck_finished (Mount *mnt,
 			   mnt->mountpoint);
 		if (is_fhs (mnt)) {
 			if (! strcmp (mnt->mountpoint, "/")) {
-				delayed_exit (EXIT_FSCK);
-			} else {
 				delayed_exit (EXIT_ROOT_FSCK);
+			} else {
+				delayed_exit (EXIT_FSCK);
 			}
 		}
 		return;
