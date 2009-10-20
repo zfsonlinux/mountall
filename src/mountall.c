@@ -3057,8 +3057,8 @@ usplash_error (int *           error,
 
 	dbus_err = (NihDBusError *)nih_error_get ();
 	if ((dbus_err->number != NIH_DBUS_ERROR)
-	    || strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStarted")
-	    || strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStopped")) {
+	    || (strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStarted")
+		&& strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStopped"))) {
 		nih_warn ("%s", dbus_err->message);
 		*error = TRUE;
 	}
