@@ -1,3 +1,10 @@
+mountall (0.2.7) UNRELEASED; urgency=low
+
+  [ Kees Cook ]
+  * Call out to restorecon after mounting tmpfs filesystems.  LP: #456942.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 18:13:21 +0100
+
 mountall (0.2.6) karmic; urgency=low
 
   * Fix the bug where we never realise that we're down, because the
