@@ -2,6 +2,8 @@ mountall (0.2.7) UNRELEASED; urgency=low
 
   [ Kees Cook ]
   * Call out to restorecon after mounting tmpfs filesystems.  LP: #456942.
+  * Only clear usplash when refreshing fsck progress indicators.  Regular
+    clearing was rendering verbose-mode useless.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 18:13:21 +0100
 
