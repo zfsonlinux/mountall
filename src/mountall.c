@@ -1450,10 +1450,12 @@ mounted (Mount *mnt)
 void
 try_mounts (void)
 {
-	int all = TRUE;
+	int all;
 
 	while (newly_mounted) {
 		newly_mounted = FALSE;
+
+		all = TRUE;
 
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
@@ -1463,10 +1465,10 @@ try_mounts (void)
 				try_mount (mnt, FALSE);
 			}
 		}
-	}
 
-	if (all)
-		delayed_exit (EXIT_OK);
+		if (all)
+			delayed_exit (EXIT_OK);
+	}
 }
 
 void
