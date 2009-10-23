@@ -3384,6 +3384,7 @@ progress_timer (void *    data,
 		}
 		if (splash
 		    && (displaying_progress || displaying_bored)) {
+			usplash_write ("CLEAR");
 			usplash_write ("TIMEOUT 60");
 			usplash_write ("ESCAPE 0");
 		}
