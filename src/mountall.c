@@ -3270,8 +3270,9 @@ progress_timer (void *    data,
 		}
 
 		/* Any remaining mounts? */
-		if ((! mnt->mounted) || needs_remount (mnt)
-		    || (mnt->mount_pid > 0))
+		if ((mnt->tag != TAG_OTHER)
+		    && ((! mnt->mounted) || needs_remount (mnt)
+			|| (mnt->mount_pid > 0)))
 			bored |= bored_bit;
 
 		bored_bit << 1;
