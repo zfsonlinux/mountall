@@ -3274,6 +3274,9 @@ progress_timer (void *    data,
 			bored = TRUE;
 	}
 
+	/* Clear anything on usplash right now */
+	usplash_write ("CLEAR");
+
 	if (num_fscks) {
 		int  blips = 0;
 		char progress[61];
@@ -3300,7 +3303,6 @@ progress_timer (void *    data,
 
 		/* Now we do something prettier for the splash screen */
 		start_usplash ();
-		usplash_write ("CLEAR");
 		usplash_write ("TIMEOUT 0");
 		usplash_write ("VERBOSE on");
 		usplash_write ("TEXT Filesystem checks are in progress:");
