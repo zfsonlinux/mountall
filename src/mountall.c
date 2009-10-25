@@ -3249,7 +3249,8 @@ progress_timer (void *    data,
 	static int    displaying_bored = 0;
 	int           total_progress = 0;
 	int           num_fscks = 0;
-	int           bored = FALSE;
+	int           bored = 0;
+	int           bored_bit = 1;
 
 	/* First make a pass through the mounts to figure out whether any
 	 * fsck are in progress, or whether we're actually waiting on
@@ -3271,11 +3272,10 @@ progress_timer (void *    data,
 		/* Any remaining mounts? */
 		if ((! mnt->mounted) || needs_remount (mnt)
 		    || (mnt->mount_pid > 0))
-			bored = TRUE;
-	}
+			bored |= bored_bit;
 
-	/* Clear anything on usplash right now */
-	usplash_write ("CLEAR");
+		bored_bit << 1;
+	}
 
 	if (num_fscks) {
 		int  blips = 0;
@@ -3303,6 +3303,7 @@ progress_timer (void *    data,
 
 		/* Now we do something prettier for the splash screen */
 		start_usplash ();
+		usplash_write ("CLEAR");
 		usplash_write ("TIMEOUT 0");
 		usplash_write ("VERBOSE on");
 		usplash_write ("TEXT Filesystem checks are in progress:");
@@ -3336,44 +3337,44 @@ progress_timer (void *    data,
 		}
 		displaying_progress = 0;
 
-		if (! displaying_bored) {
+		if (displaying_bored != bored) {
 			nih_message ("One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
 			nih_message ("(ESC for recovery shell)");
 			fflush (stdout);
-		}
 
-		/* Now we do something prettier for the splash screen */
-		start_usplash ();
-		usplash_write ("TIMEOUT 0");
-		usplash_write ("VERBOSE on");
-		usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
+			/* Now we do something prettier for the splash screen */
+			start_usplash ();
+			usplash_write ("TIMEOUT 0");
+			usplash_write ("VERBOSE on");
+			usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
 
-		NIH_LIST_FOREACH (mounts, iter) {
-			Mount *mnt = (Mount *)iter;
+			NIH_LIST_FOREACH (mounts, iter) {
+				Mount *mnt = (Mount *)iter;
 
-			if ((! mnt->mounted) || needs_remount (mnt)) {
-				if (! displaying_bored)
-					nih_message (_("%s: waiting for %s"),
-						     is_swap (mnt) ? "swap" : mnt->mountpoint,
-						     mnt->device);
-				usplash_write ("TEXT %s: waiting for %s",
-					       is_swap (mnt) ? "swap" : mnt->mountpoint,
-					       mnt->device);
-			} else if (mnt->mount_pid > 0) {
-				if (! displaying_bored)
-					nih_message (_("%s: mounting (pid %d)"),
-						     is_swap (mnt) ? mnt->device : mnt->mountpoint,
-						     mnt->mount_pid);
-				usplash_write ("TEXT %s: mounting (pid %d)",
-					       is_swap (mnt) ? mnt->device : mnt->mountpoint,
-					       mnt->mount_pid);
+				if ((! mnt->mounted) || needs_remount (mnt)) {
+					if (! displaying_bored)
+						nih_message (_("%s: waiting for %s"),
+							     is_swap (mnt) ? "swap" : mnt->mountpoint,
+							     mnt->device);
+					usplash_write ("TEXT %s: waiting for %s",
+						       is_swap (mnt) ? "swap" : mnt->mountpoint,
+						       mnt->device);
+				} else if (mnt->mount_pid > 0) {
+					if (! displaying_bored)
+						nih_message (_("%s: mounting (pid %d)"),
+							     is_swap (mnt) ? mnt->device : mnt->mountpoint,
+							     mnt->mount_pid);
+					usplash_write ("TEXT %s: mounting (pid %d)",
+						       is_swap (mnt) ? mnt->device : mnt->mountpoint,
+						       mnt->mount_pid);
+				}
 			}
+
+			displaying_bored = bored;
+
+			usplash_write ("TEXT Press ESC to enter a recovery shell");
+			usplash_write ("VERBOSE default");
 		}
-
-		displaying_bored = 1;
-
-		usplash_write ("TEXT Press ESC to enter a recovery shell");
-		usplash_write ("VERBOSE default");
 
 		usplash_write ("ESCAPE %d", getpid ());
 		exit_on_escape = TRUE;

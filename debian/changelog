@@ -4,8 +4,17 @@ mountall (0.2.7) UNRELEASED; urgency=low
   * Call out to restorecon after mounting tmpfs filesystems.  LP: #456942.
 
   [ Johan Kiviniemi ]
-  * Fix a bug introduced by the 0.2.6 change. In certain situations, we’d quit
-    even though we’re still waiting for some filesystems to be mounted.
+  * Fix a bug introduced by the 0.2.6 change. In certain situations, we’d
+    quit even though we’re still waiting for some filesystems to be mounted.
+
+  [ Scott James Remnant ]
+  * Don't clear the splash screen when we're waiting for filesystems,
+    instead just output following whatever else is there.  In non-verbose
+    mode this won't look any different, but it means we don't clear previous
+    verbose mode text.  LP: #458389.
+  * Only update the "waiting for one or more mounts" text if there's actually
+    a change in the set we're waiting for; this removes the need for a CLEAR
+    this case anyway.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 18:13:21 +0100
 
