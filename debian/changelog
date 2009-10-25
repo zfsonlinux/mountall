@@ -16,7 +16,8 @@ mountall (0.2.7) UNRELEASED; urgency=low
   * Only update the "waiting for one or more mounts" text if there's actually
     a change in the set we're waiting for; this removes the need for a CLEAR
     this case anyway.
-  * Don't say we're waiting for mounts we're, in fact, not waiting for.
+  * Don't say we're waiting for mounts we're, in fact, not waiting
+    for.  LP: #459859.
 
   * Stop mountall (normally) when entering recovery mode.  LP: #458060.
 
