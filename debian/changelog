@@ -18,8 +18,9 @@ mountall (0.2.7) UNRELEASED; urgency=low
     this case anyway.
   * Don't say we're waiting for mounts we're, in fact, not waiting
     for.  LP: #459859.
-
   * Stop mountall (normally) when entering recovery mode.  LP: #458060.
+
+  * Clean up source tarball.  LP: #460348.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 18:13:21 +0100
 
