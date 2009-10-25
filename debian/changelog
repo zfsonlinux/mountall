@@ -5,7 +5,8 @@ mountall (0.2.7) UNRELEASED; urgency=low
 
   [ Johan Kiviniemi ]
   * Fix a bug introduced by the 0.2.6 change. In certain situations, we’d
-    quit even though we’re still waiting for some filesystems to be mounted.
+    quit even though we’re still waiting for some filesystems to be
+    mounted.  LP: #456806.
 
   [ Scott James Remnant ]
   * Don't clear the splash screen when we're waiting for filesystems,
