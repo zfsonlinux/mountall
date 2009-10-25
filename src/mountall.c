@@ -1450,10 +1450,12 @@ mounted (Mount *mnt)
 void
 try_mounts (void)
 {
-	int all = TRUE;
+	int all;
 
 	while (newly_mounted) {
 		newly_mounted = FALSE;
+
+		all = TRUE;
 
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
@@ -1463,10 +1465,10 @@ try_mounts (void)
 				try_mount (mnt, FALSE);
 			}
 		}
-	}
 
-	if (all)
-		delayed_exit (EXIT_OK);
+		if (all)
+			delayed_exit (EXIT_OK);
+	}
 }
 
 void
@@ -3272,6 +3274,9 @@ progress_timer (void *    data,
 			bored = TRUE;
 	}
 
+	/* Clear anything on usplash right now */
+	usplash_write ("CLEAR");
+
 	if (num_fscks) {
 		int  blips = 0;
 		char progress[61];
@@ -3298,7 +3303,6 @@ progress_timer (void *    data,
 
 		/* Now we do something prettier for the splash screen */
 		start_usplash ();
-		usplash_write ("CLEAR");
 		usplash_write ("TIMEOUT 0");
 		usplash_write ("VERBOSE on");
 		usplash_write ("TEXT Filesystem checks are in progress:");
