@@ -1,4 +1,4 @@
-mountall (1.0) UNRELEASED; urgency=low
+mountall (1.0) karmic; urgency=low
 
   [ Kees Cook ]
   * Call out to restorecon after mounting tmpfs filesystems.  LP: #456942.
@@ -22,7 +22,7 @@ mountall (1.0) UNRELEASED; urgency=low
 
   * Clean up source tarball.  LP: #460348.
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 21 Oct 2009 18:13:21 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Mon, 26 Oct 2009 09:30:41 +0000
 
 mountall (0.2.6) karmic; urgency=low
 
