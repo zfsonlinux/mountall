@@ -3275,7 +3275,7 @@ progress_timer (void *    data,
 			|| (mnt->mount_pid > 0)))
 			bored |= bored_bit;
 
-		bored_bit << 1;
+		bored_bit <<= 1;
 	}
 
 	if (num_fscks) {
