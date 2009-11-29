@@ -3,7 +3,7 @@ Section: admin
 Priority: required
 Maintainer: Scott James Remnant <scott@ubuntu.com>
 Standards-Version: 3.8.0.0
-Build-Depends: debhelper (>= 7.3.15ubuntu2~boot7), pkg-config (>= 0.22), libdbus-1-dev (>= 1.2.16), libexpat1-dev (>= 2.0.0), libudev-dev (>= 146)
+Build-Depends: debhelper (>= 7.3.15ubuntu2~boot7), pkg-config (>= 0.22), libnih-dev (>= 1.0.0), libnih-dbus-dev (>= 1.0.0), nih-dbus-tool (>= 1.0.0), libdbus-1-dev (>= 1.2.16), libexpat1-dev (>= 2.0.0), libudev-dev (>= 146)
 Vcs-Bzr: lp:~ubuntu-core-dev/ubuntu/karmic/mountall/ubuntu
 Vcs-Browser: http://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu/karmic/mountall/ubuntu
 
