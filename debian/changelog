@@ -1,8 +1,10 @@
 mountall (1.1) UNRELEASED; urgency=low
 
+  * Update to use external libnih.
+  * Updated autoconf details at same time to match libnih.
   * rcS is a job, not an event.  LP: #456806.
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 28 Oct 2009 09:59:34 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Sun, 29 Nov 2009 20:02:20 +0000
 
 mountall (1.0) karmic; urgency=low
 

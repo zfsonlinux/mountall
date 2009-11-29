@@ -1,6 +1,8 @@
 ## Process this file with automake to produce Makefile.in
 
 AM_CFLAGS = \
+	$(NIH_CFLAGS) \
+	$(NIH_DBUS_CFLAGS) \
 	$(DBUS_CFLAGS) \
 	$(UDEV_CFLAGS)
 
@@ -20,11 +22,11 @@ nodist_mountall_SOURCES = \
 	$(com_ubuntu_Upstart_Job_OUTPUTS) \
 	$(com_ubuntu_Upstart_Instance_OUTPUTS)
 mountall_LDADD = \
-	../nih/libnih.la \
-	../nih-dbus/libnih-dbus.la \
-	$(LTLIBINTL) \
+	$(NIH_LIBS) \
+	$(NIH_DBUS_LIBS) \
 	$(DBUS_LIBS) \
-	$(UDEV_LIBS)
+	$(UDEV_LIBS) \
+	$(LTLIBINTL)
 
 
 com_ubuntu_Upstart_OUTPUTS = \
@@ -34,9 +36,11 @@ com_ubuntu_Upstart_OUTPUTS = \
 com_ubuntu_Upstart_XML = \
 	../dbus/com.ubuntu.Upstart.xml
 
-$(com_ubuntu_Upstart_OUTPUTS): $(com_ubuntu_Upstart_XML) $(top_builddir)/nih-dbus-tool/nih-dbus-tool
-	$(top_builddir)/nih-dbus-tool/nih-dbus-tool \
-		--mode=proxy --prefix=upstart --default-interface=com.ubuntu.Upstart0_6 \
+$(com_ubuntu_Upstart_OUTPUTS): $(com_ubuntu_Upstart_XML)
+	$(NIH_DBUS_TOOL) \
+		--package=$(PACAKGE) \
+		--mode=proxy --prefix=upstart \
+		--default-interface=com.ubuntu.Upstart0_6 \
 		--output=$@ $<
 
 
@@ -47,9 +51,11 @@ com_ubuntu_Upstart_Job_OUTPUTS = \
 com_ubuntu_Upstart_Job_XML = \
 	../dbus/com.ubuntu.Upstart.Job.xml
 
-$(com_ubuntu_Upstart_Job_OUTPUTS): $(com_ubuntu_Upstart_Job_XML) $(top_builddir)/nih-dbus-tool/nih-dbus-tool
-	$(top_builddir)/nih-dbus-tool/nih-dbus-tool \
-		--mode=proxy --prefix=job_class --default-interface=com.ubuntu.Upstart0_6.Job \
+$(com_ubuntu_Upstart_Job_OUTPUTS): $(com_ubuntu_Upstart_Job_XML)
+	$(NIH_DBUS_TOOL) \
+		--package=$(PACKAGE) \
+		--mode=proxy --prefix=job_class \
+		--default-interface=com.ubuntu.Upstart0_6.Job \
 		--output=$@ $<
 
 
@@ -60,9 +66,11 @@ com_ubuntu_Upstart_Instance_OUTPUTS = \
 com_ubuntu_Upstart_Instance_XML = \
 	../dbus/com.ubuntu.Upstart.Instance.xml
 
-$(com_ubuntu_Upstart_Instance_OUTPUTS): $(com_ubuntu_Upstart_Instance_XML) $(top_builddir)/nih-dbus-tool/nih-dbus-tool
-	$(top_builddir)/nih-dbus-tool/nih-dbus-tool \
-		--mode=proxy --prefix=job --default-interface=com.ubuntu.Upstart0_6.Instance \
+$(com_ubuntu_Upstart_Instance_OUTPUTS): $(com_ubuntu_Upstart_Instance_XML)
+	$(NIH_DBUS_TOOL) \
+		--package=$(PACKAGE) \
+		--mode=proxy --prefix=job \
+		--default-interface=com.ubuntu.Upstart0_6.Instance \
 		--output=$@ $<
 
 

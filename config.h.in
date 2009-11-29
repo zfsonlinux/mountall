@@ -96,7 +96,7 @@
 /* Define to 1 if you have the `getuid' function. */
 #undef HAVE_GETUID
 
-/* Define if you have the iconv() function. */
+/* Define if you have the iconv() function and it works. */
 #undef HAVE_ICONV
 
 /* Define if you have the 'intmax_t' type in <stdint.h> or <inttypes.h>. */
@@ -117,9 +117,6 @@
 
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
-
-/* Define if you have the 'long double' type. */
-#undef HAVE_LONG_DOUBLE
 
 /* Define to 1 if the system has the type `long long int'. */
 #undef HAVE_LONG_LONG_INT
@@ -210,14 +207,8 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define if you have the 'unsigned long long' type. */
-#undef HAVE_UNSIGNED_LONG_LONG
-
 /* Define to 1 if the system has the type `unsigned long long int'. */
 #undef HAVE_UNSIGNED_LONG_LONG_INT
-
-/* Define to 1 if you have the <valgrind/valgrind.h> header file. */
-#undef HAVE_VALGRIND_VALGRIND_H
 
 /* Define to 1 or 0, depending whether the compiler supports simple visibility
    declarations. */
@@ -357,9 +348,6 @@
 
 /* Define to 1 if you need to in order for `stat' and other things to work. */
 #undef _POSIX_SOURCE
-
-/* Define to empty if `__thread' is not supported. */
-#undef __thread
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
