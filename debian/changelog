@@ -1,3 +1,9 @@
+mountall (1.1) UNRELEASED; urgency=low
+
+  * rcS is a job, not an event.  LP: #456806.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 28 Oct 2009 09:59:34 +0000
+
 mountall (1.0) karmic; urgency=low
 
   [ Kees Cook ]
