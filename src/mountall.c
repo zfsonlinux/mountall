@@ -69,6 +69,8 @@
 #include <nih-dbus/dbus_proxy.h>
 #include <nih-dbus/errors.h>
 
+#include "ioprio.h"
+
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
 #include "com.ubuntu.Upstart.Job.h"
@@ -330,6 +332,16 @@ size_t num_filesystems = 0;
  * the list is a Process structure.
  **/
 NihList *procs = NULL;
+
+/**
+ * checks:
+ *
+ * List of active fsck instances, sorted by the priority (highest priority
+ * first).
+ *
+ * Each entry is a NihListEntry with a Mount object as the data member.
+ **/
+NihList *checks = NULL;
 
 /**
  * written_mtab:
@@ -1087,6 +1099,17 @@ is_remote (Mount *mnt)
 	}
 }
 
+static int
+mount_priority (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	if (mnt->tag > TAG_OTHER)
+		return 1;
+
+	return 0;
+}
+
 void
 mount_policy (void)
 {
@@ -1539,6 +1562,9 @@ spawn (Mount *         mnt,
 		return -1;
 	} else if (! pid) {
 		nih_local char *msg = NULL;
+
+		if (setpgid (0, 0) < 0)
+			nih_warn ("setpgid: %s", strerror (errno));
 
 		for (char * const *arg = args; arg && *arg; arg++)
 			NIH_MUST (nih_strcat_sprintf (&msg, NULL, msg ? " %s" : "%s", *arg));
@@ -2035,6 +2061,117 @@ finish:
 	}
 }
 
+static void
+checks_update_priorities (void)
+{
+	nih_local NihHash *locks = NULL;
+
+	int                ioprio_normal,
+			   ioprio_low;
+
+	ioprio_normal = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_BE, IOPRIO_NORM);
+	ioprio_low = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_IDLE, 7);
+
+	locks = NIH_MUST (nih_hash_string_new (NULL, 10));
+
+	nih_debug ("updating check priorities");
+
+	NIH_LIST_FOREACH (checks, iter) {
+		Mount *mnt = ((NihListEntry *)iter)->data;
+		int    low_prio = FALSE;
+
+		update_physical_dev_ids (mnt);
+
+		/* Set low_prio if something else has already locked one of the
+		 * dev_ids.
+		 */
+		NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
+			char *dev_id = ((NihListEntry *)diter)->str;
+
+			if (nih_hash_lookup (locks, dev_id)) {
+				low_prio = TRUE;
+				break;
+			}
+		}
+
+		if (! low_prio) {
+			/* Lock the dev_ids. */
+			NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
+				char *        dev_id;
+				NihListEntry *entry;
+
+				dev_id = ((NihListEntry *)diter)->str;
+
+				entry = NIH_MUST (nih_list_entry_new (locks));
+				entry->str = dev_id;
+				nih_ref (entry->str, entry);
+
+				nih_hash_add (locks, &entry->entry);
+			}
+		}
+
+		nih_debug ("%s: priority %s",
+			   mnt->mountpoint, low_prio ? "low" : "normal");
+
+		if (setpriority (PRIO_PGRP, mnt->fsck_pid,
+				 low_prio ? 19 : 0) < 0)
+			nih_warn ("setpriority %d: %s",
+				  mnt->fsck_pid, strerror (errno));
+
+		if (ioprio_set (IOPRIO_WHO_PGRP, mnt->fsck_pid,
+				low_prio ? ioprio_low : ioprio_normal) < 0)
+			nih_warn ("ioprio_set %d: %s",
+				  mnt->fsck_pid, strerror (errno));
+	}
+}
+
+static void
+checks_add (Mount *mnt)
+{
+	NihListEntry *entry;
+	NihList *     add_before;
+	int           mnt_prio;
+
+	nih_assert (mnt != NULL);
+
+	/* Find the first item that has a lower priority than mnt and add mnt
+	 * immediately before it, or at the end of the list if no such item was
+	 * found.
+	 */
+
+	mnt_prio = mount_priority (mnt);
+
+	add_before = checks;
+
+	NIH_LIST_FOREACH (checks, iter) {
+		Mount *imnt = ((NihListEntry *)iter)->data;
+
+		if (mount_priority (imnt) < mnt_prio) {
+			add_before = &((NihListEntry *)iter)->entry;
+			break;
+		}
+	}
+
+	entry = NIH_MUST (nih_list_entry_new (checks));
+	entry->data = mnt;
+
+	nih_list_add (add_before, &entry->entry);
+
+	checks_update_priorities ();
+}
+
+static void
+checks_remove (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+
+	NIH_LIST_FOREACH_SAFE (checks, iter)
+		if (((NihListEntry *)iter)->data == mnt)
+			nih_free (iter);
+
+	checks_update_priorities ();
+}
+
 void
 run_fsck (Mount *mnt)
 {
@@ -2117,6 +2254,8 @@ run_fsck (Mount *mnt)
 	mnt->fsck_progress = -1;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
+	checks_add (mnt);
+
 	/* Close writing end, reading end is left open inside the NihIo
 	 * structure watching it until the remote end is closed by fsck
 	 * finishing.
@@ -2132,6 +2271,8 @@ run_fsck_finished (Mount *mnt,
 {
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->fsck_pid == pid);
+
+	checks_remove (mnt);
 
 	mnt->fsck_pid = -1;
 	mnt->fsck_progress = -1;
@@ -3432,6 +3573,7 @@ main (int   argc,
 
 	mounts = NIH_MUST (nih_list_new (NULL));
 	procs = NIH_MUST (nih_list_new (NULL));
+	checks = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
