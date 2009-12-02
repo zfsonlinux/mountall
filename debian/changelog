@@ -1,3 +1,9 @@
+mountall (1.2~) UNRELEASED; urgency=low
+
+  * Start all fsck instances in parallel.
+
+ -- Johan Kiviniemi <debian@johan.kiviniemi.name>  Wed, 14 Oct 2009 00:58:21 +0300
+
 mountall (1.1) lucid; urgency=low
 
   * Update to use external libnih.

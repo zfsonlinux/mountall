@@ -185,11 +185,7 @@ void   run_mount_finished   (Mount *mnt, pid_t pid, int status);
 void   run_swapon           (Mount *mnt);
 void   run_swapon_finished  (Mount *mnt, pid_t pid, int status);
 
-int    fsck_lock            (Mount *mnt);
-void   fsck_unlock          (Mount *mnt);
-void   queue_fsck           (Mount *mnt);
-void   run_fsck_queue       (void);
-int    run_fsck             (Mount *mnt);
+void   run_fsck             (Mount *mnt);
 void   run_fsck_finished    (Mount *mnt, pid_t pid, int status);
 
 void   write_mtab           (void);
@@ -326,24 +322,6 @@ int newly_mounted = FALSE;
  **/
 Filesystem *filesystems = NULL;
 size_t num_filesystems = 0;
-
-/**
- * fsck_queue:
- *
- * Rather than check filesystems immediately, we lock out devices so that
- * we only thrash any given disk once at a time.  This list holds the queue
- * of mounts to be checked, each entry is an NihListEntry with the data item
- * pointing to the Mount.
- **/
-NihList *fsck_queue = NULL;
-
-/**
- * fsck_locks:
- *
- * This is the hash table of held fsck device locks, each entry is an
- * NihListEntry with the device id in the str member.
- **/
-NihHash *fsck_locks = NULL;
 
 /**
  * procs:
@@ -1518,7 +1496,7 @@ try_mount (Mount *mnt,
 	 * swapon or mount as appropriate.
 	 */
 	if (! mnt->ready) {
-		queue_fsck (mnt);
+		run_fsck (mnt);
 	} else if (is_swap (mnt)) {
 		mount_event (mnt);
 		run_swapon (mnt);
@@ -2057,63 +2035,13 @@ finish:
 	}
 }
 
-/* Returns: TRUE if the devices were successfully locked; FALSE if something
- * else had already locked one or more of them.
- */
-int
-fsck_lock (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	update_physical_dev_ids (mnt);
-
-	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
-		char *dev_id = ((NihListEntry *)iter)->str;
-
-		if (nih_hash_lookup (fsck_locks, dev_id))
-			return FALSE;
-	}
-
-	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
-		char *        dev_id = ((NihListEntry *)iter)->str;
-		NihListEntry *entry;
-
-		entry = NIH_MUST (nih_list_entry_new (fsck_locks));
-		entry->str = NIH_MUST (nih_strdup (entry, dev_id));
-
-		nih_hash_add (fsck_locks, &entry->entry);
-
-		nih_debug ("%s: lock dev_id %s", mnt->mountpoint, dev_id);
-	}
-
-	return TRUE;
-}
-
 void
-fsck_unlock (Mount *mnt)
+run_fsck (Mount *mnt)
 {
-	nih_assert (mnt != NULL);
-
-	if (! mnt->physical_dev_ids)
-		return;
-
-	NIH_HASH_FOREACH (mnt->physical_dev_ids, iter) {
-		char *        dev_id = ((NihListEntry *)iter)->str;
-		NihListEntry *entry;
-
-		entry = (NihListEntry *)nih_hash_lookup (fsck_locks, dev_id);
-		nih_assert (entry != NULL);
-
-		nih_free (entry);
-
-		nih_debug ("%s: unlock dev_id %s", mnt->mountpoint, dev_id);
-	}
-}
-
-void
-queue_fsck (Mount *mnt)
-{
-	NihListEntry *entry;
+	nih_local char **args = NULL;
+	size_t           args_len = 0;
+	int              fds[2];
+	int              flags;
 
 	nih_assert (mnt != NULL);
 
@@ -2150,64 +2078,6 @@ queue_fsck (Mount *mnt)
 			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
 		return;
 	}
-
-	NIH_LIST_FOREACH (fsck_queue, iter) {
-		NihListEntry *entry = (NihListEntry *)iter;
-		Mount *       qmnt = (Mount *)entry->data;
-
-		if (mnt != qmnt)
-			continue;
-
-		nih_debug ("%s: check already queued",
-			   is_swap (mnt) ? mnt->device : mnt->mountpoint);
-		return;
-	}
-
-	entry = NIH_MUST (nih_list_entry_new (fsck_queue));
-	entry->data = mnt;
-	nih_list_add (fsck_queue, &entry->entry);
-
-	nih_debug ("%s: queuing check",
-		   is_swap (mnt) ? mnt->device : mnt->mountpoint);
-
-	run_fsck_queue ();
-}
-
-void
-run_fsck_queue (void)
-{
-	NIH_LIST_FOREACH_SAFE (fsck_queue, iter) {
-		NihListEntry *entry = (NihListEntry *)iter;
-		Mount *       mnt = (Mount *)entry->data;
-
-		if (run_fsck (mnt)) {
-			nih_free (entry);
-			nih_debug ("%s: dequeuing check",
-				   is_swap (mnt) ? mnt->device : mnt->mountpoint);
-		}
-	}
-}
-
-/* Returns: TRUE if the check can be dequeued, FALSE if it should be retried
- * later.
- */
-int
-run_fsck (Mount *mnt)
-{
-	nih_local char **args = NULL;
-	size_t           args_len = 0;
-	int              fds[2];
-	int              flags;
-
-	nih_assert (mnt != NULL);
-	nih_assert (mnt->device != NULL);
-	nih_assert (mnt->type != NULL);
-
-	if (! fsck_lock (mnt))
-		/* Another instance has already locked one or more of the
-		 * physical devices.
-		 */
-		return FALSE;
 
 	nih_info ("checking %s", mnt->mountpoint);
 
@@ -2253,8 +2123,6 @@ run_fsck (Mount *mnt)
 	 */
 	if (fds[1] >= 0)
 		close (fds[1]);
-
-	return TRUE;
 }
 
 void
@@ -2298,9 +2166,6 @@ run_fsck_finished (Mount *mnt,
 		nih_info ("Filesystem errors corrected: %s",
 			  mnt->mountpoint);
 	}
-
-	fsck_unlock (mnt);
-	run_fsck_queue ();
 
 	mnt->ready = TRUE;
 	try_mount (mnt, FALSE);
@@ -2620,7 +2485,7 @@ try_udev_device (struct udev_device *udev_device)
 
 		mnt->physical_dev_ids_needed = TRUE;
 
-		queue_fsck (mnt);
+		run_fsck (mnt);
 	}
 }
 
@@ -3566,8 +3431,6 @@ main (int   argc,
 	track_usplash ();
 
 	mounts = NIH_MUST (nih_list_new (NULL));
-	fsck_queue = NIH_MUST (nih_list_new (NULL));
-	fsck_locks = NIH_MUST (nih_hash_string_new (NULL, 10));
 	procs = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
