@@ -4,7 +4,7 @@
 
 
 CFLAGS = -Wall -g -fstack-protector -fPIE
-LDFLAGS = -Wl,-z,relro -Wl,-z,now -pie
+LDFLAGS = -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -pie
 
 # Disable optimisations if noopt found in $DEB_BUILD_OPTIONS
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))

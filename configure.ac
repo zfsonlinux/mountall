@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.62)
-AC_INIT([mountall], [1.1], [ubuntu-devel@lists.ubuntu.com])
+AC_INIT([mountall], [1.2], [ubuntu-devel@lists.ubuntu.com])
 AC_COPYRIGHT([[Copyright © 2009 Canonical Ltd.]])
 AC_CONFIG_SRCDIR([src/mountall.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -29,6 +29,7 @@ PKG_CHECK_MODULES([NIH], [libnih >= 1.0.0])
 PKG_CHECK_MODULES([NIH_DBUS], [libnih-dbus >= 1.0.0])
 PKG_CHECK_MODULES([DBUS], [dbus-1 >= 1.2.16])
 PKG_CHECK_MODULES([UDEV], [libudev >= 146])
+PKG_CHECK_MODULES([PLYMOUTH], [plymouth-1 >= 0.8.0])
 
 # Checks for header files.
 
