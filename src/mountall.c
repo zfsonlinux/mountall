@@ -195,7 +195,6 @@ void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     NihIoWatch *watch, NihIoEvents events);
 void   udev_catchup         (void);
 
-int    dev_hook             (Mount *mnt);
 int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
 
@@ -2594,57 +2593,6 @@ struct {
 	int    purge;
 	time_t barrier;
 } nftw_hook_args;
-
-static int
-dev_hook_walk (const char *       fpath,
-	       const struct stat *sb,
-	       int                typeflag,
-	       struct FTW *       ftwbuf)
-{
-	Mount *mnt = nftw_hook_args.mnt;
-	char   dest[PATH_MAX];
-
-	strcpy (dest, mnt->mountpoint);
-	strcat (dest, fpath + 17);
-
-	if (S_ISDIR (sb->st_mode)) {
-		if ((mkdir (dest, sb->st_mode & ~S_IFMT) < 0)
-		    && (errno != EEXIST))
-			nih_warn ("%s: %s", dest, strerror (errno));
-	} else if (S_ISLNK (sb->st_mode)) {
-		char target[PATH_MAX];
-		ssize_t len;
-
-		len = readlink (fpath, target, sizeof target);
-		target[len] = '\0';
-
-		if ((symlink (target, dest) < 0)
-		    && (errno != EEXIST))
-			nih_warn ("%s: %s", dest, strerror (errno));
-	} else {
-		if ((mknod (dest, sb->st_mode, sb->st_rdev) < 0)
-		    && (errno != EEXIST))
-			nih_warn ("%s: %s", dest, strerror (errno));
-	}
-
-	return FTW_CONTINUE;
-}
-
-int
-dev_hook (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	nih_debug ("populating %s", mnt->mountpoint);
-
-	nftw_hook_args.mnt = mnt;
-	nftw ("/lib/udev/devices", dev_hook_walk, 1024,
-	      FTW_ACTIONRETVAL | FTW_PHYS | FTW_MOUNT);
-	nftw_hook_args.mnt = NULL;
-
-	return 0;
-}
-
 
 static int
 tmp_hook_walk (const char *       fpath,
