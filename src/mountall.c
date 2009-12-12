@@ -88,8 +88,6 @@ typedef enum {
 
 typedef struct mount Mount;
 
-typedef int (*MountHook) (Mount *mnt);
-
 struct mount {
 	NihList             entry;
 
@@ -116,8 +114,6 @@ struct mount {
 	Mount *             showthrough;
 	NihList             deps;
 	int                 again;
-
-	MountHook           hook;
 };
 
 typedef struct filesystem {
@@ -145,12 +141,10 @@ enum exit {
 
 
 Mount *new_mount            (const char *mountpoint, const char *device,
-			     int check, const char *type, const char *opts,
-			     MountHook hook);
+			     int check, const char *type, const char *opts);
 Mount *find_mount           (const char *mountpoint);
 void   update_mount         (Mount *mnt, const char *device, int check,
-			     const char *type, const char *opts,
-			     MountHook hook);
+			     const char *type, const char *opts);
 
 int    has_option           (Mount *mnt, const char *option, int current);
 char * get_option           (const void *parent, Mount *mnt, const char *option,
@@ -222,23 +216,22 @@ static const struct {
 	int         check;
 	const char *type;
 	const char *opts;
-	MountHook   hook;
 } builtins[] = {
-	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults",                        NULL         },
-	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid",             NULL         },
-	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid,optional",    NULL         },
-	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid",             NULL         },
-	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     "optional",                        NULL         },
-	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     "optional",                        NULL         },
-	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  "optional",                        NULL         },
-	{ "/spu",                     NULL,        FALSE, "spufs",       "gid=spu,optional",                NULL         },
-	{ "/dev",                     NULL,        FALSE, "tmpfs",       "mode=0755",                       dev_hook     },
-	{ "/dev/pts",                 NULL,        FALSE, "devpts",      "noexec,nosuid,gid=tty,mode=0620", NULL         },
-	{ "/dev/shm",                 NULL,        FALSE, "tmpfs",       "nosuid,nodev",                    NULL         },
-	{ "/tmp",                     NULL,        FALSE, NULL,          NULL,                              tmp_hook     },
-	{ "/var/run",                 NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,showthrough",    var_run_hook },
-	{ "/var/lock",                NULL,        FALSE, "tmpfs",       "nodev,noexec,nosuid,showthrough", NULL         },
-	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,optional",       NULL         },
+	{ "/",                        "/dev/root", TRUE,  "rootfs",      "defaults"                        },
+	{ "/proc",                    NULL,        FALSE, "proc",        "nodev,noexec,nosuid"             },
+	{ "/proc/sys/fs/binfmt_misc", NULL,        FALSE, "binfmt_misc", "nodev,noexec,nosuid,optional"    },
+	{ "/sys",                     NULL,        FALSE, "sysfs",       "nodev,noexec,nosuid"             },
+	{ "/sys/fs/fuse/connections", NULL,        FALSE, "fusectl",     "optional"                        },
+	{ "/sys/kernel/debug",        NULL,        FALSE, "debugfs",     "optional"                        },
+	{ "/sys/kernel/security",     NULL,        FALSE, "securityfs",  "optional"                        },
+	{ "/spu",                     NULL,        FALSE, "spufs",       "gid=spu,optional"                },
+	{ "/dev",                     NULL,        FALSE, "tmpfs",       "mode=0755"                       },
+	{ "/dev/pts",                 NULL,        FALSE, "devpts",      "noexec,nosuid,gid=tty,mode=0620" },
+	{ "/dev/shm",                 NULL,        FALSE, "tmpfs",       "nosuid,nodev"                    },
+	{ "/tmp",                     NULL,        FALSE, NULL,          NULL                              },
+	{ "/var/run",                 NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,showthrough"    },
+	{ "/var/lock",                NULL,        FALSE, "tmpfs",       "nodev,noexec,nosuid,showthrough" },
+	{ "/lib/init/rw",             NULL,        FALSE, "tmpfs",       "mode=0755,nosuid,optional"       },
 	{ NULL }
 }, *builtin;
 
@@ -457,8 +450,7 @@ new_mount (const char *mountpoint,
 	   const char *device,
 	   int         check,
 	   const char *type,
-	   const char *opts,
-	   MountHook   hook)
+	   const char *opts)
 {
 	Mount *mnt;
 
@@ -504,18 +496,15 @@ new_mount (const char *mountpoint,
 	nih_list_init (&mnt->deps);
 	mnt->again = FALSE;
 
-	mnt->hook = hook;
-
 	nih_alloc_set_destructor (mnt, nih_list_destroy);
 	nih_list_add (mounts, &mnt->entry);
 
-	nih_debug ("%s: %s %s %s%s%s",
+	nih_debug ("%s: %s %s %s%s",
 		   mnt->mountpoint,
 		   mnt->device ?: "-",
 		   mnt->type ?: "-",
 		   mnt->opts ?: "-",
-		   mnt->check ? " check" : "",
-		   mnt->hook ? " hook" : "");
+		   mnt->check ? " check" : "");
 
 	return mnt;
 }
@@ -540,8 +529,7 @@ update_mount (Mount *     mnt,
 	      const char *device,
 	      int         check,
 	      const char *type,
-	      const char *opts,
-	      MountHook   hook)
+	      const char *opts)
 {
 	nih_assert (mnt != NULL);
 
@@ -564,11 +552,6 @@ update_mount (Mount *     mnt,
 		mnt->check = check;
 
 	if (type) {
-		/* Remove the current hook if we change the type */
-		if ((! mnt->type)
-		    || strcmp (type, mnt->type))
-			mnt->hook = NULL;
-
 		if (mnt->type)
 			nih_unref (mnt->type, mounts);
 		mnt->type = NIH_MUST (nih_strdup (mounts, type));
@@ -580,16 +563,13 @@ update_mount (Mount *     mnt,
 		mnt->opts = NIH_MUST (nih_strdup (mounts, opts));
 	}
 
-	if (hook)
-		mnt->hook = hook;
 
-	nih_debug ("%s: %s %s %s%s%s",
+	nih_debug ("%s: %s %s %s%s",
 		   mnt->mountpoint,
 		   mnt->device ?: "-",
 		   mnt->type ?: "-",
 		   mnt->opts ?: "-",
-		   mnt->check ? " check" : "",
-		   mnt->hook ? " hook" : "");
+		   mnt->check ? " check" : "");
 }
 
 
@@ -733,15 +713,13 @@ parse_fstab (void)
 				      mntent->mnt_fsname,
 				      mntent->mnt_passno != 0,
 				      mntent->mnt_type,
-				      mntent->mnt_opts,
-				      NULL);
+				      mntent->mnt_opts);
 		} else {
 			mnt = new_mount (mntent->mnt_dir,
 					 mntent->mnt_fsname,
 					 mntent->mnt_passno != 0,
 					 mntent->mnt_type,
-					 mntent->mnt_opts,
-					 NULL);
+					 mntent->mnt_opts);
 		}
 	}
 
@@ -872,12 +850,12 @@ parse_mountinfo_file (FILE *mountinfo,
 		mnt = find_mount (mountpoint);
 		if (mnt
 		    && strcmp (type, "swap")) {
-			update_mount (mnt, device, -1, type, NULL, NULL);
+			update_mount (mnt, device, -1, type, NULL);
 
 			if (mnt->mount_opts)
 				nih_unref (mnt->mount_opts, mounts);
 		} else {
-			mnt = new_mount (mountpoint, device, FALSE, type, NULL, NULL);
+			mnt = new_mount (mountpoint, device, FALSE, type, NULL);
 		}
 
 		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
@@ -1312,13 +1290,6 @@ mounted (Mount *mnt)
 
 	mount_event (mnt, "mounted");
 
-	if (mnt->hook) {
-		if (mnt->hook (mnt) < 0) {
-			delayed_exit (EXIT_ERROR);
-			return;
-		}
-	}
-
 	/* Any previous mount options no longer apply
 	 * (ie. we're not read-only anymore)
 	 */
@@ -1633,7 +1604,7 @@ run_mount (Mount *mnt,
 			return;
 		}
 	} else if (! mnt->type) {
-		nih_debug ("%s: hook", mnt->mountpoint);
+		nih_debug ("%s: placeholder", mnt->mountpoint);
 		mounted (mnt);
 		return;
 	} else {
@@ -2510,13 +2481,13 @@ try_udev_device (struct udev_device *udev_device)
 				const char *name = udev_list_entry_get_name (devlink);
 
 				if (! strncmp (name, "/dev/disk/by-uuid/", 18)) {
-					update_mount (mnt, name, -1, NULL, NULL, NULL);
+					update_mount (mnt, name, -1, NULL, NULL);
 					break;
 				}
 			}
 
 			if (! devlink)
-				update_mount (mnt, devname, -1, NULL, NULL, NULL);
+				update_mount (mnt, devname, -1, NULL, NULL);
 		} else if ((! strncmp (mnt->device, "LABEL=", 6))
 			   && label
 			   && (! strcmp (mnt->device + 6, label))) {
@@ -2529,13 +2500,13 @@ try_udev_device (struct udev_device *udev_device)
 				const char *name = udev_list_entry_get_name (devlink);
 
 				if (! strncmp (name, "/dev/disk/by-label/", 18)) {
-					update_mount (mnt, name, -1, NULL, NULL, NULL);
+					update_mount (mnt, name, -1, NULL, NULL);
 					break;
 				}
 			}
 
 			if (! devlink)
-				update_mount (mnt, devname, -1, NULL, NULL, NULL);
+				update_mount (mnt, devname, -1, NULL, NULL);
 		} else if (! strcmp (mnt->device, devname)) {
 			nih_debug ("%s by name", mnt->mountpoint);
 		} else {
@@ -3222,7 +3193,7 @@ main (int   argc,
 	 */
 	for (builtin = builtins; builtin->mountpoint; builtin++)
 		new_mount (builtin->mountpoint, builtin->device, builtin->check,
-			   builtin->type, builtin->opts, builtin->hook);
+			   builtin->type, builtin->opts);
 
 	parse_fstab ();
 	parse_mountinfo ();
