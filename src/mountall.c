@@ -46,7 +46,6 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fnmatch.h>
-#include <termios.h>
 #include <dirent.h>
 
 #include <nih/macros.h>
@@ -213,8 +212,6 @@ void   usplash_write        (const char *format, ...);
 void   fsck_reader          (Mount *mnt, NihIo *io,
 			     const char *buf, size_t len);
 void   progress_timer       (void *data, NihTimer *timer);
-void   escape_reader        (void *data, NihIo *io,
-			     const char *buf, size_t len);
 
 void   int_handler          (void *data, NihSignal *signal);
 void   usr1_handler         (void *data, NihSignal *signal);
@@ -2986,7 +2983,6 @@ progress_timer (void *    data,
 {
 	static int    displaying_progress = 0;
 	static int    displaying_bored = 0;
-	int           total_progress = 0;
 	int           num_fscks = 0;
 	int           bored = 0;
 	int           bored_bit = 1;
@@ -2998,15 +2994,10 @@ progress_timer (void *    data,
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		/* On the console we can't really display multiple progress
-		 * bars (not without ncurses anyway) so work out the math
-		 * to display just one.
-		 */
+		/* Any running fscks? */
 		if ((mnt->fsck_pid > 0)
-		    && (mnt->fsck_progress >= 0)) {
+		    && (mnt->fsck_progress >= 0))
 			num_fscks++;
-			total_progress += mnt->fsck_progress;
-		}
 
 		/* Any remaining mounts? */
 		if ((mnt->tag != TAG_OTHER)
@@ -3018,30 +3009,9 @@ progress_timer (void *    data,
 	}
 
 	if (num_fscks) {
-		int  blips = 0;
-		char progress[61];
-
-		/* When doing a filesystem check, we need to update the
-		 * console specially to rewrite the same line using the
-		 * good old \r trick.
+		/* When we have running filesystem checks, send their
+		 * progress to the splash screen.
 		 */
-		if (! displaying_progress) {
-			printf ("Filesystem checks are in progress (ESC to cancel):\n");
-			fflush (stdout);
-		}
-		displaying_progress = 1;
-		displaying_bored = 0;
-
-		blips = (total_progress * 60) / (num_fscks * 100);
-
-		memset (progress, '#', blips);
-		memset (progress + blips, '-', 60-blips);
-		progress[60] = '\0';
-
-		printf ("[%s]\r", progress);
-		fflush (stdout);
-
-		/* Now we do something prettier for the splash screen */
 		usplash_write ("CLEAR");
 		usplash_write ("TIMEOUT 0");
 		usplash_write ("VERBOSE on");
@@ -3065,23 +3035,17 @@ progress_timer (void *    data,
 		usplash_write ("ESCAPE %d", getpid ());
 		exit_on_escape = FALSE;
 
+		displaying_progress = 1;
+		displaying_bored = 0;
+
 	} else if (bored
 		   && (++boredom_count > BOREDOM_TIMEOUT)) {
-		/* If we've just completed a filesystem check, we need to
-		 * clear the progress indicator.
+		/* Don't refresh the board message every time through,
+		 * just show it once and leave it there; we might be
+		 * conflicting with the thing we're waiting for asking
+		 * for something on the splash screen so we can't CLEAR.
 		 */
-		if (displaying_progress) {
-			printf ("\n\n");
-			fflush (stdout);
-		}
-		displaying_progress = 0;
-
 		if (displaying_bored != bored) {
-			nih_message ("One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
-			nih_message ("(ESC for recovery shell)");
-			fflush (stdout);
-
-			/* Now we do something prettier for the splash screen */
 			usplash_write ("TIMEOUT 0");
 			usplash_write ("VERBOSE on");
 			usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
@@ -3090,25 +3054,15 @@ progress_timer (void *    data,
 				Mount *mnt = (Mount *)iter;
 
 				if ((! mnt->mounted) || needs_remount (mnt)) {
-					if (! displaying_bored)
-						nih_message (_("%s: waiting for %s"),
-							     is_swap (mnt) ? "swap" : mnt->mountpoint,
-							     mnt->device);
 					usplash_write ("TEXT %s: waiting for %s",
 						       is_swap (mnt) ? "swap" : mnt->mountpoint,
 						       mnt->device);
 				} else if (mnt->mount_pid > 0) {
-					if (! displaying_bored)
-						nih_message (_("%s: mounting (pid %d)"),
-							     is_swap (mnt) ? mnt->device : mnt->mountpoint,
-							     mnt->mount_pid);
 					usplash_write ("TEXT %s: mounting (pid %d)",
 						       is_swap (mnt) ? mnt->device : mnt->mountpoint,
 						       mnt->mount_pid);
 				}
 			}
-
-			displaying_bored = bored;
 
 			usplash_write ("TEXT Press ESC to enter a recovery shell");
 			usplash_write ("VERBOSE default");
@@ -3117,14 +3071,13 @@ progress_timer (void *    data,
 		usplash_write ("ESCAPE %d", getpid ());
 		exit_on_escape = TRUE;
 
+		displaying_bored = bored;
+		displaying_progress = 0;
+
 	} else {
-		/* If we've just completed a filesystem check, we need to
-		 * clear the progress indicator.
+		/* Clear the splash screen if we've just completed
+		 * a filesystem check or were bored.
 		 */
-		if (displaying_progress) {
-			printf ("\n\n");
-			fflush (stdout);
-		}
 		if (displaying_progress || displaying_bored) {
 			usplash_write ("CLEAR");
 			usplash_write ("TIMEOUT 60");
@@ -3149,8 +3102,6 @@ progress_timer (void *    data,
 static void
 escape (void)
 {
-	printf ("\n");
-	fflush (stdout);
 	nih_error ("Cancelled");
 
 	if (exit_on_escape) {
@@ -3166,22 +3117,6 @@ escape (void)
 				kill (proc->pid, SIGTERM);
 		}
 	}
-}
-
-void
-escape_reader (void *      data,
-	       NihIo *     io,
-	       const char *buf,
-	       size_t      len)
-{
-	nih_local char *discard = NULL;
-
-	nih_assert (io != NULL);
-	nih_assert (buf != NULL);
-
-	if (memchr (buf, '\x1b', len))
-		escape ();
-	discard = nih_io_read (NULL, io, &len);
 }
 
 
@@ -3235,7 +3170,6 @@ main (int   argc,
 	struct udev_monitor *udev_monitor;
 	Mount *              root;
 	int                  ret;
-	struct termios       termios;
 
 	nih_main_init (argv[0]);
 
@@ -3289,13 +3223,6 @@ main (int   argc,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
 
-	if (! NIH_SHOULD (nih_io_reopen (NULL, STDIN_FILENO, NIH_IO_STREAM,
-					 escape_reader, NULL, NULL, NULL))) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_free (err);
-	}
 
 	NIH_MUST (nih_timer_add_periodic (NULL, 1,
 					  progress_timer, NULL));
@@ -3402,25 +3329,9 @@ main (int   argc,
 	/* Catch up with udev */
 	udev_catchup ();
 
-	/* Terminal needs to be in non-canonical mode to be able to trap
-	 * Escape on the console.
-	 */
-	if (isatty (STDIN_FILENO)
-	    && (tcgetattr (STDIN_FILENO, &termios) == 0)) {
-		termios.c_lflag &= ~ICANON;
-		tcsetattr (STDIN_FILENO, TCSANOW, &termios);
-	}
-
 	ret = nih_main_loop ();
 
 	nih_main_unlink_pidfile ();
-
-	/* Put it back in canonical mode */
-	if (isatty (STDIN_FILENO)
-	    && (tcgetattr (STDIN_FILENO, &termios) == 0)) {
-		termios.c_lflag |= ICANON;
-		tcsetattr (STDIN_FILENO, TCSANOW, &termios);
-	}
 
 	return ret;
 }
