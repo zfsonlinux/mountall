@@ -209,9 +209,6 @@ int    dev_hook             (Mount *mnt);
 int    tmp_hook             (Mount *mnt);
 int    var_run_hook         (Mount *mnt);
 
-void   track_usplash        (void);
-void   start_usplash        (void);
-void   stop_usplash         (void);
 void   usplash_write        (const char *format, ...);
 
 void   fsck_reader          (Mount *mnt, NihIo *io,
@@ -376,27 +373,6 @@ int exit_code = -1;
 int restorecon = FALSE;
 
 /**
- * splash:
- *
- * Whether we should start usplash.
- **/
-int splash = FALSE;
-
-/**
- * splash_running:
- *
- * Whether usplash is running
- **/
-int splash_running = FALSE;
-
-/**
- * splash_started:
- *
- * Whether we started usplash.
- **/
-int splash_started = FALSE;
-
-/**
  * boredom_count:
  *
  * Reset each time we complete a mount, swapon call or fsck call; if this
@@ -419,13 +395,6 @@ int exit_on_escape = TRUE;
  * Proxy to Upstart daemon.
  **/
 static NihDBusProxy *upstart = NULL;
-
-/**
- * usplash:
- *
- * Proxy to Usplash job.
- **/
-static NihDBusProxy *usplash = NULL;
 
 /**
  * udev:
@@ -2945,241 +2914,12 @@ var_run_hook (Mount *mnt)
 }
 
 
-static void
-usplash_instance_added (void *          data,
-			NihDBusMessage *message,
-			const char *    interface)
-{
-	nih_debug ("usplash started");
-	splash_running = TRUE;
-}
-
-static void
-usplash_instance_removed (void *          data,
-			  NihDBusMessage *message,
-			  const char *    interface)
-{
-	nih_debug ("usplash stopped");
-	splash_running = FALSE;
-
-	/* If usplash is ever stopped, we do not start it again */
-	splash = FALSE;
-}
-
-void
-track_usplash (void)
-{
-	FILE *          cmdline;
-	char            line[4096];
-	char *          tok;
-	nih_local char *usplash_path = NULL;
-	nih_local char *path = NULL;
-
-	if (getenv ("NOSPLASH"))
-		return;
-
-	/* Make sure splash is enabled on the kernel command-line */
-	cmdline = fopen ("/proc/cmdline", "r");
-	if (! cmdline)
-		return;
-
-	fgets (line, sizeof line, cmdline);
-	for (tok = strtok (line, " \t\r\n"); tok; tok = strtok (NULL, " \t\r\n")) {
-		if (! strcmp (tok, "splash"))
-			splash = TRUE;
-		if (! strcmp (tok, "nosplash"))
-			splash = FALSE;
-	}
-	fclose (cmdline);
-
-	if (! splash) {
-		nih_debug ("will not start usplash");
-		return;
-	}
-
-	/* Get the usplash job, of course it might not be installed! */
-	if (upstart_get_job_by_name_sync (NULL, upstart, "usplash",
-					  &usplash_path) < 0) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_debug ("unable to find usplash job: %s", err->message);
-		nih_free (err);
-
-		splash = FALSE;
-		return;
-	}
-
-	usplash = NIH_SHOULD (nih_dbus_proxy_new (NULL, upstart->connection,
-						  NULL, usplash_path,
-						  NULL, NULL));
-	if (! usplash) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s: %s", _("Unable to create proxy to usplash"),
-			  err->message);
-		nih_free (err);
-
-		splash = FALSE;
-		return;
-	}
-
-	/* Hook up signals so we can watch the instances going away and
-	 * coming back.  Not ideal, but as good as 0.6 will give us.
-	 */
-	if (! NIH_SHOULD (nih_dbus_proxy_connect (usplash, &job_class_com_ubuntu_Upstart0_6_Job,
-						  "InstanceAdded",
-						  (NihDBusSignalHandler)usplash_instance_added, NULL))) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s: %s", _("Unable to hook usplash InstanceAdded"),
-			  err->message);
-		nih_free (err);
-
-		nih_free (usplash);
-		usplash = NULL;
-		splash = FALSE;
-		return;
-	}
-
-	if (! NIH_SHOULD (nih_dbus_proxy_connect (usplash, &job_class_com_ubuntu_Upstart0_6_Job,
-						  "InstanceRemoved",
-						  (NihDBusSignalHandler)usplash_instance_removed, NULL))) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s: %s", _("Unable to hook usplash InstanceRemoved"),
-			  err->message);
-		nih_free (err);
-
-		nih_free (usplash);
-		usplash = NULL;
-		splash = FALSE;
-		return;
-	}
-
-	/* Now see if there is an instance */
-	if (job_class_get_instance_by_name_sync (NULL, usplash, "", &path) < 0) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_free (err);
-
-		nih_debug ("usplash is not running");
-		return;
-	}
-
-	splash_running = TRUE;
-	nih_debug ("usplash is running");
-}
-
-static void
-usplash_error (int *           error,
-	       NihDBusMessage *message)
-{
-	NihDBusError *dbus_err;
-
-	dbus_err = (NihDBusError *)nih_error_get ();
-	if ((dbus_err->number != NIH_DBUS_ERROR)
-	    || (strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStarted")
-		&& strcmp (dbus_err->name, DBUS_INTERFACE_UPSTART ".Error.AlreadyStopped"))) {
-		nih_warn ("%s", dbus_err->message);
-		*error = TRUE;
-	}
-	nih_free (dbus_err);
-}
-
-void
-start_usplash (void)
-{
-	DBusPendingCall *pending_call;
-	nih_local char **env = NULL;
-	int              error = FALSE;
-
-	if (! splash)
-		return;
-	if (splash_running)
-		return;
-
-	env = NIH_MUST (nih_str_array_new (NULL));
-
-	pending_call = NIH_SHOULD (job_class_start (usplash, env, TRUE, NULL,
-						    (NihDBusErrorHandler)usplash_error, &error,
-						    NIH_DBUS_TIMEOUT_NEVER));
-	if (! pending_call) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s", err->message);
-		nih_free (err);
-
-		return;
-	}
-
-	dbus_pending_call_block (pending_call);
-
-	dbus_pending_call_unref (pending_call);
-
-	if (! error) {
-		splash_running = TRUE;
-		splash_started = TRUE;
-		nih_debug ("usplash is now running");
-	}
-}
-
-void
-stop_usplash (void)
-{
-	DBusPendingCall *pending_call;
-	nih_local char **env = NULL;
-	int              error = FALSE;
-
-	if (! splash)
-		return;
-	if (! splash_running)
-		return;
-
-	env = NIH_MUST (nih_str_array_new (NULL));
-
-	pending_call = NIH_SHOULD (job_class_stop (usplash, env, TRUE, NULL,
-						   (NihDBusErrorHandler)usplash_error, &error,
-						   NIH_DBUS_TIMEOUT_NEVER));
-	if (! pending_call) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s", err->message);
-		nih_free (err);
-
-		return;
-	}
-
-	dbus_pending_call_block (pending_call);
-
-	dbus_pending_call_unref (pending_call);
-
-	if (! error) {
-		splash_running = FALSE;
-		nih_debug ("usplash is no longer running");
-	}
-
-	/* If we ever stop usplash by hand, we never start it again */
-	splash = FALSE;
-}
-
 void
 usplash_write (const char *format, ...)
 {
 	va_list         args;
 	nih_local char *message = NULL;
 	int             fd;
-
-	if (! splash)
-		return;
-	if (! splash_running)
-		return;
 
 	va_start (args, format);
 	message = NIH_MUST (nih_vsprintf (NULL, format, args));
@@ -3303,7 +3043,6 @@ progress_timer (void *    data,
 		fflush (stdout);
 
 		/* Now we do something prettier for the splash screen */
-		start_usplash ();
 		usplash_write ("CLEAR");
 		usplash_write ("TIMEOUT 0");
 		usplash_write ("VERBOSE on");
@@ -3344,7 +3083,6 @@ progress_timer (void *    data,
 			fflush (stdout);
 
 			/* Now we do something prettier for the splash screen */
-			start_usplash ();
 			usplash_write ("TIMEOUT 0");
 			usplash_write ("VERBOSE on");
 			usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
@@ -3388,8 +3126,7 @@ progress_timer (void *    data,
 			printf ("\n\n");
 			fflush (stdout);
 		}
-		if (splash
-		    && (displaying_progress || displaying_bored)) {
+		if (displaying_progress || displaying_bored) {
 			usplash_write ("CLEAR");
 			usplash_write ("TIMEOUT 60");
 			usplash_write ("ESCAPE 0");
@@ -3563,7 +3300,6 @@ main (int   argc,
 
 	NIH_MUST (nih_timer_add_periodic (NULL, 1,
 					  progress_timer, NULL));
-	track_usplash ();
 
 	mounts = NIH_MUST (nih_list_new (NULL));
 	fsck_queue = NIH_MUST (nih_list_new (NULL));
@@ -3679,9 +3415,6 @@ main (int   argc,
 	ret = nih_main_loop ();
 
 	nih_main_unlink_pidfile ();
-
-	if (splash_started)
-		stop_usplash ();
 
 	/* Put it back in canonical mode */
 	if (isatty (STDIN_FILENO)
