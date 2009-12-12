@@ -196,7 +196,7 @@ void   mount_showthrough    (Mount *root);
 
 void   upstart_disconnected (DBusConnection *connection);
 void   emit_event           (const char *name);
-void   mount_event          (Mount *mnt);
+void   mount_event          (Mount *mnt, const char *name);
 void   emit_event_error     (void *data, NihDBusMessage *message);
 
 void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
@@ -1319,6 +1319,8 @@ mounted (Mount *mnt)
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
 
+	mount_event (mnt, "mounted");
+
 	if (mnt->hook) {
 		if (mnt->hook (mnt) < 0) {
 			delayed_exit (EXIT_ERROR);
@@ -1485,10 +1487,10 @@ try_mount (Mount *mnt,
 	if (! mnt->ready) {
 		queue_fsck (mnt);
 	} else if (is_swap (mnt)) {
-		mount_event (mnt);
+		mount_event (mnt, "mounting");
 		run_swapon (mnt);
 	} else {
-		mount_event (mnt);
+		mount_event (mnt, "mounting");
 		run_mount (mnt, FALSE);
 	}
 }
@@ -2402,7 +2404,8 @@ emit_event (const char *name)
 }
 
 void
-mount_event (Mount *mnt)
+mount_event (Mount *     mnt,
+	     const char *name)
 {
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
@@ -2434,7 +2437,7 @@ mount_event (Mount *mnt)
 	nih_discard (var);
 
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
-						       "mount", env, TRUE,
+						       name, env, TRUE,
 						       NULL, emit_event_error, NULL,
 						       NIH_DBUS_TIMEOUT_NEVER));
 	if (! pending_call) {
