@@ -75,8 +75,6 @@
 #define USPLASH_FIFO    "/dev/.initramfs/usplash_fifo"
 #define USPLASH_OUTFIFO "/dev/.initramfs/usplash_outfifo"
 
-#define RESTORECON_PATH "/sbin/restorecon"
-
 #define BOREDOM_TIMEOUT 3
 
 
@@ -360,13 +358,6 @@ int written_mtab = FALSE;
  * any background processes (fsck, mount, etc.) have finished.
  **/
 int exit_code = -1;
-
-/**
- * restorecon:
- *
- * Whether we should call restorecon after mounting things.
- **/
-int restorecon = FALSE;
 
 /**
  * boredom_count:
@@ -1326,21 +1317,6 @@ mounted (Mount *mnt)
 			delayed_exit (EXIT_ERROR);
 			return;
 		}
-	}
-
-	if (restorecon
-	    && mnt->type
-	    && (! strcmp (mnt->type, "tmpfs"))) {
-		nih_local char **args = NULL;
-		size_t           args_len = 0;
-
-		args = NIH_MUST (nih_str_array_new (NULL));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len,
-					     RESTORECON_PATH));
-		NIH_MUST (nih_str_array_add (&args, NULL, &args_len,
-					     mnt->mountpoint));
-
-		spawn (mnt, args, TRUE, NULL);
 	}
 
 	/* Any previous mount options no longer apply
@@ -3260,10 +3236,6 @@ main (int   argc,
 		nih_fatal ("%s", _("root filesystem isn't mounted"));
 		exit (EXIT_ERROR);
 	}
-
-	/* See if we need to call restorecon */
-	if (access (RESTORECON_PATH, X_OK) == 0)
-		restorecon = TRUE;
 
 	/* Become daemon */
 	if (daemonise) {
