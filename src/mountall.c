@@ -71,7 +71,6 @@
 
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
-#include "com.ubuntu.Upstart.Job.h"
 
 
 #define USPLASH_FIFO    "/dev/.initramfs/usplash_fifo"

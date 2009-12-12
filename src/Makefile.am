@@ -19,9 +19,7 @@ sbin_PROGRAMS = \
 mountall_SOURCES = \
 	mountall.c
 nodist_mountall_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS) \
-	$(com_ubuntu_Upstart_Job_OUTPUTS) \
-	$(com_ubuntu_Upstart_Instance_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS)
 mountall_LDADD = \
 	$(NIH_LIBS) \
 	$(NIH_DBUS_LIBS) \
@@ -46,47 +44,13 @@ $(com_ubuntu_Upstart_OUTPUTS): $(com_ubuntu_Upstart_XML)
 		--output=$@ $<
 
 
-com_ubuntu_Upstart_Job_OUTPUTS = \
-	com.ubuntu.Upstart.Job.c \
-	com.ubuntu.Upstart.Job.h
-
-com_ubuntu_Upstart_Job_XML = \
-	../dbus/com.ubuntu.Upstart.Job.xml
-
-$(com_ubuntu_Upstart_Job_OUTPUTS): $(com_ubuntu_Upstart_Job_XML)
-	$(NIH_DBUS_TOOL) \
-		--package=$(PACKAGE) \
-		--mode=proxy --prefix=job_class \
-		--default-interface=com.ubuntu.Upstart0_6.Job \
-		--output=$@ $<
-
-
-com_ubuntu_Upstart_Instance_OUTPUTS = \
-	com.ubuntu.Upstart.Instance.c \
-	com.ubuntu.Upstart.Instance.h
-
-com_ubuntu_Upstart_Instance_XML = \
-	../dbus/com.ubuntu.Upstart.Instance.xml
-
-$(com_ubuntu_Upstart_Instance_OUTPUTS): $(com_ubuntu_Upstart_Instance_XML)
-	$(NIH_DBUS_TOOL) \
-		--package=$(PACKAGE) \
-		--mode=proxy --prefix=job \
-		--default-interface=com.ubuntu.Upstart0_6.Instance \
-		--output=$@ $<
-
-
 # These have to be built sources because we can't compile object files
 # without the header file existing first
 BUILT_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS) \
-	$(com_ubuntu_Upstart_Job_OUTPUTS) \
-	$(com_ubuntu_Upstart_Instance_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS)
 
 CLEANFILES = \
-	$(com_ubuntu_Upstart_OUTPUTS) \
-	$(com_ubuntu_Upstart_Job_OUTPUTS) \
-	$(com_ubuntu_Upstart_Instance_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS)
 
 
 clean-local:
