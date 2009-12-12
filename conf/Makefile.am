@@ -6,5 +6,5 @@ dist_init_DATA = \
 	mountall-net.conf \
 	mountall-reboot.conf \
 	mountall-shell.conf \
-	mounted-dev.conf
-
+	mounted-dev.conf \
+	mounted-varrun.conf

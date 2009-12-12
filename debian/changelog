@@ -7,7 +7,8 @@ mountall (1.2) UNRELEASED; urgency=low
     jobs on the "mounted" event.
   * Dropped the call to restorecon for tmpfs filesystems, this can also be
     handled by an Upstart job supplied by SELinux now.
-    - mounted-dev.conf replaces dev hook
+    - mounted-dev.conf replaces /dev hook
+    - mounted-varrun.conf replaces /var/run hook
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 11 Dec 2009 13:37:17 +0000
 
