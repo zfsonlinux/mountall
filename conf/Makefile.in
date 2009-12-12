@@ -197,6 +197,8 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
+PLYMOUTH_CFLAGS = @PLYMOUTH_CFLAGS@
+PLYMOUTH_LIBS = @PLYMOUTH_LIBS@
 POSUB = @POSUB@
 PRI_MACROS_BROKEN = @PRI_MACROS_BROKEN@
 RANLIB = @RANLIB@
@@ -272,7 +274,8 @@ dist_init_DATA = \
 	mountall.conf \
 	mountall-net.conf \
 	mountall-reboot.conf \
-	mountall-shell.conf
+	mountall-shell.conf \
+	mounted-dev.conf
 
 all: all-am
 

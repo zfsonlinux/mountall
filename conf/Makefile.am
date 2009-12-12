@@ -5,4 +5,6 @@ dist_init_DATA = \
 	mountall.conf \
 	mountall-net.conf \
 	mountall-reboot.conf \
-	mountall-shell.conf
+	mountall-shell.conf \
+	mounted-dev.conf
+
