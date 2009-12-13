@@ -195,8 +195,6 @@ void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
 			     NihIoWatch *watch, NihIoEvents events);
 void   udev_catchup         (void);
 
-int    tmp_hook             (Mount *mnt);
-
 void   usplash_write        (const char *format, ...);
 
 void   fsck_reader          (Mount *mnt, NihIo *io,
@@ -2582,94 +2580,6 @@ udev_catchup (void)
 
 		udev_device_unref (udev_device);
 	}
-}
-
-
-struct {
-	/* common */
-	Mount *mnt;
-	/* tmp_hook */
-	int    purge;
-	time_t barrier;
-} nftw_hook_args;
-
-static int
-tmp_hook_walk (const char *       fpath,
-	       const struct stat *sb,
-	       int                typeflag,
-	       struct FTW *       ftwbuf)
-{
-	Mount *     mnt = nftw_hook_args.mnt;
-	const char *name = fpath + ftwbuf->base;
-
-	if (! ftwbuf->level)
-		return FTW_CONTINUE;
-
-	if (S_ISDIR (sb->st_mode)) {
-		if (strcmp (name, "lost+found")
-		    && (nftw_hook_args.purge
-			|| ((sb->st_mtime < nftw_hook_args.barrier
-			     && (sb->st_ctime < nftw_hook_args.barrier)))))
-		{
-			if (rmdir (fpath) < 0)
-				nih_warn ("%s: %s", fpath, strerror (errno));
-		}
-
-	} else {
-		if (strcmp (name, "quota.user")
-		    && strcmp (name, "aquota.user")
-		    && strcmp (name, "quote.group")
-		    && strcmp (name, "aquota.group")
-		    && strcmp (name, ".journal")
-		    && fnmatch ("...security*", name, FNM_PATHNAME)
-		    && (nftw_hook_args.purge
-			|| ((sb->st_mtime < nftw_hook_args.barrier)
-			    && (sb->st_ctime < nftw_hook_args.barrier)
-			    && (sb->st_atime < nftw_hook_args.barrier))
-			|| ((ftwbuf->level == 1)
-			    && (! fnmatch (".X*-lock", fpath + ftwbuf->base, FNM_PATHNAME)))))
-		{
-			if (unlink (fpath) < 0)
-				nih_warn ("%s: %s", fpath, strerror (errno));
-		}
-
-	}
-
-	return FTW_CONTINUE;
-}
-
-int
-tmp_hook (Mount *mnt)
-{
-	struct stat statbuf;
-
-	nih_assert (mnt != NULL);
-
-	if ((lstat (mnt->mountpoint, &statbuf) < 0)
-	    || (! (statbuf.st_mode & S_IWOTH))) {
-		nih_debug ("cowardly not cleaning up %s", mnt->mountpoint);
-		return 0;
-	} else if (tmptime < 0) {
-		nih_debug ("not cleaning up %s", mnt->mountpoint);
-		return 0;
-	}
-
-	nih_debug ("cleaning up %s", mnt->mountpoint);
-
-	if (tmptime > 0) {
-		nftw_hook_args.purge = FALSE;
-		nftw_hook_args.barrier = time (NULL) - (tmptime * 3600);
-	} else {
-		nftw_hook_args.purge = TRUE;
-		nftw_hook_args.barrier = 0;
-	}
-
-	nftw_hook_args.mnt = mnt;
-	nftw (mnt->mountpoint, tmp_hook_walk, 1024,
-	      FTW_ACTIONRETVAL | FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
-	nftw_hook_args.mnt = NULL;
-
-	return 0;
 }
 
 
