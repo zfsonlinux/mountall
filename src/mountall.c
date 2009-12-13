@@ -961,17 +961,6 @@ is_remote (Mount *mnt)
 	}
 }
 
-static int
-mount_priority (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (mnt->tag > TAG_OTHER)
-		return 1;
-
-	return 0;
-}
-
 void
 mount_policy (void)
 {
@@ -1963,33 +1952,13 @@ static void
 checks_add (Mount *mnt)
 {
 	NihListEntry *entry;
-	NihList *     add_before;
-	int           mnt_prio;
 
 	nih_assert (mnt != NULL);
-
-	/* Find the first item that has a lower priority than mnt and add mnt
-	 * immediately before it, or at the end of the list if no such item was
-	 * found.
-	 */
-
-	mnt_prio = mount_priority (mnt);
-
-	add_before = checks;
-
-	NIH_LIST_FOREACH (checks, iter) {
-		Mount *imnt = ((NihListEntry *)iter)->data;
-
-		if (mount_priority (imnt) < mnt_prio) {
-			add_before = &((NihListEntry *)iter)->entry;
-			break;
-		}
-	}
 
 	entry = NIH_MUST (nih_list_entry_new (checks));
 	entry->data = mnt;
 
-	nih_list_add (add_before, &entry->entry);
+	nih_list_add (checks, &entry->entry);
 
 	checks_update_priorities ();
 }
