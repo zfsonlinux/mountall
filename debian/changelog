@@ -20,6 +20,9 @@ mountall (1.2) UNRELEASED; urgency=low
   * Rather than hiding the built-in mountpoints inside the code, put them
     in a new /lib/init/fstab file; that way users can copy the lines into
     /etc/fstab if they wish to override them in some interesting way.
+  * Now supports multiple filesystem types listed in fstab, the whole
+    comma-separated list is passed to mount and then /proc/self/mountinfo
+    is reparsed to find out what mount actually did.
   * Filesystem checks may be forced by adding force-fsck to the kernel
     command-line.
   * Exit gracefully with an error on failed system calls, don't infinite
