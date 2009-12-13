@@ -719,16 +719,11 @@ parse_mountinfo_file (FILE *mountinfo,
 		type = strtok_r (NULL, " \t\n", &saveptr);
 		if (! type)
 			continue;
-		if (! strcmp (type, "rootfs"))
-			type = NULL;
 
 		/* device */
 		device = strtok_r (NULL, " \t\n", &saveptr);
 		if (! device)
 			continue;
-		if ((! strcmp (device, "/dev/root"))
-		    || (! strcmp (device, "none")))
-			device = NULL;
 
 		/* superblock opts */
 		super_opts = strtok_r (NULL, " \t\n", &saveptr);
@@ -739,12 +734,20 @@ parse_mountinfo_file (FILE *mountinfo,
 		mnt = find_mount (mountpoint);
 		if (mnt
 		    && strcmp (type, "swap")) {
+			if (! strcmp (type, "rootfs"))
+				type = NULL;
+
+			if ((! strcmp (device, "/dev/root"))
+			    || (! strcmp (device, "none")))
+				device = NULL;
+
 			update_mount (mnt, device, -1, type, NULL);
 
 			if (mnt->mount_opts)
 				nih_unref (mnt->mount_opts, mounts);
 		} else {
-			mnt = new_mount (mountpoint, device, FALSE, type, NULL);
+			mnt = new_mount (mountpoint, device, FALSE, type,
+					 "defaults");
 		}
 
 		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
