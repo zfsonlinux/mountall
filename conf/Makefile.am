@@ -7,4 +7,5 @@ dist_init_DATA = \
 	mountall-reboot.conf \
 	mountall-shell.conf \
 	mounted-dev.conf \
-	mounted-varrun.conf
+	mounted-varrun.conf \
+	mounted-tmp.conf
