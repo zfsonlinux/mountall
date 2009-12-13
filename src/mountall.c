@@ -28,11 +28,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
-#include <sys/utsname.h>
-#include <sys/sendfile.h>
 
-#include <ftw.h>
-#include <grp.h>
 #include <time.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -401,14 +397,6 @@ static int force_fsck = FALSE;
  * Set to TRUE if we should pass -y to fsck invocations.
  **/
 static int fsck_fix = FALSE;
-
-/**
- * tmptime:
- *
- * Set to the number of hours grace files and directories in /tmp
- * are given before being removed.
- **/
-static int tmptime = -1;
 
 
 static void
@@ -2793,28 +2781,6 @@ escape (void)
 }
 
 
-int
-tmptime_option (NihOption * option,
-		const char *arg)
-{
-        int *value;
-
-        nih_assert (option != NULL);
-        nih_assert (option->value != NULL);
-        nih_assert (arg != NULL);
-
-        value = (int *)option->value;
-
-	if (strcmp (arg, "infinite")
-	    && strcmp (arg, "infinity")) {
-		*value = atoi (arg);
-	} else {
-		*value = -1;
-	}
-
-        return 0;
-}
-
 /**
  * options:
  *
@@ -2827,8 +2793,6 @@ static NihOption options[] = {
 	  NULL, NULL, &force_fsck, NULL },
 	{ 0, "fsck-fix", N_("Attempt to fix all fsck errors"),
 	  NULL, NULL, &fsck_fix, NULL },
-	{ 0, "tmptime", N_("Grace to give files in /tmp"),
-	  NULL, "HOURS", &tmptime, tmptime_option },
 
 	NIH_OPTION_LAST
 };
