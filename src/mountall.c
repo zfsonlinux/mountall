@@ -1016,7 +1016,8 @@ mount_policy (void)
 					   MOUNT_NAME (mount_parent));
 				mount_parent = NULL;
 			} else if ((! strcmp (mount_parent->mountpoint, "/"))
-				   && mnt->nodev) {
+				   && mnt->nodev
+				   && strcmp (mnt->type, "none")) {
 				nih_debug ("%s can be mounted while root readonly",
 					   MOUNT_NAME (mnt));
 				mount_parent = NULL;
@@ -1093,14 +1094,16 @@ mount_policy (void)
 		} else if (mnt->nodev
 			   && strcmp (mnt->type, "fuse")) {
 			if (mount_parent
-			    && strcmp (mount_parent->mountpoint, "/")
+			    && (strcmp (mount_parent->mountpoint, "/")
+				|| (! strcmp (mnt->type, "none")))
 			    && (mount_parent->tag == TAG_REMOTE)) {
 				mnt->tag = TAG_REMOTE;
 				num_remote++;
 				nih_debug ("%s is remote (inherited)",
 					   MOUNT_NAME (mnt));
 			} else if (mount_parent
-				   && strcmp (mount_parent->mountpoint, "/")
+				   && (strcmp (mount_parent->mountpoint, "/")
+				       || (! strcmp (mnt->type, "none")))
 				   && (mount_parent->tag == TAG_LOCAL)) {
 				mnt->tag = TAG_LOCAL;
 				num_local++;
