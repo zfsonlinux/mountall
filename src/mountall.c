@@ -182,8 +182,7 @@ void   write_mtab           (void);
 void   mount_showthrough    (Mount *root);
 
 void   upstart_disconnected (DBusConnection *connection);
-void   emit_event           (const char *name);
-void   mount_event          (Mount *mnt, const char *name);
+void   emit_event           (const char *name, Mount *mnt);
 void   emit_event_error     (void *data, NihDBusMessage *message);
 
 void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
@@ -1213,7 +1212,7 @@ mounted (Mount *mnt)
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
 
-	mount_event (mnt, "mounted");
+	emit_event ("mounted", mnt);
 
 	/* Any previous mount options no longer apply
 	 * (ie. we're not read-only anymore)
@@ -1231,38 +1230,38 @@ mounted (Mount *mnt)
 		if ((++num_local_mounted == num_local)
 		    && (num_virtual_mounted == num_virtual)) {
 			nih_info ("local finished");
-			emit_event ("local-filesystems");
+			emit_event ("local-filesystems", NULL);
 
 			if (num_remote_mounted == num_remote) {
 				nih_info ("filesystem mounted");
-				emit_event ("filesystem");
+				emit_event ("filesystem", NULL);
 			}
 		}
 		break;
 	case TAG_REMOTE:
 		if (++num_remote_mounted == num_remote) {
 			nih_info ("remote finished");
-			emit_event ("remote-filesystems");
+			emit_event ("remote-filesystems", NULL);
 
 			if ((num_local_mounted == num_local)
 			    && (num_virtual_mounted == num_virtual)) {
 				nih_info ("filesystem mounted");
-				emit_event ("filesystem");
+				emit_event ("filesystem", NULL);
 			}
 		}
 		break;
 	case TAG_VIRTUAL:
 		if (++num_virtual_mounted == num_virtual) {
 			nih_info ("virtual finished");
-			emit_event ("virtual-filesystems");
+			emit_event ("virtual-filesystems", NULL);
 
 			if (num_local_mounted == num_local) {
 				nih_info ("local finished");
-				emit_event ("local-filesystems");
+				emit_event ("local-filesystems", NULL);
 
 				if (num_remote_mounted == num_remote) {
 					nih_info ("filesystem mounted");
-					emit_event ("filesystem");
+					emit_event ("filesystem", NULL);
 				}
 			}
 		}
@@ -1270,7 +1269,7 @@ mounted (Mount *mnt)
 	case TAG_SWAP:
 		if (++num_swap_mounted == num_swap) {
 			nih_info ("swap finished");
-			emit_event ("all-swaps");
+			emit_event ("all-swaps", NULL);
 		}
 		break;
 	default:
@@ -1358,10 +1357,10 @@ try_mount (Mount *mnt,
 	if (! mnt->ready) {
 		queue_fsck (mnt);
 	} else if (is_swap (mnt)) {
-		mount_event (mnt, "mounting");
+		emit_event ("mounting", mnt);
 		run_swapon (mnt);
 	} else {
-		mount_event (mnt, "mounting");
+		emit_event ("mounting", mnt);
 		run_mount (mnt, FALSE);
 	}
 }
@@ -2242,17 +2241,43 @@ upstart_disconnected (DBusConnection *connection)
 }
 
 void
-emit_event (const char *name)
+emit_event (const char *name,
+	    Mount *     mnt)
 {
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
+	size_t           env_len = 0;
 
 	nih_assert (name != NULL);
 
 	env = NIH_MUST (nih_str_array_new (NULL));
 
+	if (mnt) {
+		char *var;
+
+		var = NIH_MUST (nih_sprintf (NULL, "DEVICE=%s",
+					     mnt->device ?: "none"));
+		NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
+		nih_discard (var);
+
+		var = NIH_MUST (nih_sprintf (NULL, "MOUNTPOINT=%s",
+					     mnt->mountpoint));
+		NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
+		nih_discard (var);
+
+		var = NIH_MUST (nih_sprintf (NULL, "TYPE=%s",
+					     mnt->type ?: "none"));
+		NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
+		nih_discard (var);
+
+		var = NIH_MUST (nih_sprintf (NULL, "OPTIONS=%s",
+					     mnt->opts ?: ""));
+		NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
+		nih_discard (var);
+	}
+
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
-						       name, env, FALSE,
+						       name, env, mnt ? TRUE : FALSE,
 						       NULL, emit_event_error, NULL,
 						       NIH_DBUS_TIMEOUT_NEVER));
 	if (! pending_call) {
@@ -2265,57 +2290,8 @@ emit_event (const char *name)
 		return;
 	}
 
-	dbus_pending_call_unref (pending_call);
-}
-
-void
-mount_event (Mount *     mnt,
-	     const char *name)
-{
-	DBusPendingCall *pending_call;
-	nih_local char **env = NULL;
-	size_t           env_len = 0;
-	nih_local char * var = NULL;
-
-	nih_assert (mnt != NULL);
-
-	env = NIH_MUST (nih_str_array_new (NULL));
-
-	var = NIH_MUST (nih_sprintf (NULL, "DEVICE=%s",
-				     mnt->device ?: "none"));
-	NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
-	nih_discard (var);
-
-	var = NIH_MUST (nih_sprintf (NULL, "MOUNTPOINT=%s",
-				     mnt->mountpoint));
-	NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
-	nih_discard (var);
-
-	var = NIH_MUST (nih_sprintf (NULL, "TYPE=%s",
-				     mnt->type ?: "none"));
-	NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
-	nih_discard (var);
-
-	var = NIH_MUST (nih_sprintf (NULL, "OPTIONS=%s",
-				     mnt->opts ?: ""));
-	NIH_MUST (nih_str_array_addp (&env, NULL, &env_len, var));
-	nih_discard (var);
-
-	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
-						       name, env, TRUE,
-						       NULL, emit_event_error, NULL,
-						       NIH_DBUS_TIMEOUT_NEVER));
-	if (! pending_call) {
-		NihError *err;
-
-		err = nih_error_get ();
-		nih_warn ("%s", err->message);
-		nih_free (err);
-
-		return;
-	}
-
-	dbus_pending_call_block (pending_call);
+	if (mnt)
+		dbus_pending_call_block (pending_call);
 
 	dbus_pending_call_unref (pending_call);
 }
