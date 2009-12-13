@@ -10,6 +10,9 @@ mountall (1.2) UNRELEASED; urgency=low
     - mounted-dev.conf replaces /dev hook
     - mounted-varrun.conf replaces /var/run hook
     - mounted-tmp.conf replaces /tmp hook
+  * Try and make mountpoints, though we only care about failure if the
+    mountpoint is marked "optional" since otherwise the filesystem might
+    make the mountpoint or something.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 11 Dec 2009 13:37:17 +0000
 

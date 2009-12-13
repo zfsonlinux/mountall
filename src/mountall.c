@@ -1595,15 +1595,13 @@ run_mount (Mount *mnt,
 		nih_info ("mounting %s", mnt->mountpoint);
 	}
 
-	/* If this is optional, the mountpoint might not exist
-	 * (don't check otherwise, let mount worry about it - since some
-	 *  fuse module might make them :p)
-	 */
-	if (has_option (mnt, "optional", FALSE)) {
-		struct stat statbuf;
-
-		if ((stat (mnt->mountpoint, &statbuf) < 0)
-		    && (errno == ENOENT)) {
+	if (mkdir (mnt->mountpoint, 0755) < 0) {
+		/* If this is optional, the mountpoint might not exist
+		 * (don't check otherwise, let mount worry about it - since
+		 *  some fuse module might make them :p)
+		 */
+		if ((errno != EEXIST)
+		    && has_option (mnt, "optional", FALSE)) {
 			nih_debug ("%s: mountpoint doesn't exist, ignoring",
 				   mnt->mountpoint);
 			mounted (mnt);
