@@ -10,7 +10,10 @@ mountall (1.2) UNRELEASED; urgency=low
     handled by an Upstart job supplied by SELinux now.
     - mounted-dev.conf replaces /dev hook
     - mounted-varrun.conf replaces /var/run hook
-    - mounted-tmp.conf replaces /tmp hook
+    - mounted-tmp.conf replaces /tmp hook.
+      + Hook will be run for any /tmp mountpoint.  LP: #478392.
+      + Switching back to using "find" fixes $TMPTIME to be in days again,
+        rathern than hours.  LP: #482602
   * Try and make mountpoints, though we only care about failure if the
     mountpoint is marked "optional" since otherwise the filesystem might
     make the mountpoint or something.
@@ -25,7 +28,7 @@ mountall (1.2) UNRELEASED; urgency=low
     theoretical sense to only wait for key filesystems, in practice we can't
     tell what are really key or not - and there's a simple rule that if
     someone adds something to their /etc/fstab without "noauto" then they
-    want it mounted.
+    want it mounted.  LP: #484234.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
