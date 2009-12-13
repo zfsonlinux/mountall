@@ -581,7 +581,7 @@ parse_fstab (const char *filename)
 
 	nih_assert (filename != NULL);
 
-	nih_debug ("updating mounts");
+	nih_debug ("updating from %s", filename);
 
 	fstab = setmntent (filename, "r");
 	if (! fstab) {
