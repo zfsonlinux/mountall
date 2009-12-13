@@ -13,6 +13,10 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/intl
 
 
+initdir = $(libdir)/init
+dist_init_DATA = fstab
+
+
 sbin_PROGRAMS = \
 	mountall
 
