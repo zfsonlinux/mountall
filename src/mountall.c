@@ -648,14 +648,18 @@ mount_proc (void)
 		mnt->mounted = TRUE;
 }
 
+static FILE *mountinfo = NULL;
+
 static void
-parse_mountinfo_file (FILE *mountinfo,
-		      int   reparsed)
+parse_mountinfo_file (int reparsed)
 {
 	nih_local char *buf = NULL;
 	size_t          bufsz;
 
 	nih_assert (mountinfo != NULL);
+
+	if (reparsed)
+		rewind (mountinfo);
 
 	nih_debug ("updating mounts");
 
@@ -765,40 +769,35 @@ mountinfo_watcher (void *      data,
 		   NihIoWatch *watch,
 		   NihIoEvents events)
 {
-	FILE *mountinfo;
-
-	nih_assert (watch != NULL);
-	nih_assert (events > 0);
-
-	nih_assert (mountinfo = fdopen (watch->fd, "r"));
-	rewind (mountinfo);
+	nih_assert (mountinfo != NULL);
 
 	nih_debug ("mountinfo changed, reparsing");
-
-	parse_mountinfo_file (mountinfo, TRUE);
+	parse_mountinfo_file (TRUE);
 }
 
 void
 parse_mountinfo (void)
 {
-	FILE *mountinfo;
-
-	mountinfo = fopen ("/proc/self/mountinfo", "r");
-	if ((! mountinfo) && (errno == ENOENT)) {
-		mount_proc ();
+	if (mountinfo) {
+		parse_mountinfo_file (TRUE);
+	} else {
 		mountinfo = fopen ("/proc/self/mountinfo", "r");
-	}
-	if (! mountinfo) {
-		nih_fatal ("%s: %s", "/proc/self/mountinfo",
-			   strerror (errno));
-		delayed_exit (EXIT_MOUNT);
-		return;
-	}
+		if ((! mountinfo) && (errno == ENOENT)) {
+			mount_proc ();
+			mountinfo = fopen ("/proc/self/mountinfo", "r");
+		}
+		if (! mountinfo) {
+			nih_fatal ("%s: %s", "/proc/self/mountinfo",
+				   strerror (errno));
+			delayed_exit (EXIT_MOUNT);
+			return;
+		}
 
-	parse_mountinfo_file (mountinfo, FALSE);
+		parse_mountinfo_file (FALSE);
 
-	NIH_MUST (nih_io_add_watch (NULL, fileno (mountinfo), NIH_IO_EXCEPT,
-				    mountinfo_watcher, NULL));
+		NIH_MUST (nih_io_add_watch (NULL, fileno (mountinfo), NIH_IO_EXCEPT,
+					    mountinfo_watcher, NULL));
+	}
 }
 
 
@@ -1576,7 +1575,13 @@ run_mount_finished (Mount *mnt,
 
 	if (mnt->has_showthrough)
 		mount_showthrough (mnt);
-	mounted (mnt);
+
+	/* Parse mountinfo to see what mount did; in particular to update
+	 * the type if multiple types are listed in fstab.
+	 */
+	parse_mountinfo ();
+	if (! mnt->mounted)
+		mounted (mnt);
 }
 
 
