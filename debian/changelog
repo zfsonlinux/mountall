@@ -23,6 +23,8 @@ mountall (1.2) UNRELEASED; urgency=low
   * Now supports multiple filesystem types listed in fstab, the whole
     comma-separated list is passed to mount and then /proc/self/mountinfo
     is reparsed to find out what mount actually did.
+    * /dev will be mounted as a devtmpfs filesystem if supported by the
+      kernel (which then does not need to run the /dev hook script).
   * Filesystem checks may be forced by adding force-fsck to the kernel
     command-line.
   * Exit gracefully with an error on failed system calls, don't infinite
