@@ -938,12 +938,10 @@ mount_policy (void)
 			continue;
 		}
 
-		/* Otherwise if there's no device, but we know the type,
-		 * it's implicitly nodev whether or not we know about the
-		 * filesystem type.
+		/* Otherwise If there's no device, it's implicitly
+		 * nodev whether or not we know about the filesystem.
 		 */
-		if (! strcmp (mnt->device, "none")
-		    && strcmp (mnt->type, "none"))
+		if (! strcmp (mnt->device, "none"))
 			mnt->nodev = TRUE;
 
 		/* Drop anything with ignore as its type. */
