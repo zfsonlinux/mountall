@@ -1305,7 +1305,12 @@ spawn (Mount *         mnt,
 	nih_assert (args != NULL);
 	nih_assert (args[0] != NULL);
 
-	NIH_ZERO (pipe2 (fds, O_CLOEXEC));
+	if (pipe2 (fds, O_CLOEXEC) < 0) {
+		nih_fatal ("Unable to create pipe for spawned process: %s",
+			   strerror (errno));
+		delayed_exit (EXIT_ERROR);
+		return -1;
+	}
 
 	fflush (stdout);
 	fflush (stderr);
@@ -1366,7 +1371,14 @@ spawn (Mount *         mnt,
 	if (wait) {
 		siginfo_t info;
 
-		NIH_ZERO (waitid (P_PID, pid, &info, WEXITED));
+		if (waitid (P_PID, pid, &info, WEXITED) < 0) {
+			nih_fatal ("Unable to obtain process exit status: %s",
+				   strerror (errno));
+			nih_free (proc);
+			delayed_exit (EXIT_ERROR);
+			return -1;
+		}
+
 		spawn_child_handler (proc, pid, info.si_code == CLD_EXITED ? NIH_CHILD_EXITED : NIH_CHILD_KILLED,
 				     info.si_status);
 		return 0;
@@ -1903,7 +1915,12 @@ run_fsck (Mount *mnt)
 	nih_info ("checking %s", MOUNT_NAME (mnt));
 
 	/* Create a pipe to receive progress indication */
-	NIH_ZERO (pipe2 (fds, O_CLOEXEC));
+	if (pipe2 (fds, O_CLOEXEC) < 0) {
+		nih_fatal ("Unable to create pipe for spawned process: %s",
+			   strerror (errno));
+		delayed_exit (EXIT_ERROR);
+		return;
+	}
 
 	flags = fcntl (fds[1], F_GETFD);
 	if ((flags < 0)
