@@ -678,7 +678,8 @@ parse_mountinfo_file (int reparsed)
 
 		while ((! strchr (buf, '\n')) && (! feof (mountinfo))) {
 			buf = NIH_MUST (nih_realloc (buf, NULL, bufsz + 4096));
-			fgets (buf + bufsz - 1, 4097, mountinfo);
+			if (! fgets (buf + bufsz - 1, 4097, mountinfo))
+				break;
 			bufsz += 4096;
 		}
 
@@ -832,7 +833,8 @@ parse_filesystems (void)
 
 		while (((ptr = strchr (buf, '\n')) == NULL) && (! feof (fs))) {
 			buf = NIH_MUST (nih_realloc (buf, NULL, bufsz + 4096));
-			fgets (buf + bufsz - 1, 4097, fs);
+			if (! fgets (buf + bufsz - 1, 4097, fs))
+				break;
 			bufsz += 4096;
 		}
 
@@ -1342,7 +1344,7 @@ spawn (Mount *         mnt,
 		execvp (args[0], args);
 		nih_fatal ("%s %s [%d]: %s", args[0], MOUNT_NAME (mnt),
 			   getpid (), strerror (errno));
-		write (fds[1], &flag, 1);
+		nih_assert (write (fds[1], &flag, 1) == 1);
 		exit (0);
 	} else {
 		int ret;
@@ -2374,7 +2376,8 @@ usplash_write (const char *format, ...)
 	if (fd < 0)
 		return;
 
-	write (fd, message, strlen (message) + 1);
+	if (write (fd, message, strlen (message) + 1) < 0)
+		;
 
 	close (fd);
 }
