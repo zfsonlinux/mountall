@@ -14,6 +14,13 @@ mountall (1.2) UNRELEASED; urgency=low
     mountpoint is marked "optional" since otherwise the filesystem might
     make the mountpoint or something.
 
+  * All filesystems are now mounted before emitting events; the "bootwait"
+    and "nobootwait" options have been removed.  While it made some kind of
+    theoretical sense to only wait for key filesystems, in practice we can't
+    tell what are really key or not - and there's a simple rule that if
+    someone adds something to their /etc/fstab without "noauto" then they
+    want it mounted.
+
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 11 Dec 2009 13:37:17 +0000
 
 mountall (1.1) lucid; urgency=low

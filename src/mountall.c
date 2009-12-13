@@ -75,7 +75,6 @@
 
 
 typedef enum {
-	TAG_OTHER,
 	TAG_LOCAL,
 	TAG_REMOTE,
 	TAG_VIRTUAL,
@@ -227,41 +226,6 @@ static const struct {
 	{ NULL }
 }, *builtin;
 
-static const char *fhs[] = {
-	"/",
-	"/boot",			/* Often separate */
-	"/dev",				/* udev */
-	"/dev/pts",			/* Built-in */
-	"/dev/shm",			/* Built-in */
-	"/home",
-	"/lib/init/rw",			/* Built-in */
-	"/opt",
-	"/proc",			/* Linux appendix */
-	"/proc/sys/fs/binfmt_misc",	/* Built-in */
-	"/spu",				/* Built-in */
-	"/sys",				/* Not in FHS yet */
-	"/sys/fs/fuse/connections",	/* Built-in */
-	"/sys/kernel/debug",		/* Built-in */
-	"/sys/kernel/security",		/* Built-in */
-	"/tmp",
-	"/usr",
-	"/usr/local",
-	"/usr/var",			/* Recommendation for /var symlink */
-	"/var",
-	"/var/cache/man",
-	"/var/cache/fonts",
-	"/var/lib",
-	"/var/lock",
-	"/var/log",
-	"/var/mail",
-	"/var/opt",
-	"/var/run",
-	"/var/spool",
-	"/var/tmp",
-	"/var/yp",
-	NULL
-};
-
 
 /**
  * mounts:
@@ -273,8 +237,7 @@ static const char *fhs[] = {
 NihList *mounts = NULL;
 
 /**
- * Counters for the different tags, including a special FHS tag for
- * everything that's not swap or other.
+ * Counters for the different tags.
  **/
 size_t num_local = 0;
 size_t num_local_mounted = 0;
@@ -474,7 +437,7 @@ new_mount (const char *mountpoint,
 	mnt->mount_opts = NULL;
 	mnt->check = check;
 
-	mnt->tag = TAG_OTHER;
+	mnt->tag = TAG_LOCAL;
 	mnt->has_showthrough = FALSE;
 	mnt->showthrough = NULL;
 	nih_list_init (&mnt->deps);
@@ -978,24 +941,6 @@ is_parent (char *root,
 }
 
 static int
-is_fhs (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	if (has_option (mnt, "bootwait", FALSE)) {
-		return TRUE;
-	} else if (has_option (mnt, "nobootwait", FALSE)) {
-		return FALSE;
-	}
-
-	for (const char * const *path = fhs; path && *path; path++)
-		if (! strcmp (*path, mnt->mountpoint))
-			return TRUE;
-
-	return FALSE;
-}
-
-static int
 is_swap (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
@@ -1209,44 +1154,40 @@ mount_policy (void)
 			mnt->tag = TAG_LOCAL;
 			num_local++;
 			nih_debug ("%s is local (root)", mnt->mountpoint);
-		} else if (is_fhs (mnt)) {
-			if (is_remote (mnt)) {
-				mnt->tag = TAG_REMOTE;
-				num_remote++;
-				nih_debug ("%s is remote", mnt->mountpoint);
-			} else if (mnt->nodev
-				   && ((! mnt->type)
-				       || strcmp (mnt->type, "fuse"))) {
-				if (mount_parent
-				    && strcmp (mount_parent->mountpoint, "/")
-				    && (mount_parent->tag == TAG_REMOTE)) {
-					mnt->tag = TAG_REMOTE;
-					num_remote++;
-					nih_debug ("%s is remote (inherited)", mnt->mountpoint);
-				} else if (mount_parent
-				    && strcmp (mount_parent->mountpoint, "/")
-				    && (mount_parent->tag == TAG_LOCAL)) {
-					mnt->tag = TAG_LOCAL;
-					num_local++;
-					nih_debug ("%s is local (inherited)", mnt->mountpoint);
-				} else {
-					mnt->tag = TAG_VIRTUAL;
-					num_virtual++;
-					nih_debug ("%s is virtual", mnt->mountpoint);
-				}
-			} else if (mount_parent
-				   && strcmp (mount_parent->mountpoint, "/")
-				   && (mount_parent->tag == TAG_REMOTE)) {
+		} else if (is_remote (mnt)) {
+			mnt->tag = TAG_REMOTE;
+			num_remote++;
+			nih_debug ("%s is remote", mnt->mountpoint);
+		} else if (mnt->nodev
+			   && ((! mnt->type)
+			       || strcmp (mnt->type, "fuse"))) {
+			if (mount_parent
+			    && strcmp (mount_parent->mountpoint, "/")
+			    && (mount_parent->tag == TAG_REMOTE)) {
 				mnt->tag = TAG_REMOTE;
 				num_remote++;
 				nih_debug ("%s is remote (inherited)", mnt->mountpoint);
-			} else {
+			} else if (mount_parent
+				   && strcmp (mount_parent->mountpoint, "/")
+				   && (mount_parent->tag == TAG_LOCAL)) {
 				mnt->tag = TAG_LOCAL;
 				num_local++;
-				nih_debug ("%s is local", mnt->mountpoint);
+				nih_debug ("%s is local (inherited)", mnt->mountpoint);
+			} else {
+				mnt->tag = TAG_VIRTUAL;
+				num_virtual++;
+				nih_debug ("%s is virtual", mnt->mountpoint);
 			}
+		} else if (mount_parent
+			   && strcmp (mount_parent->mountpoint, "/")
+			   && (mount_parent->tag == TAG_REMOTE)) {
+			mnt->tag = TAG_REMOTE;
+			num_remote++;
+			nih_debug ("%s is remote (inherited)", mnt->mountpoint);
 		} else {
-			nih_debug ("%s is other (default)", mnt->mountpoint);
+			mnt->tag = TAG_LOCAL;
+			num_local++;
+			nih_debug ("%s is local", mnt->mountpoint);
 		}
 	}
 
@@ -1293,7 +1234,7 @@ mounted (Mount *mnt)
 			emit_event ("local-filesystems");
 
 			if (num_remote_mounted == num_remote) {
-				nih_info ("fhs mounted");
+				nih_info ("filesystem mounted");
 				emit_event ("filesystem");
 			}
 		}
@@ -1305,7 +1246,7 @@ mounted (Mount *mnt)
 
 			if ((num_local_mounted == num_local)
 			    && (num_virtual_mounted == num_virtual)) {
-				nih_info ("fhs mounted");
+				nih_info ("filesystem mounted");
 				emit_event ("filesystem");
 			}
 		}
@@ -1320,7 +1261,7 @@ mounted (Mount *mnt)
 				emit_event ("local-filesystems");
 
 				if (num_remote_mounted == num_remote) {
-					nih_info ("fhs mounted");
+					nih_info ("filesystem mounted");
 					emit_event ("filesystem");
 				}
 			}
@@ -1333,8 +1274,7 @@ mounted (Mount *mnt)
 		}
 		break;
 	default:
-		/* other ignored */
-		;
+		nih_assert_not_reached ();
 	}
 
 	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
@@ -1633,8 +1573,7 @@ run_mount (Mount *mnt,
 	if (mnt->opts) {
 		nih_local char *opts = NULL;
 
-		opts = cut_options (NULL, mnt, "showthrough", "bootwait",
-				    "nobootwait", "optional",
+		opts = cut_options (NULL, mnt, "showthrough", "optional",
 				    NULL);
 		if (mnt->mounted && (! fake)) {
 			char *tmp;
@@ -1709,7 +1648,7 @@ run_mount_finished (Mount *mnt,
 		nih_error ("Filesystem could not be mounted: %s",
 			   mnt->mountpoint);
 
-		if (is_fhs (mnt) && (! is_remote (mnt)))
+		if (! is_remote (mnt))
 			delayed_exit (EXIT_MOUNT);
 		return;
 	}
@@ -2174,12 +2113,10 @@ run_fsck_finished (Mount *mnt,
 	} else if (status & 4) {
 		nih_error ("Filesystem has errors: %s",
 			   mnt->mountpoint);
-		if (is_fhs (mnt)) {
-			if (! strcmp (mnt->mountpoint, "/")) {
-				delayed_exit (EXIT_ROOT_FSCK);
-			} else {
-				delayed_exit (EXIT_FSCK);
-			}
+		if (! strcmp (mnt->mountpoint, "/")) {
+			delayed_exit (EXIT_ROOT_FSCK);
+		} else {
+			delayed_exit (EXIT_FSCK);
 		}
 		return;
 	} else if ((status & 32) || (status == SIGTERM)) {
@@ -2187,8 +2124,7 @@ run_fsck_finished (Mount *mnt,
 			  mnt->mountpoint);
 	} else if ((status & (8 | 16 | 128)) || (status > 255)) {
 		nih_fatal ("General fsck error");
-		if (is_fhs (mnt))
-			delayed_exit (EXIT_ERROR);
+		delayed_exit (EXIT_ERROR);
 		return;
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s",
@@ -2659,9 +2595,9 @@ progress_timer (void *    data,
 			num_fscks++;
 
 		/* Any remaining mounts? */
-		if ((mnt->tag != TAG_OTHER)
-		    && ((! mnt->mounted) || needs_remount (mnt)
-			|| (mnt->mount_pid > 0)))
+		if ((! mnt->mounted)
+		    || needs_remount (mnt)
+		    || (mnt->mount_pid > 0))
 			bored |= bored_bit;
 
 		bored_bit <<= 1;
