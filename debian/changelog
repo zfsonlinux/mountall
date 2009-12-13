@@ -1,5 +1,6 @@
 mountall (1.2) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * "mount" event changed to "mounting", to make it clear it happens
     before the filesystem is mounted.  Added "mounted" event which
     happens afterwards.
@@ -20,6 +21,10 @@ mountall (1.2) UNRELEASED; urgency=low
     tell what are really key or not - and there's a simple rule that if
     someone adds something to their /etc/fstab without "noauto" then they
     want it mounted.
+
+  [ Johan Kiviniemi ]
+  * Start all fsck instances in parallel, but set their priorities so that
+    thrashing is avoided.  LP: #491389.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 11 Dec 2009 13:37:17 +0000
 
