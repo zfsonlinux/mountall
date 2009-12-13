@@ -271,15 +271,6 @@ size_t num_filesystems = 0;
  **/
 NihList *procs = NULL;
 
-/**
- * checks:
- *
- * List of active fsck instances, sorted by the priority (highest priority
- * first).
- *
- * Each entry is a NihListEntry with a Mount object as the data member.
- **/
-NihList *checks = NULL;
 
 /**
  * written_mtab:
@@ -1885,7 +1876,7 @@ finish:
 }
 
 static void
-checks_update_priorities (void)
+fsck_update_priorities (void)
 {
 	nih_local NihHash *locks = NULL;
 
@@ -1899,9 +1890,12 @@ checks_update_priorities (void)
 
 	nih_debug ("updating check priorities");
 
-	NIH_LIST_FOREACH (checks, iter) {
-		Mount *mnt = ((NihListEntry *)iter)->data;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
 		int    low_prio = FALSE;
+
+		if (mnt->fsck_pid <= 0)
+			continue;
 
 		update_physical_dev_ids (mnt);
 
@@ -1946,33 +1940,6 @@ checks_update_priorities (void)
 			nih_warn ("ioprio_set %d: %s",
 				  mnt->fsck_pid, strerror (errno));
 	}
-}
-
-static void
-checks_add (Mount *mnt)
-{
-	NihListEntry *entry;
-
-	nih_assert (mnt != NULL);
-
-	entry = NIH_MUST (nih_list_entry_new (checks));
-	entry->data = mnt;
-
-	nih_list_add (checks, &entry->entry);
-
-	checks_update_priorities ();
-}
-
-static void
-checks_remove (Mount *mnt)
-{
-	nih_assert (mnt != NULL);
-
-	NIH_LIST_FOREACH_SAFE (checks, iter)
-		if (((NihListEntry *)iter)->data == mnt)
-			nih_free (iter);
-
-	checks_update_priorities ();
 }
 
 void
@@ -2057,7 +2024,7 @@ run_fsck (Mount *mnt)
 	mnt->fsck_progress = -1;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
-	checks_add (mnt);
+	fsck_update_priorities ();
 
 	/* Close writing end, reading end is left open inside the NihIo
 	 * structure watching it until the remote end is closed by fsck
@@ -2075,12 +2042,12 @@ run_fsck_finished (Mount *mnt,
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->fsck_pid == pid);
 
-	checks_remove (mnt);
-
 	mnt->fsck_pid = -1;
 	mnt->fsck_progress = -1;
 
 	boredom_count = 0;
+
+ 	fsck_update_priorities ();
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s",
@@ -2751,7 +2718,6 @@ main (int   argc,
 
 	mounts = NIH_MUST (nih_list_new (NULL));
 	procs = NIH_MUST (nih_list_new (NULL));
-	checks = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
