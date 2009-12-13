@@ -119,7 +119,6 @@ typedef struct filesystem {
 } Filesystem;
 
 typedef struct process {
-	NihList       entry;
 	Mount *       mnt;
 	char * const *args;
 	pid_t         pid;
@@ -262,14 +261,6 @@ int newly_mounted = FALSE;
  **/
 Filesystem *filesystems = NULL;
 size_t num_filesystems = 0;
-
-/**
- * procs:
- *
- * List of processes we're currently waiting to complete, each entry in
- * the list is a Process structure.
- **/
-NihList *procs = NULL;
 
 
 /**
@@ -1414,19 +1405,15 @@ spawn (Mount *         mnt,
 		   pid);
 
 	proc = NIH_MUST (nih_new (NULL, Process));
-	nih_list_init (&proc->entry);
 
 	proc->mnt = mnt;
 
 	proc->args = args;
-	if (! wait)
+	if (proc->args)
 		nih_ref (proc->args, proc);
 
 	proc->pid = pid;
-
 	proc->handler = handler;
-
-	nih_list_add (procs, &proc->entry);
 
 	if (wait) {
 		siginfo_t info;
@@ -1450,8 +1437,6 @@ spawn_child_handler (Process *      proc,
 {
 	nih_assert (proc != NULL);
 	nih_assert (pid == proc->pid);
-
-	nih_list_remove (&proc->entry);
 
 	if (event != NIH_CHILD_EXITED) {
 		const char *sig;
@@ -2617,19 +2602,19 @@ escape (void)
 {
 	nih_error ("Cancelled");
 
-	if (exit_on_escape) {
-		NIH_LIST_FOREACH (procs, iter) {
-			Process *proc = (Process *)iter;
-			kill (proc->pid, SIGTERM);
-		}
-		delayed_exit (EXIT_ERROR);
-	} else {
-		NIH_LIST_FOREACH (procs, iter) {
-			Process *proc = (Process *)iter;
-			if (proc->pid == proc->mnt->fsck_pid)
-				kill (proc->pid, SIGTERM);
-		}
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if ((mnt->mount_pid > 0)
+		    && exit_on_escape)
+			kill (mnt->mount_pid, SIGTERM);
+
+		if (mnt->fsck_pid > 0)
+			kill (mnt->fsck_pid, SIGTERM);
 	}
+
+	if (exit_on_escape)
+		delayed_exit (EXIT_ERROR);
 }
 
 
@@ -2717,7 +2702,6 @@ main (int   argc,
 					  progress_timer, NULL));
 
 	mounts = NIH_MUST (nih_list_new (NULL));
-	procs = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
@@ -2848,8 +2832,17 @@ delayed_exit (int code)
 {
 	exit_code = nih_max (exit_code, code);
 
-	if ((exit_code >= EXIT_OK) && NIH_LIST_EMPTY (procs)) {
-		nih_main_unlink_pidfile ();
-		nih_main_loop_exit (exit_code);
+	if (exit_code < EXIT_OK)
+		return;
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mount = (Mount *)iter;
+
+		if ((mount->mount_pid > 0)
+		    || (mount->fsck_pid > 0))
+			return;
 	}
+
+	nih_main_unlink_pidfile ();
+	nih_main_loop_exit (exit_code);
 }
