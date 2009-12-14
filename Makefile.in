@@ -37,8 +37,8 @@ subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(top_srcdir)/configure $(top_srcdir)/intl/Makefile.in \
-	ABOUT-NLS COPYING compile config.guess config.rpath config.sub \
-	depcomp install-sh ltmain.sh missing
+	ABOUT-NLS COPYING TODO compile config.guess config.rpath \
+	config.sub depcomp install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/codeset.m4 \
 	$(top_srcdir)/m4/gettext.m4 $(top_srcdir)/m4/glibc2.m4 \
@@ -228,6 +228,8 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
+PLYMOUTH_CFLAGS = @PLYMOUTH_CFLAGS@
+PLYMOUTH_LIBS = @PLYMOUTH_LIBS@
 POSUB = @POSUB@
 PRI_MACROS_BROKEN = @PRI_MACROS_BROKEN@
 RANLIB = @RANLIB@
