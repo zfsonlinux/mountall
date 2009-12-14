@@ -302,6 +302,13 @@ static struct udev *udev = NULL;
  **/
 static ply_event_loop_t *ply_event_loop = NULL;
 
+/**
+ * ply_boot_client:
+ *
+ * Plymouth boot client.
+ **/
+static ply_boot_client_t *ply_boot_client = NULL;
+
 
 /**
  * daemonise:
@@ -2625,7 +2632,6 @@ main (int   argc,
 	char **              args;
 	DBusConnection *     connection;
 	struct udev_monitor *udev_monitor;
-	ply_boot_client_t   *ply_boot_client;
 	Mount *              root;
 	int                  ret;
 
