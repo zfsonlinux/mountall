@@ -2651,8 +2651,6 @@ main (int   argc,
 
 	ret = nih_main_loop ();
 
-	nih_main_unlink_pidfile ();
-
 	return ret;
 }
 
@@ -2688,6 +2686,5 @@ delayed_exit (int code)
 			return;
 	}
 
-	nih_main_unlink_pidfile ();
 	nih_main_loop_exit (exit_code);
 }
