@@ -1741,13 +1741,26 @@ run_fsck_finished (Mount *mnt,
 		   pid_t  pid,
 		   int    status)
 {
+	nih_local char *update = NULL;
+
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->fsck_pid == pid);
 
+	/* Finish off the progress bar */
+	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:100",
+					MOUNT_NAME (mnt)));
+
+	ply_boot_client_update_daemon (ply_boot_client, update,
+				       plymouth_response,
+				       plymouth_response,
+				       NULL);
+
+	/* The check is done */
 	mnt->fsck_pid = -1;
 
  	fsck_update ();
 
+	/* Handle errors */
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
 		exit (4);
