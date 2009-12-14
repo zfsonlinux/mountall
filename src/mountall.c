@@ -197,11 +197,15 @@ void   fsck_reader           (Mount *mnt, NihIo *io,
 			      const char *buf, size_t len);
 void   boredom_timeout       (void *data, NihTimer *timer);
 
+char * plymouth_prompt       (const void *parent, const char *message,
+			      const char *keys);
 void   plymouth_response     (void *user_data, ply_boot_client_t *client);
+void   plymouth_answer       (void *user_data, const char *keys,
+			      ply_boot_client_t *client);
+void   plymouth_failed       (void *user_data, ply_boot_client_t *client);
 void   plymouth_disconnected (void *user_data, ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
-void   delayed_exit          (int code);
 
 
 /**
@@ -1419,9 +1423,6 @@ spawn_child_handler (Process *      proc,
 		proc->handler (proc->mnt, pid, status);
 
 	nih_free (proc);
-
-	/* Exit now if there's a delayed exit */
-	delayed_exit (-1);
 }
 
 
@@ -1558,8 +1559,30 @@ run_mount_finished (Mount *mnt,
 		nih_error ("Filesystem could not be mounted: %s",
 			   MOUNT_NAME (mnt));
 
-		if (! is_remote (mnt))
-			delayed_exit (EXIT_MOUNT);
+		if (! is_remote (mnt)) {
+			nih_local char *message = NULL;
+			nih_local char *answer = NULL;
+
+			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [DS]"),
+						 MOUNT_NAME (mnt)));
+
+			answer = plymouth_prompt (NULL, message, "DdSs");
+			if ((! answer)
+			    || (answer[0] == 'S')
+			    || (answer[0] == 's')) {
+				exit (EXIT_ERROR);
+
+			} else if ((answer[0] == 'D')
+				   || (answer[0] == 'd')) {
+				nih_message (_("Fake mounting %s at user request"),
+					     MOUNT_NAME (mnt));
+				mounted (mnt);
+
+			} else {
+				nih_assert_not_reached ();
+			}
+		}
+
 		return;
 	}
 
@@ -1733,24 +1756,80 @@ run_fsck_finished (Mount *mnt,
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
-		delayed_exit (EXIT_REBOOT);
-		return;
+		exit (EXIT_REBOOT);
+
 	} else if (status & 4) {
+		nih_local char *message = NULL;
+		nih_local char *answer = NULL;
+
+		/* FIXME add a fix option that repeats the fsck with
+		 * -f
+		 */
+
 		nih_error ("Filesystem has errors: %s", MOUNT_NAME (mnt));
-		if (! strcmp (mnt->mountpoint, "/")) {
-			delayed_exit (EXIT_ROOT_FSCK);
+
+		message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [DIS]"),
+						 MOUNT_NAME (mnt)));
+
+		answer = plymouth_prompt (NULL, message, "DdSs");
+		if ((! answer)
+		    || (answer[0] == 'S')
+		    || (answer[0] == 's')) {
+			exit (EXIT_ERROR);
+
+		} else if ((answer[0] == 'D')
+			   || (answer[0] == 'd')) {
+			nih_message (_("Fake mounting %s at user request"),
+				     MOUNT_NAME (mnt));
+			mounted (mnt);
+			return;
+
+		} else if ((answer[0] == 'I')
+			   || (answer[0] == 'I')) {
+			nih_message (_("Ignoring errors with %s at user request"),
+				     MOUNT_NAME (mnt));
+			/* Fall through */
 		} else {
-			delayed_exit (EXIT_FSCK);
+			nih_assert_not_reached ();
 		}
-		return;
 	} else if ((status & 32) || (status == SIGTERM)) {
 		nih_info ("Filesytem check cancelled: %s", MOUNT_NAME (mnt));
+
+		/* Fall through */
 	} else if ((status & (8 | 16 | 128)) || (status > 255)) {
-		nih_fatal ("General fsck error");
-		delayed_exit (EXIT_FSCK);
-		return;
+		nih_local char *message = NULL;
+		nih_local char *answer = NULL;
+
+		nih_error ("General fsck error: %s", MOUNT_NAME (mnt));
+
+		message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [DIS]"),
+						 MOUNT_NAME (mnt)));
+
+		answer = plymouth_prompt (NULL, message, "DdSs");
+		if ((! answer)
+		    || (answer[0] == 'S')
+		    || (answer[0] == 's')) {
+			exit (EXIT_ERROR);
+
+		} else if ((answer[0] == 'D')
+			   || (answer[0] == 'd')) {
+			nih_message (_("Fake mounting %s at user request"),
+				     MOUNT_NAME (mnt));
+			mounted (mnt);
+			return;
+
+		} else if ((answer[0] == 'I')
+			   || (answer[0] == 'I')) {
+			nih_message (_("Ignoring errors with %s at user request"),
+				     MOUNT_NAME (mnt));
+			/* Fall through */
+		} else {
+			nih_assert_not_reached ();
+		}
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s", MOUNT_NAME (mnt));
+
+		/* Fall through */
 	}
 
 	mnt->ready = TRUE;
@@ -2435,24 +2514,107 @@ void
 boredom_timeout (void *    data,
 		 NihTimer *timer)
 {
-	/* FIXME:
-	 * do something interesting here, e.g. iterate over the mounts and
-	 * allow to ignore any that we are waiting for.
-	 */
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *           mnt = (Mount *)iter;
+		nih_local char *  message = NULL;
+		nih_local char *  answer = NULL;
+
+		if (mnt->mounted && (! needs_remount (mnt)))
+			continue;
+		if (mnt->fsck_pid > 0)
+			continue;
+		if (mnt->mount_pid > 0)
+			continue;
+
+		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [DS]"),
+						 MOUNT_NAME (mnt)));
+
+		answer = plymouth_prompt (NULL, message, "DdSs");
+		if ((! answer)
+		    || (answer[0] == 'S')
+		    || (answer[0] == 's')) {
+			exit (EXIT_ERROR);
+
+		} else if ((answer[0] == 'D')
+			   || (answer[0] == 'd')) {
+			nih_message (_("Fake mounting %s at user request"),
+				     MOUNT_NAME (mnt));
+			mounted (mnt);
+
+		} else {
+			nih_assert_not_reached ();
+		}
+	}
+}
+
+
+char *
+plymouth_prompt (const void *parent,
+		 const char *message,
+		 const char *keys)
+{
+	char *answer;
+
+	nih_assert (message != NULL);
+	nih_assert (keys != NULL);
 
 	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-							_("Waiting for one or more filesystems"),
+							message,
 							plymouth_response,
 							plymouth_response,
 							NULL);
-}
 
+	ply_boot_client_ask_daemon_to_watch_for_keystroke (ply_boot_client,
+							   keys,
+							   plymouth_answer,
+							   plymouth_failed,
+							   &answer);
+
+	if (ply_event_loop_run (ply_event_loop))
+		return NULL;
+
+	ply_boot_client_attach_to_event_loop (ply_boot_client, ply_event_loop);
+
+	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+							"",
+							plymouth_response,
+							plymouth_response,
+							NULL);
+
+	ply_boot_client_ask_daemon_to_ignore_keystroke (ply_boot_client,
+							keys,
+							(ply_boot_client_answer_handler_t)plymouth_response,
+							plymouth_response,
+							NULL);
+
+	return answer;
+}
 
 void
 plymouth_response (void *             user_data,
 		   ply_boot_client_t *client)
 {
 	/* No response */
+}
+
+void
+plymouth_answer (void *             user_data,
+		 const char *       keys,
+		 ply_boot_client_t *client)
+{
+	char **reply = (char **)user_data;
+
+	*reply = NIH_MUST (nih_strdup (NULL, keys));
+
+	ply_event_loop_exit (ply_event_loop, 0);
+}
+
+void
+plymouth_failed (void *             user_data,
+		 ply_boot_client_t *client)
+{
+	nih_error (_("Plymouth command failed"));
+	ply_event_loop_exit (ply_event_loop, 1);
 }
 
 void
@@ -2668,23 +2830,4 @@ usr1_handler (void *     data,
 		    && ((! mnt->mounted) || needs_remount (mnt)))
 			try_mount (mnt, TRUE);
 	}
-}
-
-void
-delayed_exit (int code)
-{
-	exit_code = nih_max (exit_code, code);
-
-	if (exit_code < EXIT_OK)
-		return;
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mount = (Mount *)iter;
-
-		if ((mount->mount_pid > 0)
-		    || (mount->fsck_pid > 0))
-			return;
-	}
-
-	nih_main_loop_exit (exit_code);
 }
