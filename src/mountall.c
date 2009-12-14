@@ -64,6 +64,9 @@
 #include <nih-dbus/dbus_proxy.h>
 #include <nih-dbus/errors.h>
 
+#include <ply-event-loop.h>
+#include <ply-boot-client.h>
+
 #include "ioprio.h"
 
 #include "dbus/upstart.h"
@@ -142,65 +145,68 @@ enum exit {
 };
 
 
-Mount *new_mount            (const char *mountpoint, const char *device,
-			     int check, const char *type, const char *opts);
-Mount *find_mount           (const char *mountpoint);
-void   update_mount         (Mount *mnt, const char *device, int check,
-			     const char *type, const char *opts);
+Mount *new_mount             (const char *mountpoint, const char *device,
+			      int check, const char *type, const char *opts);
+Mount *find_mount            (const char *mountpoint);
+void   update_mount          (Mount *mnt, const char *device, int check,
+			      const char *type, const char *opts);
 
-int    has_option           (Mount *mnt, const char *option, int current);
-char * get_option           (const void *parent, Mount *mnt, const char *option,
-			     int current);
-char * cut_options          (const void *parent, Mount *mnt, ...);
+int    has_option            (Mount *mnt, const char *option, int current);
+char * get_option            (const void *parent, Mount *mnt, const char *option,
+			      int current);
+char * cut_options           (const void *parent, Mount *mnt, ...);
 
-void   parse_fstab          (const char *filename);
-void   parse_mountinfo      (void);
+void   parse_fstab           (const char *filename);
+void   parse_mountinfo       (void);
 
-void   parse_filesystems    (void);
+void   parse_filesystems     (void);
 
-void   mount_policy         (void);
+void   mount_policy          (void);
 
-void   mounted              (Mount *mnt);
-void   trigger_events       (void);
+void   mounted               (Mount *mnt);
+void   trigger_events        (void);
 
-void   try_mounts           (void);
-void   try_mount            (Mount *mnt, int force);
+void   try_mounts            (void);
+void   try_mount             (Mount *mnt, int force);
 
-pid_t  spawn                (Mount *mnt, char * const *args, int wait,
-			     void (*handler) (Mount *mnt, pid_t pid, int status));
-void   spawn_child_handler  (Process *proc, pid_t pid,
-			     NihChildEvents event, int status);
+pid_t  spawn                 (Mount *mnt, char * const *args, int wait,
+			      void (*handler) (Mount *mnt, pid_t pid, int status));
+void   spawn_child_handler   (Process *proc, pid_t pid,
+			      NihChildEvents event, int status);
 
-void   run_mount            (Mount *mnt, int fake);
-void   run_mount_finished   (Mount *mnt, pid_t pid, int status);
+void   run_mount             (Mount *mnt, int fake);
+void   run_mount_finished    (Mount *mnt, pid_t pid, int status);
 
-void   run_swapon           (Mount *mnt);
-void   run_swapon_finished  (Mount *mnt, pid_t pid, int status);
+void   run_swapon            (Mount *mnt);
+void   run_swapon_finished   (Mount *mnt, pid_t pid, int status);
 
-void   run_fsck             (Mount *mnt);
-void   run_fsck_finished    (Mount *mnt, pid_t pid, int status);
+void   run_fsck              (Mount *mnt);
+void   run_fsck_finished     (Mount *mnt, pid_t pid, int status);
 
-void   write_mtab           (void);
+void   write_mtab            (void);
 
-void   mount_showthrough    (Mount *root);
+void   mount_showthrough     (Mount *root);
 
-void   upstart_disconnected (DBusConnection *connection);
-void   emit_event           (const char *name, Mount *mnt);
-void   emit_event_error     (void *data, NihDBusMessage *message);
+void   upstart_disconnected  (DBusConnection *connection);
+void   emit_event            (const char *name, Mount *mnt);
+void   emit_event_error      (void *data, NihDBusMessage *message);
 
-void   udev_monitor_watcher (struct udev_monitor *udev_monitor,
-			     NihIoWatch *watch, NihIoEvents events);
-void   udev_catchup         (void);
+void   udev_monitor_watcher  (struct udev_monitor *udev_monitor,
+			      NihIoWatch *watch, NihIoEvents events);
+void   udev_catchup          (void);
 
-void   usplash_write        (const char *format, ...);
+void   usplash_write         (const char *format, ...);
 
-void   fsck_reader          (Mount *mnt, NihIo *io,
-			     const char *buf, size_t len);
-void   progress_timer       (void *data, NihTimer *timer);
+void   plymouth_disconnected (void *user_data,
+			      ply_boot_client_t *ply_boot_client);
 
-void   int_handler          (void *data, NihSignal *signal);
-void   usr1_handler         (void *data, NihSignal *signal);
-void   delayed_exit         (int code);
+void   fsck_reader           (Mount *mnt, NihIo *io,
+			      const char *buf, size_t len);
+void   progress_timer        (void *data, NihTimer *timer);
+
+void   int_handler           (void *data, NihSignal *signal);
+void   usr1_handler          (void *data, NihSignal *signal);
+void   delayed_exit          (int code);
 
 
 /**
@@ -288,6 +294,13 @@ static NihDBusProxy *upstart = NULL;
  * libudev context.
  **/
 static struct udev *udev = NULL;
+
+/**
+ * ply_event_loop:
+ *
+ * plymouth event loop
+ **/
+static ply_event_loop_t *ply_event_loop = NULL;
 
 
 /**
@@ -2391,6 +2404,15 @@ usplash_write (const char *format, ...)
 
 
 void
+plymouth_disconnected (void *             user_data,
+		       ply_boot_client_t *ply_boot_client)
+{
+	nih_fatal (_("Disconnected from Plymouth"));
+	delayed_exit (EXIT_ERROR);
+}
+
+
+void
 fsck_reader (Mount *     mnt,
 	     NihIo *     io,
 	     const char *buf,
@@ -2603,6 +2625,7 @@ main (int   argc,
 	char **              args;
 	DBusConnection *     connection;
 	struct udev_monitor *udev_monitor;
+	ply_boot_client_t   *ply_boot_client;
 	Mount *              root;
 	int                  ret;
 
@@ -2658,6 +2681,23 @@ main (int   argc,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
 
+	/* Initialise the connection to plymouth */
+	nih_assert (ply_event_loop = ply_event_loop_new ());
+
+	NIH_MUST (nih_io_add_watch (NULL, *(int *)ply_event_loop,
+				    NIH_IO_READ,
+				    (NihIoWatcher)ply_event_loop_process_pending_events,
+				    ply_event_loop));
+
+	nih_assert (ply_boot_client = ply_boot_client_new ());
+	ply_boot_client_attach_to_event_loop (ply_boot_client,
+					      ply_event_loop);
+
+	if (! ply_boot_client_connect (ply_boot_client,
+				       plymouth_disconnected, NULL)) {
+		nih_fatal (_("Could not connect to Plymouth"));
+		exit (EXIT_ERROR);
+	}
 
 	NIH_MUST (nih_timer_add_periodic (NULL, 1,
 					  progress_timer, NULL));
