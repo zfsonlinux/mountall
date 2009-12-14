@@ -131,16 +131,6 @@ typedef struct process {
 } Process;
 
 
-enum exit {
-	EXIT_OK,	/* Ok */
-	EXIT_ERROR,	/* General/OS error */
-	EXIT_FSCK,	/* Filesystem check failed */
-	EXIT_ROOT_FSCK,	/* Filesystem check of root filesystem failed */
-	EXIT_MOUNT,	/* Failed to mount a filesystem */
-	EXIT_REBOOT,	/* Require a reboot */
-};
-
-
 Mount *new_mount             (const char *mountpoint, const char *device,
 			      int check, const char *type, const char *opts);
 Mount *find_mount            (const char *mountpoint);
@@ -588,7 +578,7 @@ parse_fstab (const char *filename)
 	fstab = setmntent (filename, "r");
 	if (! fstab) {
 		nih_fatal ("%s: %s", filename, strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	while ((mntent = getmntent (fstab)) != NULL) {
@@ -640,7 +630,7 @@ mount_proc (void)
 		nih_fatal ("%s: %s: %s", "/proc",
 			   _("unable to mount"),
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	mnt = find_mount ("/proc");
@@ -790,7 +780,7 @@ parse_mountinfo (void)
 		if (! mountinfo) {
 			nih_fatal ("%s: %s", "/proc/self/mountinfo",
 				   strerror (errno));
-			exit (EXIT_ERROR);
+			exit (1);
 		}
 
 		parse_mountinfo_file (FALSE);
@@ -818,7 +808,7 @@ parse_filesystems (void)
 	if (! fs) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	bufsz = 4096;
@@ -859,7 +849,7 @@ parse_filesystems (void)
 	if (fclose (fs) < 0) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			  strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 }
 
@@ -1241,7 +1231,7 @@ try_mounts (void)
 		}
 
 		if (all)
-			nih_main_loop_exit (EXIT_OK);
+			nih_main_loop_exit (0);
 	}
 }
 
@@ -1314,7 +1304,7 @@ spawn (Mount *         mnt,
 	if (pipe2 (fds, O_CLOEXEC) < 0) {
 		nih_fatal ("Unable to create pipe for spawned process: %s",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	fflush (stdout);
@@ -1327,7 +1317,7 @@ spawn (Mount *         mnt,
 
 		nih_fatal ("%s %s: %s", args[0], MOUNT_NAME (mnt),
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	} else if (! pid) {
 		nih_local char *msg = NULL;
 
@@ -1354,7 +1344,7 @@ spawn (Mount *         mnt,
 		close (fds[0]);
 
 		if (ret > 0)
-			exit (EXIT_ERROR);
+			exit (1);
 	}
 
 	nih_debug ("%s %s [%d]", args[0], MOUNT_NAME (mnt), pid);
@@ -1376,7 +1366,7 @@ spawn (Mount *         mnt,
 		if (waitid (P_PID, pid, &info, WEXITED) < 0) {
 			nih_fatal ("Unable to obtain process exit status: %s",
 				   strerror (errno));
-			exit (EXIT_ERROR);
+			exit (1);
 		}
 
 		spawn_child_handler (proc, pid, info.si_code == CLD_EXITED ? NIH_CHILD_EXITED : NIH_CHILD_KILLED,
@@ -1521,7 +1511,7 @@ run_mount (Mount *mnt,
 		if ((mkdir (mountpoint, 0755) < 0)
 		    && (errno != EEXIST)) {
 			nih_fatal ("mkdir %s: %s", mountpoint, strerror (errno));
-			exit (EXIT_ERROR);
+			exit (1);
 		} else
 			NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mountpoint));
 	} else {
@@ -1570,7 +1560,7 @@ run_mount_finished (Mount *mnt,
 			if ((! answer)
 			    || (answer[0] == 'S')
 			    || (answer[0] == 's')) {
-				exit (EXIT_ERROR);
+				exit (2);
 
 			} else if ((answer[0] == 'D')
 				   || (answer[0] == 'd')) {
@@ -1697,7 +1687,7 @@ run_fsck (Mount *mnt)
 	if (pipe2 (fds, O_CLOEXEC) < 0) {
 		nih_fatal ("Unable to create pipe for spawned process: %s",
 			   strerror (errno));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	flags = fcntl (fds[1], F_GETFD);
@@ -1756,7 +1746,7 @@ run_fsck_finished (Mount *mnt,
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
-		exit (EXIT_REBOOT);
+		exit (4);
 
 	} else if (status & 4) {
 		nih_local char *message = NULL;
@@ -1775,7 +1765,7 @@ run_fsck_finished (Mount *mnt,
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			exit (EXIT_ERROR);
+			exit (2);
 
 		} else if ((answer[0] == 'D')
 			   || (answer[0] == 'd')) {
@@ -1809,7 +1799,7 @@ run_fsck_finished (Mount *mnt,
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			exit (EXIT_ERROR);
+			exit (2);
 
 		} else if ((answer[0] == 'D')
 			   || (answer[0] == 'd')) {
@@ -1937,7 +1927,7 @@ void
 upstart_disconnected (DBusConnection *connection)
 {
 	nih_fatal (_("Disconnected from Upstart"));
-	exit (EXIT_ERROR);
+	exit (1);
 }
 
 void
@@ -2533,7 +2523,7 @@ boredom_timeout (void *    data,
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			exit (EXIT_ERROR);
+			exit (2);
 
 		} else if ((answer[0] == 'D')
 			   || (answer[0] == 'd')) {
@@ -2622,7 +2612,7 @@ plymouth_disconnected (void *             user_data,
 		       ply_boot_client_t *client)
 {
 	nih_fatal (_("Disconnected from Plymouth"));
-	exit (EXIT_ERROR);
+	exit (1);
 }
 
 
@@ -2663,7 +2653,7 @@ main (int   argc,
 
 	args = nih_option_parser (NULL, argc, argv, options, FALSE);
 	if (! args)
-		exit (EXIT_ERROR);
+		exit (1);
 
 	nih_signal_reset ();
 
@@ -2677,7 +2667,7 @@ main (int   argc,
 			   err->message);
 		nih_free (err);
 
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	upstart = NIH_SHOULD (nih_dbus_proxy_new (NULL, connection,
@@ -2691,7 +2681,7 @@ main (int   argc,
 			   err->message);
 		nih_free (err);
 
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	/* Initialise the connection to udev */
@@ -2720,7 +2710,7 @@ main (int   argc,
 	if (! ply_boot_client_connect (ply_boot_client,
 				       plymouth_disconnected, NULL)) {
 		nih_fatal (_("Could not connect to Plymouth"));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 
@@ -2745,7 +2735,7 @@ main (int   argc,
 	root = find_mount ("/");
 	if (! root->mounted) {
 		nih_fatal ("%s", _("root filesystem isn't mounted"));
-		exit (EXIT_ERROR);
+		exit (1);
 	}
 
 	/* Become daemon */
@@ -2761,7 +2751,7 @@ main (int   argc,
 			nih_fatal ("%s: %s", _("Unable to become daemon"),
 				   strerror (errno));
 
-			exit (EXIT_ERROR);
+			exit (1);
 		} else if (pid > 0) {
 			exit (0);
 		}
@@ -2775,7 +2765,7 @@ main (int   argc,
 			nih_fatal ("%s: %s", _("Unable to become daemon"),
 				   strerror (errno));
 
-			exit (EXIT_ERROR);
+			exit (1);
 		} else if (pid > 0) {
 			exit (0);
 		}
