@@ -1584,9 +1584,13 @@ run_mount_finished (Mount *mnt,
 	/* Parse mountinfo to see what mount did; in particular to update
 	 * the type if multiple types are listed in fstab.
 	 */
-	parse_mountinfo ();
-	if (! mnt->mounted)
+	if (! mnt->mounted) {
+		parse_mountinfo ();
+		if (! mnt->mounted)
+			mounted (mnt);
+	} else {
 		mounted (mnt);
+	}
 }
 
 
