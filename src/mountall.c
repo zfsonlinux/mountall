@@ -2432,14 +2432,6 @@ fsck_update (void)
 						  NULL, BOREDOM_TIMEOUT,
 						  boredom_timeout, NULL));
 	}
-
-	/* FIXME
-	 * don't need this when we get proper boredom handling.
-	 */
-	ply_boot_client_tell_daemon_to_display_message (ply_boot_client, "",
-							plymouth_response,
-							plymouth_response,
-							NULL);
 }
 
 
