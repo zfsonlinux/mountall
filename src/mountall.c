@@ -194,6 +194,8 @@ void   plymouth_response     (void *user_data, ply_boot_client_t *client);
 void   plymouth_answer       (void *user_data, const char *keys,
 			      ply_boot_client_t *client);
 void   plymouth_failed       (void *user_data, ply_boot_client_t *client);
+void   plymouth_cancel_fsck  (void *user_data, const char *keys,
+			      ply_boot_client_t *client);
 void   plymouth_disconnected (void *user_data, ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
@@ -2422,6 +2424,19 @@ fsck_update (void)
 		boredom_timer = NIH_MUST (nih_timer_add_timeout (
 						  NULL, BOREDOM_TIMEOUT,
 						  boredom_timeout, NULL));
+
+		/* Clear any cancel prompt */
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+		ply_boot_client_ask_daemon_to_ignore_keystroke (ply_boot_client,
+								"Cc",
+								(ply_boot_client_answer_handler_t)plymouth_response,
+								plymouth_response,
+								NULL);
 	}
 }
 
@@ -2479,6 +2494,18 @@ fsck_reader (Mount *     mnt,
 					       plymouth_response,
 					       plymouth_response,
 					       NULL);
+
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"[C]",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+		ply_boot_client_ask_daemon_to_watch_for_keystroke (ply_boot_client,
+								   "Cc",
+								   plymouth_cancel_fsck,
+								   plymouth_response,
+								   NULL);
 	}
 }
 
@@ -2588,6 +2615,19 @@ plymouth_failed (void *             user_data,
 {
 	nih_error (_("Plymouth command failed"));
 	ply_event_loop_exit (ply_event_loop, 1);
+}
+
+void
+plymouth_cancel_fsck (void *             user_data,
+		      const char *       keys,
+		      ply_boot_client_t *client)
+{
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->fsck_pid > 0)
+			kill (mnt->fsck_pid, SIGTERM);
+	}
 }
 
 void
