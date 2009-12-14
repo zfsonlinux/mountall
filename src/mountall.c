@@ -1237,7 +1237,7 @@ try_mounts (void)
 		}
 
 		if (all)
-			delayed_exit (EXIT_OK);
+			nih_main_loop_exit (EXIT_OK);
 	}
 }
 
