@@ -1556,7 +1556,7 @@ run_mount_finished (Mount *mnt,
 			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [DS]"),
 						 MOUNT_NAME (mnt)));
 
-			answer = plymouth_prompt (NULL, message, "DdSs");
+			answer = plymouth_prompt (NULL, message, "SsDd");
 			if ((! answer)
 			    || (answer[0] == 'S')
 			    || (answer[0] == 's')) {
@@ -1748,7 +1748,7 @@ run_fsck_finished (Mount *mnt,
 		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
 		exit (4);
 
-	} else if (status & 4) {
+ 	} else if ((status & (4 | 8 | 16 | 128)) || (status > 255)) {
 		nih_local char *message = NULL;
 		nih_local char *answer = NULL;
 
@@ -1756,12 +1756,19 @@ run_fsck_finished (Mount *mnt,
 		 * -f
 		 */
 
-		nih_error ("Filesystem has errors: %s", MOUNT_NAME (mnt));
+		if (status & 4) {
+			nih_error ("Filesystem has errors: %s", MOUNT_NAME (mnt));
 
-		message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [DIS]"),
-						 MOUNT_NAME (mnt)));
+			message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [DIS]"),
+							 MOUNT_NAME (mnt)));
+		} else {
+			nih_error ("Unrecoverable fsck error: %s", MOUNT_NAME (mnt));
 
-		answer = plymouth_prompt (NULL, message, "DdSs");
+			message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [DIS]"),
+							 MOUNT_NAME (mnt)));
+		}
+
+		answer = plymouth_prompt (NULL, message, "SsDdIi");
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
@@ -1779,47 +1786,21 @@ run_fsck_finished (Mount *mnt,
 			nih_message (_("Ignoring errors with %s at user request"),
 				     MOUNT_NAME (mnt));
 			/* Fall through */
+
 		} else {
 			nih_assert_not_reached ();
 		}
+
 	} else if ((status & 32) || (status == SIGTERM)) {
 		nih_info ("Filesytem check cancelled: %s", MOUNT_NAME (mnt));
 
 		/* Fall through */
-	} else if ((status & (8 | 16 | 128)) || (status > 255)) {
-		nih_local char *message = NULL;
-		nih_local char *answer = NULL;
 
-		nih_error ("General fsck error: %s", MOUNT_NAME (mnt));
-
-		message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [DIS]"),
-						 MOUNT_NAME (mnt)));
-
-		answer = plymouth_prompt (NULL, message, "DdSs");
-		if ((! answer)
-		    || (answer[0] == 'S')
-		    || (answer[0] == 's')) {
-			exit (2);
-
-		} else if ((answer[0] == 'D')
-			   || (answer[0] == 'd')) {
-			nih_message (_("Fake mounting %s at user request"),
-				     MOUNT_NAME (mnt));
-			mounted (mnt);
-			return;
-
-		} else if ((answer[0] == 'I')
-			   || (answer[0] == 'I')) {
-			nih_message (_("Ignoring errors with %s at user request"),
-				     MOUNT_NAME (mnt));
-			/* Fall through */
-		} else {
-			nih_assert_not_reached ();
-		}
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s", MOUNT_NAME (mnt));
 
 		/* Fall through */
+
 	}
 
 	mnt->ready = TRUE;
@@ -2511,7 +2492,7 @@ boredom_timeout (void *    data,
 		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [DS]"),
 						 MOUNT_NAME (mnt)));
 
-		answer = plymouth_prompt (NULL, message, "DdSs");
+		answer = plymouth_prompt (NULL, message, "SsDd");
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
