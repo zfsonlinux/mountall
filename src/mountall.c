@@ -75,9 +75,6 @@
 
 #define BUILTIN_FSTAB   "/lib/init/fstab"
 
-#define USPLASH_FIFO    "/dev/.initramfs/usplash_fifo"
-#define USPLASH_OUTFIFO "/dev/.initramfs/usplash_outfifo"
-
 #define BOREDOM_TIMEOUT 3
 
 
@@ -102,7 +99,6 @@ struct mount {
 	NihHash *           physical_dev_ids;
 	int                 physical_dev_ids_needed;
 	pid_t               fsck_pid;
-	int                 fsck_progress;
 	int                 ready;
 
 	char *              type;
@@ -195,16 +191,15 @@ void   udev_monitor_watcher  (struct udev_monitor *udev_monitor,
 			      NihIoWatch *watch, NihIoEvents events);
 void   udev_catchup          (void);
 
-void   usplash_write         (const char *format, ...);
-
-void   plymouth_disconnected (void *user_data,
-			      ply_boot_client_t *ply_boot_client);
+void   fsck_update           (void);
 
 void   fsck_reader           (Mount *mnt, NihIo *io,
 			      const char *buf, size_t len);
-void   progress_timer        (void *data, NihTimer *timer);
+void   boredom_timeout       (void *data, NihTimer *timer);
 
-void   int_handler           (void *data, NihSignal *signal);
+void   plymouth_response     (void *user_data, ply_boot_client_t *client);
+void   plymouth_disconnected (void *user_data, ply_boot_client_t *client);
+
 void   usr1_handler          (void *data, NihSignal *signal);
 void   delayed_exit          (int code);
 
@@ -263,22 +258,6 @@ int written_mtab = FALSE;
  * any background processes (fsck, mount, etc.) have finished.
  **/
 int exit_code = -1;
-
-/**
- * boredom_count:
- *
- * Reset each time we complete a mount, swapon call or fsck call; if this
- * exceeds BOREDOM_TIMEOUT than we inform the console user what we're
- * still waiting for.
- **/
-int boredom_count = 0;
-
-/**
- * exit_on_escape:
- *
- * Whether we should exit when Escape or ^C are recevied.
- **/
-int exit_on_escape = TRUE;
 
 
 /**
@@ -391,7 +370,6 @@ new_mount (const char *mountpoint,
 	mnt->physical_dev_ids = NULL;
 	mnt->physical_dev_ids_needed = TRUE;
 	mnt->fsck_pid = -1;
-	mnt->fsck_progress = -1;
 	mnt->ready = FALSE;
 
 	mnt->type = NULL;
@@ -1239,6 +1217,8 @@ mounted (Mount *mnt)
 		   num_remote_mounted, num_remote,
 		   num_virtual_mounted, num_virtual,
 		   num_swap_mounted, num_swap);
+
+	fsck_update ();
 }
 
 
@@ -1580,8 +1560,6 @@ run_mount_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
-	boredom_count = 0;
-
 	if (status) {
 		if (mnt->again) {
 			nih_debug ("%s: trying again", MOUNT_NAME (mnt));
@@ -1657,8 +1635,6 @@ run_swapon_finished (Mount *mnt,
 
 	mnt->mount_pid = -1;
 
-	boredom_count = 0;
-
 	/* Swapon doesn't return any useful status codes, so we just
 	 * carry on regardless if it failed.
 	 */
@@ -1668,250 +1644,6 @@ run_swapon_finished (Mount *mnt,
 	mounted (mnt);
 }
 
-
-static void
-destroy_device (NihListEntry *entry)
-{
-	struct udev_device *dev;
-
-	nih_assert (entry != NULL);
-
-	dev = (struct udev_device *)entry->data;
-	nih_assert (dev != NULL);
-
-	udev_device_unref (dev);
-	nih_list_destroy (&entry->entry);
-}
-
-static void
-add_device (NihList *           devices,
-	    struct udev_device *srcdev,
-	    struct udev_device *newdev,
-	    size_t *            nadded)
-{
-	NihListEntry *entry;
-
-	nih_assert (devices != NULL);
-	nih_assert (newdev != NULL);
-
-	udev_device_ref (newdev);
-
-	entry = NIH_MUST (nih_list_entry_new (devices));
-	entry->data = newdev;
-	nih_alloc_set_destructor (entry, destroy_device);
-	nih_list_add (devices, &entry->entry);
-
-	if (nadded)
-		(*nadded)++;
-
-	if (srcdev)
-		nih_debug ("traverse: %s -> %s",
-			   udev_device_get_sysname (srcdev),
-			   udev_device_get_sysname (newdev));
-}
-
-static void
-update_physical_dev_ids (Mount *mnt)
-{
-	nih_local NihList *devices = NULL;
-
-	nih_assert (mnt != NULL);
-
-	if (! mnt->physical_dev_ids_needed)
-		return;
-
-	mnt->physical_dev_ids_needed = FALSE;
-
-	if (mnt->physical_dev_ids) {
-		nih_free (mnt->physical_dev_ids);
-		nih_debug ("recomputing physical_dev_ids for %s",
-			   MOUNT_NAME (mnt));
-	}
-
-	mnt->physical_dev_ids = NIH_MUST (nih_hash_string_new (mnt, 10));
-
-	devices = NIH_MUST (nih_list_new (NULL));
-
-	if (mnt->udev_device) {
-		add_device (devices, NULL, mnt->udev_device, NULL);
-	} else {
-		struct stat         sb;
-		struct udev_device *dev;
-
-		/* Is it a loop file? */
-
-		if ((stat (mnt->device, &sb) == 0)
-		    && S_ISREG (sb.st_mode)
-		    && (dev = udev_device_new_from_devnum (udev, 'b',
-							   sb.st_dev))) {
-			add_device (devices, NULL, dev, NULL);
-			udev_device_unref (dev);
-		} else {
-			nih_debug ("%s: couldn't resolve physical devices",
-				   MOUNT_NAME (mnt));
-		}
-	}
-
-	while (! NIH_LIST_EMPTY (devices)) {
-		NihListEntry *      entry;
-
-		struct udev_device *dev;
-		struct udev_device *newdev;
-
-		size_t              nadded;
-
-		const char *        syspath;
-		nih_local char *    slavespath = NULL;
-
-		const char *        dev_id;
-
-		DIR *               dir;
-		struct dirent *     ent;
-
-		entry = (NihListEntry *)devices->next;
-		dev = (struct udev_device *)entry->data;
-
-		/* Does this device have a parent? */
-
-		newdev = udev_device_get_parent_with_subsystem_devtype (
-			dev, "block", "disk");
-		if (newdev) {
-			add_device (devices, dev, newdev, NULL);
-			goto finish;
-		}
-
-		/* Does this device have slaves? */
-
-		nadded = 0;
-
-		nih_assert (syspath = udev_device_get_syspath (dev));
-		slavespath = NIH_MUST (nih_sprintf (NULL, "%s/slaves",
-						    syspath));
-
-		if ((dir = opendir (slavespath))) {
-			while ((ent = readdir (dir))) {
-				nih_local char *slavepath = NULL;
-
-				if ((! strcmp (ent->d_name, "."))
-				    || (! strcmp (ent->d_name, "..")))
-					continue;
-
-				slavepath = NIH_MUST (nih_sprintf (NULL,
-					"%s/%s", slavespath, ent->d_name));
-
-				newdev = udev_device_new_from_syspath (
-					udev, slavepath);
-				if (! newdev) {
-					nih_warn ("%s: %s", slavepath,
-						  "udev_device_new_from_syspath"
-						  " failed");
-					continue;
-				}
-
-				add_device (devices, dev, newdev, &nadded);
-				udev_device_unref (newdev);
-			}
-
-			closedir (dir);
-		} else if (errno != ENOENT) {
-			nih_warn ("%s: opendir: %s", slavespath,
-				  strerror (errno));
-		}
-
-		if (nadded > 0)
-			goto finish;
-
-		/* This device has no parents or slaves; we’ve reached the
-		 * physical device.
-		 */
-
-		dev_id = udev_device_get_sysattr_value (dev, "dev");
-		if (dev_id) {
-			nih_local NihListEntry *entry = NULL;
-
-			entry = NIH_MUST (nih_list_entry_new (mnt->physical_dev_ids));
-			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
-
-			if (nih_hash_add_unique (mnt->physical_dev_ids,
-						 &entry->entry)) {
-				nih_debug ("results: %s -> %s",
-					   MOUNT_NAME (mnt), dev_id);
-			}
-		} else {
-			nih_warn ("%s: failed to get sysattr 'dev'", syspath);
-		}
-
-finish:
-		nih_free (entry);
-	}
-}
-
-static void
-fsck_update_priorities (void)
-{
-	nih_local NihHash *locks = NULL;
-
-	int                ioprio_normal,
-			   ioprio_low;
-
-	ioprio_normal = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_BE, IOPRIO_NORM);
-	ioprio_low = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_IDLE, 7);
-
-	locks = NIH_MUST (nih_hash_string_new (NULL, 10));
-
-	nih_debug ("updating check priorities");
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-		int    low_prio = FALSE;
-
-		if (mnt->fsck_pid <= 0)
-			continue;
-
-		update_physical_dev_ids (mnt);
-
-		/* Set low_prio if something else has already locked one of the
-		 * dev_ids.
-		 */
-		NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
-			char *dev_id = ((NihListEntry *)diter)->str;
-
-			if (nih_hash_lookup (locks, dev_id)) {
-				low_prio = TRUE;
-				break;
-			}
-		}
-
-		if (! low_prio) {
-			/* Lock the dev_ids. */
-			NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
-				char *        dev_id;
-				NihListEntry *entry;
-
-				dev_id = ((NihListEntry *)diter)->str;
-
-				entry = NIH_MUST (nih_list_entry_new (locks));
-				entry->str = dev_id;
-				nih_ref (entry->str, entry);
-
-				nih_hash_add (locks, &entry->entry);
-			}
-		}
-
-		nih_debug ("%s: priority %s",
-			   MOUNT_NAME (mnt), low_prio ? "low" : "normal");
-
-		if (setpriority (PRIO_PGRP, mnt->fsck_pid,
-				 low_prio ? 19 : 0) < 0)
-			nih_warn ("setpriority %d: %s",
-				  mnt->fsck_pid, strerror (errno));
-
-		if (ioprio_set (IOPRIO_WHO_PGRP, mnt->fsck_pid,
-				low_prio ? ioprio_low : ioprio_normal) < 0)
-			nih_warn ("ioprio_set %d: %s",
-				  mnt->fsck_pid, strerror (errno));
-	}
-}
 
 void
 run_fsck (Mount *mnt)
@@ -1989,10 +1721,9 @@ run_fsck (Mount *mnt)
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->type));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device));
 
-	mnt->fsck_progress = -1;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
-	fsck_update_priorities ();
+	fsck_update ();
 
 	/* Close writing end, reading end is left open inside the NihIo
 	 * structure watching it until the remote end is closed by fsck
@@ -2011,11 +1742,8 @@ run_fsck_finished (Mount *mnt,
 	nih_assert (mnt->fsck_pid == pid);
 
 	mnt->fsck_pid = -1;
-	mnt->fsck_progress = -1;
 
-	boredom_count = 0;
-
- 	fsck_update_priorities ();
+ 	fsck_update ();
 
 	if (status & 2) {
 		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
@@ -2388,34 +2116,275 @@ udev_catchup (void)
 }
 
 
-void
-usplash_write (const char *format, ...)
+static void
+destroy_device (NihListEntry *entry)
 {
-	va_list         args;
-	nih_local char *message = NULL;
-	int             fd;
+	struct udev_device *dev;
 
-	va_start (args, format);
-	message = NIH_MUST (nih_vsprintf (NULL, format, args));
-	va_end (args);
+	nih_assert (entry != NULL);
 
-	fd = open (USPLASH_FIFO, O_WRONLY | O_NONBLOCK);
-	if (fd < 0)
-		return;
+	dev = (struct udev_device *)entry->data;
+	nih_assert (dev != NULL);
 
-	if (write (fd, message, strlen (message) + 1) < 0)
-		;
-
-	close (fd);
+	udev_device_unref (dev);
+	nih_list_destroy (&entry->entry);
 }
 
+static void
+add_device (NihList *           devices,
+	    struct udev_device *srcdev,
+	    struct udev_device *newdev,
+	    size_t *            nadded)
+{
+	NihListEntry *entry;
+
+	nih_assert (devices != NULL);
+	nih_assert (newdev != NULL);
+
+	udev_device_ref (newdev);
+
+	entry = NIH_MUST (nih_list_entry_new (devices));
+	entry->data = newdev;
+	nih_alloc_set_destructor (entry, destroy_device);
+	nih_list_add (devices, &entry->entry);
+
+	if (nadded)
+		(*nadded)++;
+
+	if (srcdev)
+		nih_debug ("traverse: %s -> %s",
+			   udev_device_get_sysname (srcdev),
+			   udev_device_get_sysname (newdev));
+}
+
+static void
+update_physical_dev_ids (Mount *mnt)
+{
+	nih_local NihList *devices = NULL;
+
+	nih_assert (mnt != NULL);
+
+	if (! mnt->physical_dev_ids_needed)
+		return;
+
+	mnt->physical_dev_ids_needed = FALSE;
+
+	if (mnt->physical_dev_ids) {
+		nih_free (mnt->physical_dev_ids);
+		nih_debug ("recomputing physical_dev_ids for %s",
+			   MOUNT_NAME (mnt));
+	}
+
+	mnt->physical_dev_ids = NIH_MUST (nih_hash_string_new (mnt, 10));
+
+	devices = NIH_MUST (nih_list_new (NULL));
+
+	if (mnt->udev_device) {
+		add_device (devices, NULL, mnt->udev_device, NULL);
+	} else {
+		struct stat         sb;
+		struct udev_device *dev;
+
+		/* Is it a loop file? */
+
+		if ((stat (mnt->device, &sb) == 0)
+		    && S_ISREG (sb.st_mode)
+		    && (dev = udev_device_new_from_devnum (udev, 'b',
+							   sb.st_dev))) {
+			add_device (devices, NULL, dev, NULL);
+			udev_device_unref (dev);
+		} else {
+			nih_debug ("%s: couldn't resolve physical devices",
+				   MOUNT_NAME (mnt));
+		}
+	}
+
+	while (! NIH_LIST_EMPTY (devices)) {
+		NihListEntry *      entry;
+
+		struct udev_device *dev;
+		struct udev_device *newdev;
+
+		size_t              nadded;
+
+		const char *        syspath;
+		nih_local char *    slavespath = NULL;
+
+		const char *        dev_id;
+
+		DIR *               dir;
+		struct dirent *     ent;
+
+		entry = (NihListEntry *)devices->next;
+		dev = (struct udev_device *)entry->data;
+
+		/* Does this device have a parent? */
+
+		newdev = udev_device_get_parent_with_subsystem_devtype (
+			dev, "block", "disk");
+		if (newdev) {
+			add_device (devices, dev, newdev, NULL);
+			goto finish;
+		}
+
+		/* Does this device have slaves? */
+
+		nadded = 0;
+
+		nih_assert (syspath = udev_device_get_syspath (dev));
+		slavespath = NIH_MUST (nih_sprintf (NULL, "%s/slaves",
+						    syspath));
+
+		if ((dir = opendir (slavespath))) {
+			while ((ent = readdir (dir))) {
+				nih_local char *slavepath = NULL;
+
+				if ((! strcmp (ent->d_name, "."))
+				    || (! strcmp (ent->d_name, "..")))
+					continue;
+
+				slavepath = NIH_MUST (nih_sprintf (NULL,
+					"%s/%s", slavespath, ent->d_name));
+
+				newdev = udev_device_new_from_syspath (
+					udev, slavepath);
+				if (! newdev) {
+					nih_warn ("%s: %s", slavepath,
+						  "udev_device_new_from_syspath"
+						  " failed");
+					continue;
+				}
+
+				add_device (devices, dev, newdev, &nadded);
+				udev_device_unref (newdev);
+			}
+
+			closedir (dir);
+		} else if (errno != ENOENT) {
+			nih_warn ("%s: opendir: %s", slavespath,
+				  strerror (errno));
+		}
+
+		if (nadded > 0)
+			goto finish;
+
+		/* This device has no parents or slaves; we’ve reached the
+		 * physical device.
+		 */
+
+		dev_id = udev_device_get_sysattr_value (dev, "dev");
+		if (dev_id) {
+			nih_local NihListEntry *entry = NULL;
+
+			entry = NIH_MUST (nih_list_entry_new (mnt->physical_dev_ids));
+			entry->str = NIH_MUST (nih_strdup (entry, dev_id));
+
+			if (nih_hash_add_unique (mnt->physical_dev_ids,
+						 &entry->entry)) {
+				nih_debug ("results: %s -> %s",
+					   MOUNT_NAME (mnt), dev_id);
+			}
+		} else {
+			nih_warn ("%s: failed to get sysattr 'dev'", syspath);
+		}
+
+finish:
+		nih_free (entry);
+	}
+}
 
 void
-plymouth_disconnected (void *             user_data,
-		       ply_boot_client_t *ply_boot_client)
+fsck_update (void)
 {
-	nih_fatal (_("Disconnected from Plymouth"));
-	delayed_exit (EXIT_ERROR);
+	nih_local NihHash *locks = NULL;
+
+	int                ioprio_normal,
+			   ioprio_low;
+
+	int                fsck_running = FALSE;
+	static NihTimer *  boredom_timer = NULL;
+
+	ioprio_normal = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_BE, IOPRIO_NORM);
+	ioprio_low = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_IDLE, 7);
+
+	locks = NIH_MUST (nih_hash_string_new (NULL, 10));
+
+	nih_debug ("updating check priorities");
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+		int    low_prio = FALSE;
+
+		if (mnt->fsck_pid <= 0)
+			continue;
+
+		fsck_running = TRUE;
+
+		update_physical_dev_ids (mnt);
+
+		/* Set low_prio if something else has already locked one of the
+		 * dev_ids.
+		 */
+		NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
+			char *dev_id = ((NihListEntry *)diter)->str;
+
+			if (nih_hash_lookup (locks, dev_id)) {
+				low_prio = TRUE;
+				break;
+			}
+		}
+
+		if (! low_prio) {
+			/* Lock the dev_ids. */
+			NIH_HASH_FOREACH (mnt->physical_dev_ids, diter) {
+				char *        dev_id;
+				NihListEntry *entry;
+
+				dev_id = ((NihListEntry *)diter)->str;
+
+				entry = NIH_MUST (nih_list_entry_new (locks));
+				entry->str = dev_id;
+				nih_ref (entry->str, entry);
+
+				nih_hash_add (locks, &entry->entry);
+			}
+		}
+
+		nih_debug ("%s: priority %s",
+			   MOUNT_NAME (mnt), low_prio ? "low" : "normal");
+
+		if (setpriority (PRIO_PGRP, mnt->fsck_pid,
+				 low_prio ? 19 : 0) < 0)
+			nih_warn ("setpriority %d: %s",
+				  mnt->fsck_pid, strerror (errno));
+
+		if (ioprio_set (IOPRIO_WHO_PGRP, mnt->fsck_pid,
+				low_prio ? ioprio_low : ioprio_normal) < 0)
+			nih_warn ("ioprio_set %d: %s",
+				  mnt->fsck_pid, strerror (errno));
+	}
+
+	/* Reset timeout each pass through, since activity has taken place;
+	 * don't restore the timeout while fsck is running.
+	 */
+	if (boredom_timer)
+		nih_free (boredom_timer);
+
+	if (fsck_running) {
+		boredom_timer = NULL;
+	} else {
+		boredom_timer = NIH_MUST (nih_timer_add_timeout (
+						  NULL, BOREDOM_TIMEOUT,
+						  boredom_timeout, NULL));
+	}
+
+	/* FIXME
+	 * don't need this when we get proper boredom handling.
+	 */
+	ply_boot_client_tell_daemon_to_display_message (ply_boot_client, "",
+							plymouth_response,
+							plymouth_response,
+							NULL);
 }
 
 
@@ -2430,11 +2399,12 @@ fsck_reader (Mount *     mnt,
 	nih_assert (buf != NULL);
 
 	for (;;) {
-		int pass;
-		int cur;
-		int max;
-
 		nih_local char *line = NULL;
+		int             pass;
+		int             cur;
+		int             max;
+		int             progress;
+		nih_local char *update = NULL;
 
 		line = nih_io_get (NULL, io, "\n");
 		if ((! line) || (! *line))
@@ -2445,166 +2415,66 @@ fsck_reader (Mount *     mnt,
 
 		switch (pass) {
 		case 1:
-			mnt->fsck_progress = (cur * 70) / max;
+			progress = (cur * 70) / max;
 			break;
 		case 2:
-			mnt->fsck_progress = 70 + (cur * 20) / max;
+			progress = 70 + (cur * 20) / max;
 			break;
 		case 3:
-			mnt->fsck_progress = 90 + (cur * 2) / max;
+			progress = 90 + (cur * 2) / max;
 			break;
 		case 4:
-			mnt->fsck_progress = 92 + (cur * 3) / max;
+			progress = 92 + (cur * 3) / max;
 			break;
 		case 5:
-			mnt->fsck_progress = 95 + (cur * 5) / max;
+			progress = 95 + (cur * 5) / max;
 			break;
 		default:
 			nih_assert_not_reached ();
 		}
+
+		update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
+						MOUNT_NAME (mnt),
+						progress));
+
+		ply_boot_client_update_daemon (ply_boot_client, update,
+					       plymouth_response,
+					       plymouth_response,
+					       NULL);
 	}
+}
+
+
+void
+boredom_timeout (void *    data,
+		 NihTimer *timer)
+{
+	/* FIXME:
+	 * do something interesting here, e.g. iterate over the mounts and
+	 * allow to ignore any that we are waiting for.
+	 */
+
+	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+							_("Waiting for one or more filesystems"),
+							plymouth_response,
+							plymouth_response,
+							NULL);
+}
+
+
+void
+plymouth_response (void *             user_data,
+		   ply_boot_client_t *client)
+{
+	/* No response */
 }
 
 void
-progress_timer (void *    data,
-		NihTimer *timer)
+plymouth_disconnected (void *             user_data,
+		       ply_boot_client_t *client)
 {
-	static int    displaying_progress = 0;
-	static int    displaying_bored = 0;
-	int           num_fscks = 0;
-	int           bored = 0;
-	int           bored_bit = 1;
-
-	/* First make a pass through the mounts to figure out whether any
-	 * fsck are in progress, or whether we're actually waiting on
-	 * anything.
-	 */
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		/* Any running fscks? */
-		if ((mnt->fsck_pid > 0)
-		    && (mnt->fsck_progress >= 0))
-			num_fscks++;
-
-		/* Any remaining mounts? */
-		if ((! mnt->mounted)
-		    || needs_remount (mnt)
-		    || (mnt->mount_pid > 0))
-			bored |= bored_bit;
-
-		bored_bit <<= 1;
-	}
-
-	if (num_fscks) {
-		/* When we have running filesystem checks, send their
-		 * progress to the splash screen.
-		 */
-		usplash_write ("CLEAR");
-		usplash_write ("TIMEOUT 0");
-		usplash_write ("VERBOSE on");
-		usplash_write ("TEXT Filesystem checks are in progress:");
-
-		NIH_LIST_FOREACH (mounts, iter) {
-			Mount *mnt = (Mount *)iter;
-
-			if ((mnt->fsck_pid > 0)
-			    && (mnt->fsck_progress >= 0)) {
-				usplash_write ("TEXT %s (%s)",
-					       MOUNT_NAME (mnt),
-					       mnt->device);
-				usplash_write ("STATUS %d%%", mnt->fsck_progress);
-			}
-		}
-
-		usplash_write ("TEXT Press ESC to cancel checks");
-		usplash_write ("VERBOSE default");
-
-		usplash_write ("ESCAPE %d", getpid ());
-		exit_on_escape = FALSE;
-
-		displaying_progress = 1;
-		displaying_bored = 0;
-
-	} else if (bored
-		   && (++boredom_count > BOREDOM_TIMEOUT)) {
-		/* Don't refresh the board message every time through,
-		 * just show it once and leave it there; we might be
-		 * conflicting with the thing we're waiting for asking
-		 * for something on the splash screen so we can't CLEAR.
-		 */
-		if (displaying_bored != bored) {
-			usplash_write ("TIMEOUT 0");
-			usplash_write ("VERBOSE on");
-			usplash_write ("TEXT One or more of the mounts listed in /etc/fstab cannot yet be mounted:");
-
-			NIH_LIST_FOREACH (mounts, iter) {
-				Mount *mnt = (Mount *)iter;
-
-				if ((! mnt->mounted) || needs_remount (mnt)) {
-					usplash_write ("TEXT %s: waiting for %s",
-						       MOUNT_NAME (mnt),
-						       mnt->device);
-				} else if (mnt->mount_pid > 0) {
-					usplash_write ("TEXT %s: mounting (pid %d)",
-						       MOUNT_NAME (mnt),
-						       mnt->mount_pid);
-				}
-			}
-
-			usplash_write ("TEXT Press ESC to enter a recovery shell");
-			usplash_write ("VERBOSE default");
-		}
-
-		usplash_write ("ESCAPE %d", getpid ());
-		exit_on_escape = TRUE;
-
-		displaying_bored = bored;
-		displaying_progress = 0;
-
-	} else {
-		/* Clear the splash screen if we've just completed
-		 * a filesystem check or were bored.
-		 */
-		if (displaying_progress || displaying_bored) {
-			usplash_write ("CLEAR");
-			usplash_write ("TIMEOUT 60");
-			usplash_write ("ESCAPE 0");
-		}
-
-		displaying_progress = 0;
-		displaying_bored = 0;
-
-		/* Reset the bored timer */
-		if (! bored)
-			boredom_count = 0;
-
-		/* Return to exiting on escape/SIGINT */
-		exit_on_escape = TRUE;
-
-		return;
-
-	}
-}
-
-static void
-escape (void)
-{
-	nih_error ("Cancelled");
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		if ((mnt->mount_pid > 0)
-		    && exit_on_escape)
-			kill (mnt->mount_pid, SIGTERM);
-
-		if (mnt->fsck_pid > 0)
-			kill (mnt->fsck_pid, SIGTERM);
-	}
-
-	if (exit_on_escape)
-		delayed_exit (EXIT_ERROR);
+	nih_fatal (_("Disconnected from Plymouth"));
+	delayed_exit (EXIT_ERROR);
 }
 
 
@@ -2705,10 +2575,6 @@ main (int   argc,
 		exit (EXIT_ERROR);
 	}
 
-	NIH_MUST (nih_timer_add_periodic (NULL, 1,
-					  progress_timer, NULL));
-
-	mounts = NIH_MUST (nih_list_new (NULL));
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
@@ -2719,6 +2585,7 @@ main (int   argc,
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
 	 * we need to do.
 	 */
+	mounts = NIH_MUST (nih_list_new (NULL));
 	parse_fstab (BUILTIN_FSTAB);
 	parse_fstab (_PATH_MNTTAB);
 	parse_mountinfo ();
@@ -2787,10 +2654,6 @@ main (int   argc,
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
 
-	/* SIGINT tells us to stop what we're doing */
-	nih_signal_set_handler (SIGINT, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGINT, int_handler, NULL));
-
 	/* See what we can mount straight away, and then schedule the same
 	 * function to be run each time through the main loop.
 	 */
@@ -2807,14 +2670,6 @@ main (int   argc,
 	return ret;
 }
 
-void
-int_handler (void *     data,
-	     NihSignal *signal)
-{
-	nih_debug ("Received SIGINT");
-
-	escape ();
-}
 
 void
 usr1_handler (void *     data,
