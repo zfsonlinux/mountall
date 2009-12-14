@@ -584,8 +584,7 @@ parse_fstab (const char *filename)
 	fstab = setmntent (filename, "r");
 	if (! fstab) {
 		nih_fatal ("%s: %s", filename, strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return;
+		exit (EXIT_ERROR);
 	}
 
 	while ((mntent = getmntent (fstab)) != NULL) {
@@ -637,8 +636,7 @@ mount_proc (void)
 		nih_fatal ("%s: %s: %s", "/proc",
 			   _("unable to mount"),
 			   strerror (errno));
-		delayed_exit (EXIT_MOUNT);
-		return;
+		exit (EXIT_ERROR);
 	}
 
 	mnt = find_mount ("/proc");
@@ -788,8 +786,7 @@ parse_mountinfo (void)
 		if (! mountinfo) {
 			nih_fatal ("%s: %s", "/proc/self/mountinfo",
 				   strerror (errno));
-			delayed_exit (EXIT_MOUNT);
-			return;
+			exit (EXIT_ERROR);
 		}
 
 		parse_mountinfo_file (FALSE);
@@ -817,8 +814,7 @@ parse_filesystems (void)
 	if (! fs) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			   strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return;
+		exit (EXIT_ERROR);
 	}
 
 	bufsz = 4096;
@@ -859,8 +855,7 @@ parse_filesystems (void)
 	if (fclose (fs) < 0) {
 		nih_fatal ("%s: %s", "/proc/filesystems",
 			  strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return;
+		exit (EXIT_ERROR);
 	}
 }
 
@@ -1315,8 +1310,7 @@ spawn (Mount *         mnt,
 	if (pipe2 (fds, O_CLOEXEC) < 0) {
 		nih_fatal ("Unable to create pipe for spawned process: %s",
 			   strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return -1;
+		exit (EXIT_ERROR);
 	}
 
 	fflush (stdout);
@@ -1329,8 +1323,7 @@ spawn (Mount *         mnt,
 
 		nih_fatal ("%s %s: %s", args[0], MOUNT_NAME (mnt),
 			   strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return -1;
+		exit (EXIT_ERROR);
 	} else if (! pid) {
 		nih_local char *msg = NULL;
 
@@ -1356,10 +1349,8 @@ spawn (Mount *         mnt,
 		ret = read (fds[0], &flag, 1);
 		close (fds[0]);
 
-		if (ret > 0) {
-			delayed_exit (EXIT_ERROR);
-			return -1;
-		}
+		if (ret > 0)
+			exit (EXIT_ERROR);
 	}
 
 	nih_debug ("%s %s [%d]", args[0], MOUNT_NAME (mnt), pid);
@@ -1381,9 +1372,7 @@ spawn (Mount *         mnt,
 		if (waitid (P_PID, pid, &info, WEXITED) < 0) {
 			nih_fatal ("Unable to obtain process exit status: %s",
 				   strerror (errno));
-			nih_free (proc);
-			delayed_exit (EXIT_ERROR);
-			return -1;
+			exit (EXIT_ERROR);
 		}
 
 		spawn_child_handler (proc, pid, info.si_code == CLD_EXITED ? NIH_CHILD_EXITED : NIH_CHILD_KILLED,
@@ -1531,9 +1520,7 @@ run_mount (Mount *mnt,
 		if ((mkdir (mountpoint, 0755) < 0)
 		    && (errno != EEXIST)) {
 			nih_fatal ("mkdir %s: %s", mountpoint, strerror (errno));
-
-			delayed_exit (EXIT_ERROR);
-			return;
+			exit (EXIT_ERROR);
 		} else
 			NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mountpoint));
 	} else {
@@ -1687,8 +1674,7 @@ run_fsck (Mount *mnt)
 	if (pipe2 (fds, O_CLOEXEC) < 0) {
 		nih_fatal ("Unable to create pipe for spawned process: %s",
 			   strerror (errno));
-		delayed_exit (EXIT_ERROR);
-		return;
+		exit (EXIT_ERROR);
 	}
 
 	flags = fcntl (fds[1], F_GETFD);
@@ -1761,7 +1747,7 @@ run_fsck_finished (Mount *mnt,
 		nih_info ("Filesytem check cancelled: %s", MOUNT_NAME (mnt));
 	} else if ((status & (8 | 16 | 128)) || (status > 255)) {
 		nih_fatal ("General fsck error");
-		delayed_exit (EXIT_ERROR);
+		delayed_exit (EXIT_FSCK);
 		return;
 	} else if (status & 1) {
 		nih_info ("Filesystem errors corrected: %s", MOUNT_NAME (mnt));
@@ -1872,7 +1858,7 @@ void
 upstart_disconnected (DBusConnection *connection)
 {
 	nih_fatal (_("Disconnected from Upstart"));
-	delayed_exit (EXIT_ERROR);
+	exit (EXIT_ERROR);
 }
 
 void
@@ -2474,7 +2460,7 @@ plymouth_disconnected (void *             user_data,
 		       ply_boot_client_t *client)
 {
 	nih_fatal (_("Disconnected from Plymouth"));
-	delayed_exit (EXIT_ERROR);
+	exit (EXIT_ERROR);
 }
 
 
