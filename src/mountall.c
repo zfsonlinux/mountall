@@ -99,6 +99,7 @@ struct mount {
 	NihHash *           physical_dev_ids;
 	int                 physical_dev_ids_needed;
 	pid_t               fsck_pid;
+	int                 fsck_fix;
 	int                 ready;
 
 	char *              type;
@@ -364,6 +365,7 @@ new_mount (const char *mountpoint,
 	mnt->physical_dev_ids = NULL;
 	mnt->physical_dev_ids_needed = TRUE;
 	mnt->fsck_pid = -1;
+	mnt->fsck_fix = FALSE;
 	mnt->ready = FALSE;
 
 	mnt->type = NULL;
@@ -1703,7 +1705,7 @@ run_fsck (Mount *mnt)
 
 	args = NIH_MUST (nih_str_array_new (NULL));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "fsck"));
-	if (fsck_fix) {
+	if (fsck_fix || mnt->fsck_fix) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-y"));
 	} else {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
@@ -1750,25 +1752,24 @@ run_fsck_finished (Mount *mnt,
 
  	} else if ((status & (4 | 8 | 16 | 128)) || (status > 255)) {
 		nih_local char *message = NULL;
+		const char *    keys = NULL;
 		nih_local char *answer = NULL;
 
-		/* FIXME add a fix option that repeats the fsck with
-		 * -f
-		 */
-
-		if (status & 4) {
+		if ((status & 4) && (! fsck_fix) && (! mnt->fsck_fix)) {
 			nih_error ("Filesystem has errors: %s", MOUNT_NAME (mnt));
 
-			message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [DIS]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [SDIF]"),
 							 MOUNT_NAME (mnt)));
+			keys = "SsDdIiFf";
 		} else {
 			nih_error ("Unrecoverable fsck error: %s", MOUNT_NAME (mnt));
 
-			message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [DIS]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [SDI]"),
 							 MOUNT_NAME (mnt)));
+			keys = "SsDdIi";
 		}
 
-		answer = plymouth_prompt (NULL, message, "SsDdIi");
+		answer = plymouth_prompt (NULL, message, keys);
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
@@ -1786,6 +1787,15 @@ run_fsck_finished (Mount *mnt,
 			nih_message (_("Ignoring errors with %s at user request"),
 				     MOUNT_NAME (mnt));
 			/* Fall through */
+
+		} else if ((answer[0] == 'F')
+			   || (answer[0] == 'f')) {
+			nih_message (_("Attempting to fix %s filesystem"),
+				     MOUNT_NAME (mnt));
+
+			mnt->fsck_fix = TRUE;
+			run_fsck (mnt);
+			return;
 
 		} else {
 			nih_assert_not_reached ();
