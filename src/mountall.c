@@ -1555,7 +1555,7 @@ run_mount_finished (Mount *mnt,
 			nih_local char *message = NULL;
 			nih_local char *answer = NULL;
 
-			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [DS]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [SD]"),
 						 MOUNT_NAME (mnt)));
 
 			answer = plymouth_prompt (NULL, message, "SsDd");
@@ -2499,7 +2499,7 @@ boredom_timeout (void *    data,
 		if (mnt->mount_pid > 0)
 			continue;
 
-		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [DS]"),
+		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [SD]"),
 						 MOUNT_NAME (mnt)));
 
 		answer = plymouth_prompt (NULL, message, "SsDd");
