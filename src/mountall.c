@@ -149,6 +149,7 @@ void   parse_mountinfo       (void);
 void   parse_filesystems     (void);
 
 void   mount_policy          (void);
+void   mark_mounted          (void);
 
 void   mounted               (Mount *mnt);
 void   trigger_events        (void);
@@ -1118,13 +1119,14 @@ mount_policy (void)
 			nih_debug ("%s is local", MOUNT_NAME (mnt));
 		}
 	}
+}
 
+void
+mark_mounted (void)
+{
  	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		/* If it's already mounted, keep count of events and run hooks
-		 * and such, unless we still need to remount it.
-		 */
 		if (mnt->mounted && (! needs_remount (mnt)))
 			mounted (mnt);
 	}
@@ -2844,6 +2846,9 @@ main (int   argc,
 
 		fclose (cmdline);
 	}
+
+	/* See what's already mounted */
+	mark_mounted ();
 
 	/* See what we can mount straight away, and then schedule the same
 	 * function to be run each time through the main loop.
