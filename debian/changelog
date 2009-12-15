@@ -31,6 +31,9 @@ mountall (1.2) UNRELEASED; urgency=low
     loop over them.  LP: #469985.
   * Use plymouth for all user communication, replacing existing usplash and
     console code.
+  * Rather than exiting on failures, prompt the user as to whether to fix
+    the problem (if possible), ignore the problem, ignore the mountpoint or
+    drop to a maintenance shell.  LP: #489474.
 
   * All filesystems are now mounted before emitting events; the "bootwait"
     and "nobootwait" options have been removed.  While it made some kind of
