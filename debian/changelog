@@ -38,6 +38,7 @@ mountall (1.2) UNRELEASED; urgency=low
     tell what are really key or not - and there's a simple rule that if
     someone adds something to their /etc/fstab without "noauto" then they
     want it mounted.  LP: #484234.
+    * /etc/fstab will be modified on installation to remove the options.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
