@@ -2673,6 +2673,7 @@ int
 main (int   argc,
       char *argv[])
 {
+	FILE *               cmdline;
 	char **              args;
 	DBusConnection *     connection;
 	struct udev_monitor *udev_monitor;
@@ -2748,7 +2749,6 @@ main (int   argc,
 		nih_fatal (_("Could not connect to Plymouth"));
 		exit (1);
 	}
-
 
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
@@ -2827,6 +2827,23 @@ main (int   argc,
 	/* SIGUSR1 tells us that a network device came up */
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
+
+	/* Check for force-fsck on the kernel command line */
+	cmdline = fopen ("/proc/cmdline", "r");
+	if (cmdline) {
+		char line[4096];
+
+		if (fgets (line, sizeof line, cmdline)) {
+			char *tok;
+			
+			for (tok = strtok (line, " "); tok;
+			     tok = strtok (NULL, " "))
+				if (! strcmp (tok, "force-fsck"))
+					force_fsck = 1;
+		}
+
+		fclose (cmdline);
+	}
 
 	/* See what we can mount straight away, and then schedule the same
 	 * function to be run each time through the main loop.
