@@ -44,6 +44,7 @@ mountall (2.0) UNRELEASED; urgency=low
   * Always try network mount points, since we allow them to fail silently;
     SIGUSR1 now simply retries them once more.  LP: #470776.
   * Don't retry devices repeatedly.  LP: #480564.
+  * Added manual pages for the events emitted by this tool.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
