@@ -2837,7 +2837,7 @@ main (int   argc,
 
 		if (fgets (line, sizeof line, cmdline)) {
 			char *tok;
-			
+
 			for (tok = strtok (line, " "); tok;
 			     tok = strtok (NULL, " "))
 				if (! strcmp (tok, "force-fsck"))
