@@ -43,6 +43,7 @@ mountall (1.2) UNRELEASED; urgency=low
       those marked with the "bootwait" option.
   * Always try network mount points, since we allow them to fail silently;
     SIGUSR1 now simply retries them once more.  LP: #470776.
+  * Don't retry devices repeatedly.  LP: #480564.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
