@@ -2416,11 +2416,6 @@ fsck_update (void)
 		nih_debug ("%s: priority %s",
 			   MOUNT_NAME (mnt), low_prio ? "low" : "normal");
 
-		if (setpriority (PRIO_PGRP, mnt->fsck_pid,
-				 low_prio ? 19 : 0) < 0)
-			nih_warn ("setpriority %d: %s",
-				  mnt->fsck_pid, strerror (errno));
-
 		if (ioprio_set (IOPRIO_WHO_PGRP, mnt->fsck_pid,
 				low_prio ? ioprio_low : ioprio_normal) < 0)
 			nih_warn ("ioprio_set %d: %s",
