@@ -3002,11 +3002,6 @@ usr1_handler (void *     data,
 {
 	nih_debug ("Received SIGUSR1 (network device up)");
 
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		if (is_remote (mnt)
-		    && ((! mnt->mounted) || needs_remount (mnt)))
-			try_mount (mnt, TRUE);
-	}
+	newly_mounted = TRUE;
+	nih_main_loop_interrupt ();
 }
