@@ -2768,6 +2768,14 @@ plymouth_cancel_fsck (void *             user_data,
 		      const char *       keys,
 		      ply_boot_client_t *client)
 {
+	if (! keys)
+		return;
+	if ((keys[0] != 'C')
+	    && (keys[0] != 'c'))
+		return;
+
+	nih_info (_("User cancelled filesystem check."));
+
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
