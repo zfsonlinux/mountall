@@ -82,6 +82,7 @@ enum exit {
 	EXIT_OK = 0,		/* Ok */
 	EXIT_ERROR = 1,		/* General/OS error */
 	EXIT_SHELL = 2,		/* Start maintenance shell */
+	EXIT_SHELL_REBOOT = 3,	/* Start maintenance shell, reboot when done */
 	EXIT_REBOOT = 4,	/* System must reboot */
 };
 
@@ -1797,7 +1798,11 @@ run_fsck_finished (Mount *mnt,
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			exit (EXIT_SHELL);
+			if (! strcmp (mnt->mountpoint, "/")) {
+				exit (EXIT_SHELL_REBOOT);
+			} else {
+				exit (EXIT_SHELL);
+			}
 
 		} else if ((answer[0] == 'D')
 			   || (answer[0] == 'd')) {
