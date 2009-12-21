@@ -189,6 +189,7 @@ void   fsck_reader           (Mount *mnt, NihIo *io,
 			      const char *buf, size_t len);
 void   boredom_timeout       (void *data, NihTimer *timer);
 
+void   plymouth_progress     (Mount *mnt, int progress);
 char * plymouth_prompt       (const void *parent, const char *message,
 			      const char *keys);
 void   plymouth_response     (void *user_data, ply_boot_client_t *client);
@@ -285,6 +286,13 @@ static ply_event_loop_t *ply_event_loop = NULL;
  * Plymouth boot client.
  **/
 static ply_boot_client_t *ply_boot_client = NULL;
+
+/**
+ * plymouth_connected:
+ *
+ * TRUE when we're connected to the plymouth daemon.
+ **/
+static int plymouth_connected = FALSE;
 
 
 /**
@@ -1743,19 +1751,11 @@ run_fsck_finished (Mount *mnt,
 		   pid_t  pid,
 		   int    status)
 {
-	nih_local char *update = NULL;
-
 	nih_assert (mnt != NULL);
 	nih_assert (mnt->fsck_pid == pid);
 
 	/* Finish off the progress bar */
-	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:100",
-					MOUNT_NAME (mnt)));
-
-	ply_boot_client_update_daemon (ply_boot_client, update,
-				       plymouth_response,
-				       plymouth_response,
-				       NULL);
+	plymouth_progress (mnt, 100);
 
 	/* The check is done */
 	mnt->fsck_pid = -1;
@@ -2436,17 +2436,7 @@ fsck_update (void)
 						  boredom_timeout, NULL));
 
 		/* Clear any cancel prompt */
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-		ply_boot_client_ask_daemon_to_ignore_keystroke (ply_boot_client,
-								"Cc",
-								(ply_boot_client_answer_handler_t)plymouth_response,
-								plymouth_response,
-								NULL);
+		plymouth_progress (NULL, 0);
 	}
 }
 
@@ -2467,7 +2457,6 @@ fsck_reader (Mount *     mnt,
 		int             cur;
 		int             max;
 		int             progress;
-		nih_local char *update = NULL;
 
 		line = nih_io_get (NULL, io, "\n");
 		if ((! line) || (! *line))
@@ -2496,26 +2485,7 @@ fsck_reader (Mount *     mnt,
 			nih_assert_not_reached ();
 		}
 
-		update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
-						MOUNT_NAME (mnt),
-						progress));
-
-		ply_boot_client_update_daemon (ply_boot_client, update,
-					       plymouth_response,
-					       plymouth_response,
-					       NULL);
-
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"[C]",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-		ply_boot_client_ask_daemon_to_watch_for_keystroke (ply_boot_client,
-								   "Cc",
-								   plymouth_cancel_fsck,
-								   plymouth_response,
-								   NULL);
+		plymouth_progress (mnt, progress);
 	}
 }
 
@@ -2558,6 +2528,67 @@ boredom_timeout (void *    data,
 }
 
 
+static int
+plymouth_is_connected (void)
+{
+	if (plymouth_connected)
+		return TRUE;
+
+	if (ply_boot_client_connect (ply_boot_client,
+				     plymouth_disconnected, NULL)) {
+		plymouth_connected = TRUE;
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+void
+plymouth_progress (Mount *mnt,
+		   int    progress)
+{
+	if (! plymouth_is_connected ())
+		return;
+
+	if (mnt) {
+		nih_local char *update = NULL;
+
+		progress = nih_max (nih_min (progress, 100), 0);
+
+		update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
+						MOUNT_NAME (mnt), progress));
+
+		ply_boot_client_update_daemon (ply_boot_client, update,
+					       plymouth_response,
+					       plymouth_response,
+					       NULL);
+
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"[C]",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+		ply_boot_client_ask_daemon_to_watch_for_keystroke (ply_boot_client,
+								   "Cc",
+								   plymouth_cancel_fsck,
+								   plymouth_response,
+								   NULL);
+	} else {
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+		ply_boot_client_ask_daemon_to_ignore_keystroke (ply_boot_client,
+								"Cc",
+								(ply_boot_client_answer_handler_t)plymouth_response,
+								plymouth_response,
+								NULL);
+	}
+}
+
 char *
 plymouth_prompt (const void *parent,
 		 const char *message,
@@ -2567,6 +2598,9 @@ plymouth_prompt (const void *parent,
 
 	nih_assert (message != NULL);
 	nih_assert (keys != NULL);
+
+	if (! plymouth_is_connected ())
+		return NULL;
 
 	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
 							message,
@@ -2644,8 +2678,8 @@ void
 plymouth_disconnected (void *             user_data,
 		       ply_boot_client_t *client)
 {
-	nih_fatal (_("Disconnected from Plymouth"));
-	exit (1);
+	nih_warn (_("Disconnected from Plymouth"));
+	plymouth_connected = FALSE;
 }
 
 
@@ -2741,10 +2775,11 @@ main (int   argc,
 	ply_boot_client_attach_to_event_loop (ply_boot_client,
 					      ply_event_loop);
 
-	if (! ply_boot_client_connect (ply_boot_client,
-				       plymouth_disconnected, NULL)) {
-		nih_fatal (_("Could not connect to Plymouth"));
-		exit (1);
+	if (ply_boot_client_connect (ply_boot_client,
+				     plymouth_disconnected, NULL)) {
+		plymouth_connected = TRUE;
+	} else {
+		nih_warn (_("Could not connect to Plymouth"));
 	}
 
 	/* Parse /proc/filesystems to find out which filesystems don't

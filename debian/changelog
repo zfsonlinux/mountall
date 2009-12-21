@@ -30,11 +30,12 @@ mountall (1.2) UNRELEASED; urgency=low
   * Exit gracefully with an error on failed system calls, don't infinite
     loop over them.  LP: #469985.
   * Use plymouth for all user communication, replacing existing usplash and
-    console code.
-  * Rather than exiting on failures, prompt the user as to whether to fix
-    the problem (if possible), ignore the problem, ignore the mountpoint or
-    drop to a maintenance shell.  LP: #489474.
-
+    console code;
+    * When plymouth is running, rather than exiting on failures, prompt the
+      user as to whether to fix the problem (if possible), ignore the problem,
+      ignore the mountpoint or drop to a maintenance shell.  LP: #489474.
+    * If plymouth is not running for whatever reason, the fallback action
+      is always to start the recovery shell.
   * All filesystems are now mounted before emitting events; the "bootwait"
     and "nobootwait" options have been removed.  While it made some kind of
     theoretical sense to only wait for key filesystems, in practice we can't
