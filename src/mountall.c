@@ -161,6 +161,7 @@ void   mount_policy          (void);
 void   mark_mounted          (void);
 
 void   mounted               (Mount *mnt);
+void   skip_mount            (Mount *mnt);
 void   trigger_events        (void);
 
 void   try_mounts            (void);
@@ -1189,53 +1190,18 @@ mounted (Mount *mnt)
 	if ((! written_mtab))
 		write_mtab ();
 
-	/* Does mounting this filesystem mean that we trigger a new event? */
 	switch (mnt->tag) {
 	case TAG_LOCAL:
-		if ((++num_local_mounted == num_local)
-		    && (num_virtual_mounted == num_virtual)) {
-			nih_info ("local finished");
-			emit_event ("local-filesystems", NULL);
-
-			if (num_remote_mounted == num_remote) {
-				nih_info ("filesystem mounted");
-				emit_event ("filesystem", NULL);
-			}
-		}
+		num_local_mounted++;
 		break;
 	case TAG_REMOTE:
-		if (++num_remote_mounted == num_remote) {
-			nih_info ("remote finished");
-			emit_event ("remote-filesystems", NULL);
-
-			if ((num_local_mounted == num_local)
-			    && (num_virtual_mounted == num_virtual)) {
-				nih_info ("filesystem mounted");
-				emit_event ("filesystem", NULL);
-			}
-		}
+		num_remote_mounted++;
 		break;
 	case TAG_VIRTUAL:
-		if (++num_virtual_mounted == num_virtual) {
-			nih_info ("virtual finished");
-			emit_event ("virtual-filesystems", NULL);
-
-			if (num_local_mounted == num_local) {
-				nih_info ("local finished");
-				emit_event ("local-filesystems", NULL);
-
-				if (num_remote_mounted == num_remote) {
-					nih_info ("filesystem mounted");
-					emit_event ("filesystem", NULL);
-				}
-			}
-		}
+		num_virtual_mounted++;
 		break;
 	case TAG_SWAP:
-		if (++num_swap_mounted == num_swap) {
-			nih_info ("swap finished");
-			emit_event ("all-swaps", NULL);
-		}
+		num_swap_mounted++;
 		break;
 	case TAG_NOWAIT:
 		break;
@@ -1243,13 +1209,103 @@ mounted (Mount *mnt)
 		nih_assert_not_reached ();
 	}
 
+	trigger_events ();
+
+	fsck_update ();
+}
+
+void
+skip_mount (Mount *mnt)
+{
+	nih_assert (mnt != NULL);
+	nih_assert (! mnt->mounted);
+
+	nih_debug ("%s", MOUNT_NAME (mnt));
+
+	newly_mounted = TRUE;
+	nih_main_loop_interrupt ();
+
+	switch (mnt->tag) {
+	case TAG_LOCAL:
+		num_local--;
+		break;
+	case TAG_REMOTE:
+		num_remote--;
+		break;
+	case TAG_VIRTUAL:
+		num_virtual--;
+		break;
+	case TAG_SWAP:
+		num_swap--;
+		break;
+	case TAG_NOWAIT:
+		break;
+	default:
+		nih_assert_not_reached ();
+	}
+
+	mnt->tag = TAG_NOWAIT;
+
+	trigger_events ();
+}
+
+void
+trigger_events (void)
+{
+	static int virtual_triggered = FALSE;
+	static int local_triggered = FALSE;
+	static int remote_triggered = FALSE;
+	static int swap_triggered = FALSE;
+	static int filesystem_triggered = FALSE;
+
+	/* Virtual may be triggered at any time */
+	if ((! virtual_triggered)
+	    && (num_virtual_mounted == num_virtual)) {
+		nih_info ("virtual finished");
+		emit_event ("virtual-filesystems", NULL);
+		virtual_triggered = TRUE;
+	}
+
+	/* Enforce local only after virtual filesystems triggered */
+	if ((! local_triggered)
+	    && virtual_triggered
+	    && (num_local_mounted == num_local)) {
+		nih_info ("local finished");
+		emit_event ("local-filesystems", NULL);
+		local_triggered = TRUE;
+	}
+
+	/* Enforce remote only after virtual filesystems triggrered */
+	if ((! remote_triggered)
+	    && virtual_triggered
+	    && (num_remote_mounted == num_remote)) {
+		nih_info ("remote finished");
+		emit_event ("remote-filesystems", NULL);
+		remote_triggered = TRUE;
+	}
+
+	/* Aggregate event for all filesystems */
+	if ((! filesystem_triggered)
+	    && virtual_triggered
+	    && local_triggered
+	    && remote_triggered) {
+		nih_info ("filesystem mounted");
+		emit_event ("filesystem", NULL);
+		filesystem_triggered = TRUE;
+	}
+
+	/* Swaps may be triggered at any time */
+	if ((! swap_triggered)
+	    && (num_swap_mounted == num_swap)) {
+		nih_info ("swap finished");
+		emit_event ("all-swaps", NULL);
+	}
+
 	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
 		   num_local_mounted, num_local,
 		   num_remote_mounted, num_remote,
 		   num_virtual_mounted, num_virtual,
 		   num_swap_mounted, num_swap);
-
-	fsck_update ();
 }
 
 
@@ -1597,20 +1653,20 @@ run_mount_finished (Mount *mnt,
 			nih_local char *message = NULL;
 			nih_local char *answer = NULL;
 
-			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [SD]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("Failed to mount %s [SM]"),
 						 MOUNT_NAME (mnt)));
 
-			answer = plymouth_prompt (NULL, message, "SsDd");
+			answer = plymouth_prompt (NULL, message, "SsMm");
 			if ((! answer)
 			    || (answer[0] == 'S')
 			    || (answer[0] == 's')) {
-				exit (EXIT_SHELL);
-
-			} else if ((answer[0] == 'D')
-				   || (answer[0] == 'd')) {
-				nih_message (_("Fake mounting %s at user request"),
+				nih_message (_("Skipping %s at user request"),
 					     MOUNT_NAME (mnt));
-				mounted (mnt);
+				skip_mount (mnt);
+
+			} else if ((answer[0] == 'M')
+				   || (answer[0] == 'm')) {
+				exit (EXIT_SHELL);
 
 			} else {
 				nih_assert_not_reached ();
@@ -1805,32 +1861,25 @@ run_fsck_finished (Mount *mnt,
 		if ((status & 4) && (! fsck_fix) && (! mnt->fsck_fix)) {
 			nih_error ("Filesystem has errors: %s", MOUNT_NAME (mnt));
 
-			message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [SDIF]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("%s filesystem has errors [SIFM]"),
 							 MOUNT_NAME (mnt)));
-			keys = "SsDdIiFf";
+			keys = "SsIiFfMm";
 		} else {
 			nih_error ("Unrecoverable fsck error: %s", MOUNT_NAME (mnt));
 
-			message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [SDI]"),
+			message = NIH_MUST (nih_sprintf (NULL, _("Unrecoverable filesystem check error for %s [SIM]"),
 							 MOUNT_NAME (mnt)));
-			keys = "SsDdIi";
+			keys = "SsIiMm";
 		}
 
 		answer = plymouth_prompt (NULL, message, keys);
+
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			if (! strcmp (mnt->mountpoint, "/")) {
-				exit (EXIT_SHELL_REBOOT);
-			} else {
-				exit (EXIT_SHELL);
-			}
-
-		} else if ((answer[0] == 'D')
-			   || (answer[0] == 'd')) {
-			nih_message (_("Fake mounting %s at user request"),
+			nih_message (_("Skipping %s at user request"),
 				     MOUNT_NAME (mnt));
-			mounted (mnt);
+			skip_mount (mnt);
 			return;
 
 		} else if ((answer[0] == 'I')
@@ -1848,6 +1897,13 @@ run_fsck_finished (Mount *mnt,
 			run_fsck (mnt);
 			return;
 
+		} else if ((answer[0] == 'M')
+			   || (answer[0] == 'm')) {
+			if (! strcmp (mnt->mountpoint, "/")) {
+				exit (EXIT_SHELL_REBOOT);
+			} else {
+				exit (EXIT_SHELL);
+			}
 		} else {
 			nih_assert_not_reached ();
 		}
@@ -2542,20 +2598,20 @@ boredom_timeout (void *    data,
 		if (mnt->tag == TAG_NOWAIT)
 			continue;
 
-		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [SD]"),
+		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [SM]"),
 						 MOUNT_NAME (mnt)));
 
-		answer = plymouth_prompt (NULL, message, "SsDd");
+		answer = plymouth_prompt (NULL, message, "SsMm");
 		if ((! answer)
 		    || (answer[0] == 'S')
 		    || (answer[0] == 's')) {
-			exit (EXIT_SHELL);
-
-		} else if ((answer[0] == 'D')
-			   || (answer[0] == 'd')) {
-			nih_message (_("Fake mounting %s at user request"),
+			nih_message (_("Skipping %s at user request"),
 				     MOUNT_NAME (mnt));
-			mounted (mnt);
+			skip_mount (mnt);
+
+		} else if ((answer[0] == 'M')
+			   || (answer[0] == 'm')) {
+			exit (EXIT_SHELL);
 
 		} else {
 			nih_assert_not_reached ();
