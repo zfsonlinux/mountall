@@ -90,7 +90,8 @@ typedef enum {
 	TAG_LOCAL,
 	TAG_REMOTE,
 	TAG_VIRTUAL,
-	TAG_SWAP
+	TAG_SWAP,
+	TAG_NOWAIT,
 } Tag;
 
 typedef struct mount Mount;
@@ -1096,9 +1097,20 @@ mount_policy (void)
 			num_local++;
 			nih_debug ("%s is local (root)", MOUNT_NAME (mnt));
 		} else if (is_remote (mnt)) {
-			mnt->tag = TAG_REMOTE;
-			num_remote++;
-			nih_debug ("%s is remote", MOUNT_NAME (mnt));
+			if ((! strcmp (mnt->mountpoint, "/usr"))
+			    || (! strcmp (mnt->mountpoint, "/var"))
+			    || (! strncmp (mnt->mountpoint, "/usr/", 5))
+			    || (! strncmp (mnt->mountpoint, "/var/", 5))
+			    || (has_option (mnt, "bootwait", FALSE)))
+			{
+				mnt->tag = TAG_REMOTE;
+				num_remote++;
+				nih_debug ("%s is remote", MOUNT_NAME (mnt));
+			} else {
+				mnt->tag = TAG_NOWAIT;
+				nih_debug ("%s is nowait (remote)",
+					   MOUNT_NAME (mnt));
+			}
 		} else if (mnt->nodev
 			   && strcmp (mnt->type, "fuse")) {
 			if (mount_parent
@@ -1130,9 +1142,15 @@ mount_policy (void)
 			nih_debug ("%s is remote (inherited)",
 				   MOUNT_NAME (mnt));
 		} else {
-			mnt->tag = TAG_LOCAL;
-			num_local++;
-			nih_debug ("%s is local", MOUNT_NAME (mnt));
+			if (! has_option (mnt, "nobootwait", FALSE)) {
+				mnt->tag = TAG_LOCAL;
+				num_local++;
+				nih_debug ("%s is local", MOUNT_NAME (mnt));
+			} else {
+				mnt->tag = TAG_NOWAIT;
+				nih_debug ("%s is nowait (local)",
+					   MOUNT_NAME (mnt));
+			}
 		}
 	}
 }
@@ -1218,6 +1236,8 @@ mounted (Mount *mnt)
 			nih_info ("swap finished");
 			emit_event ("all-swaps", NULL);
 		}
+		break;
+	case TAG_NOWAIT:
 		break;
 	default:
 		nih_assert_not_reached ();
@@ -1484,7 +1504,9 @@ run_mount (Mount *mnt,
 		}
 	}
 
-	opts = cut_options (NULL, mnt, "showthrough", "optional", NULL);
+	opts = cut_options (NULL, mnt, "showthrough", "optional",
+			    "bootwait", "nobootwait",
+			    NULL);
 	if (mnt->mounted && (! fake)) {
 		char *tmp;
 
@@ -2516,6 +2538,8 @@ boredom_timeout (void *    data,
 		if (mnt->fsck_pid > 0)
 			continue;
 		if (mnt->mount_pid > 0)
+			continue;
+		if (mnt->tag == TAG_NOWAIT)
 			continue;
 
 		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [SD]"),

@@ -36,13 +36,11 @@ mountall (1.2) UNRELEASED; urgency=low
       ignore the mountpoint or drop to a maintenance shell.  LP: #489474.
     * If plymouth is not running for whatever reason, the fallback action
       is always to start the recovery shell.
-  * All filesystems are now mounted before emitting events; the "bootwait"
-    and "nobootwait" options have been removed.  While it made some kind of
-    theoretical sense to only wait for key filesystems, in practice we can't
-    tell what are really key or not - and there's a simple rule that if
-    someone adds something to their /etc/fstab without "noauto" then they
-    want it mounted.  LP: #484234.
-    * /etc/fstab will be modified on installation to remove the options.
+  * Adjust the set of filesystems that we wait for by default: LP: #484234.
+    * Wait for all local filesystems, except those marked with the
+      "nobootwait" option.
+    * Wait for remote filesystems mounted as, or under, /usr or /var, and
+      those marked with the "bootwait" option.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
