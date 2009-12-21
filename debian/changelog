@@ -1,4 +1,4 @@
-mountall (2.0) UNRELEASED; urgency=low
+mountall (2.0) lucid; urgency=low
 
   [ Scott James Remnant ]
   * "mount" event changed to "mounting", to make it clear it happens
@@ -50,7 +50,7 @@ mountall (2.0) UNRELEASED; urgency=low
   * Start all fsck instances in parallel, but set their priorities so that
     thrashing is avoided.  LP: #491389.
 
- -- Scott James Remnant <scott@ubuntu.com>  Fri, 11 Dec 2009 13:37:17 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Mon, 21 Dec 2009 23:09:23 +0000
 
 mountall (1.1) lucid; urgency=low
 
