@@ -1358,18 +1358,16 @@ try_mount (Mount *mnt,
 	}
 
 	/* If there's an underlying device that udev is going to deal with,
-	 * or it's a remote filesystem, we wait for the udev watcher or the
-	 * USR1 signal function to mark it ready.
+	 * and it's not a virtual or remote filesystem, we wait for the udev
+	 * watcher to mark it ready.
 	 */
 	if ((! mnt->ready)
 	    && (! force)
-	    && (((! mnt->nodev)
-		 && ((! strncmp (mnt->device, "/dev/", 5))
-		     || (! strncmp (mnt->device, "UUID=", 5))
-		     || (! strncmp (mnt->device, "LABEL=", 6))))
-		|| (is_remote (mnt)
-		    && ((! mnt->mounted)
-			|| needs_remount (mnt)))))
+	    && (! mnt->nodev)
+	    && (! is_remote (mnt))
+	    && ((! strncmp (mnt->device, "/dev/", 5))
+		|| (! strncmp (mnt->device, "UUID=", 5))
+		|| (! strncmp (mnt->device, "LABEL=", 6))))
 	{
 		nih_debug ("%s waiting for device", MOUNT_NAME (mnt));
 
@@ -1379,7 +1377,8 @@ try_mount (Mount *mnt,
 	/* Queue a filesystem check if not yet ready, otherwise run
 	 * swapon or mount as appropriate.
 	 */
-	if (! mnt->ready) {
+	if ((! mnt->ready)
+	    && (! is_remote (mnt))) {
 		run_fsck (mnt);
 	} else if (! strcmp (mnt->type, "swap")) {
 		emit_event ("mounting", mnt);
