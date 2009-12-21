@@ -1,4 +1,4 @@
-mountall (1.2) UNRELEASED; urgency=low
+mountall (2.0) UNRELEASED; urgency=low
 
   [ Scott James Remnant ]
   * "mount" event changed to "mounting", to make it clear it happens
