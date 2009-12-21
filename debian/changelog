@@ -41,6 +41,8 @@ mountall (1.2) UNRELEASED; urgency=low
       "nobootwait" option.
     * Wait for remote filesystems mounted as, or under, /usr or /var, and
       those marked with the "bootwait" option.
+  * Always try network mount points, since we allow them to fail silently;
+    SIGUSR1 now simply retries them once more.  LP: #470776.
 
   [ Johan Kiviniemi ]
   * Start all fsck instances in parallel, but set their priorities so that
