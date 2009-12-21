@@ -331,7 +331,7 @@ static int fsck_fix = FALSE;
  *
  * Set to TRUE if we should not emit events.
  **/
-static int no_events = TRUE;
+static int no_events = FALSE;
 
 
 static void
