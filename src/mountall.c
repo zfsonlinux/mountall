@@ -327,6 +327,13 @@ static int force_fsck = FALSE;
  **/
 static int fsck_fix = FALSE;
 
+/**
+ * no_events:
+ *
+ * Set to TRUE if we should not emit events.
+ **/
+static int no_events = TRUE;
+
 
 static void
 dequote (char *str)
@@ -2038,6 +2045,9 @@ emit_event (const char *name,
 
 	nih_assert (name != NULL);
 
+	if (no_events)
+		return;
+
 	env = NIH_MUST (nih_str_array_new (NULL));
 
 	if (mnt) {
@@ -2787,6 +2797,8 @@ static NihOption options[] = {
 	  NULL, NULL, &force_fsck, NULL },
 	{ 0, "fsck-fix", N_("Attempt to fix all fsck errors"),
 	  NULL, NULL, &fsck_fix, NULL },
+	{ 0, "no-events", N_("Do not emit events after mounting filesystems"),
+	  NULL, NULL, &no_events, NULL },
 
 	NIH_OPTION_LAST
 };
