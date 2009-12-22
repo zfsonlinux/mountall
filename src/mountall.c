@@ -1302,9 +1302,6 @@ skip_mount (Mount *mnt)
 
 	nih_debug ("%s", MOUNT_NAME (mnt));
 
-	newly_mounted = TRUE;
-	nih_main_loop_interrupt ();
-
 	switch (mnt->tag) {
 	case TAG_LOCAL:
 		num_local--;
