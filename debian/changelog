@@ -15,6 +15,9 @@ mountall (2.1) UNRELEASED; urgency=low
   * Skipping a mount doesn't increase our changes of mounting other
     filesystems, it just means we'll enter an infinite loop of trying to
     mount the filesystem we just skipped!
+  * Mountpoints not listed in /etc/fstab should be recorded with the options
+    they were mounted with, not "defaults", otherwise we'll attempt to
+    remount them if read-only.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
 

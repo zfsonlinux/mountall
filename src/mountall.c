@@ -694,6 +694,7 @@ parse_mountinfo_file (int reparsed)
 		char * device;
 		char * mount_opts;
 		char * super_opts;
+		char * opts;
 		Mount *mnt;
 
 		while ((! strchr (buf, '\n')) && (! feof (mountinfo))) {
@@ -756,6 +757,9 @@ parse_mountinfo_file (int reparsed)
 			continue;
 
 
+		opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
+					      mount_opts, super_opts));
+
 		mnt = find_mount (mountpoint);
 		if (mnt
 		    && strcmp (type, "swap")) {
@@ -770,13 +774,12 @@ parse_mountinfo_file (int reparsed)
 
 			if (mnt->mount_opts)
 				nih_unref (mnt->mount_opts, mounts);
+			mnt->mount_opts = opts;
 		} else {
-			mnt = new_mount (mountpoint, device, FALSE, type,
-					 "defaults");
+			mnt = new_mount (mountpoint, device, FALSE, type, opts);
+			mnt->mount_opts = opts;
 		}
 
-		mnt->mount_opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
-							 mount_opts, super_opts));
 		if (reparsed && (! mnt->mounted)) {
 			mounted (mnt);
 		} else {
