@@ -18,6 +18,7 @@ mountall (2.1) UNRELEASED; urgency=low
   * Mountpoints not listed in /etc/fstab should be recorded with the options
     they were mounted with, not "defaults", otherwise we'll attempt to
     remount them if read-only.
+  * Start maintenance shell should mountall crash.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
 
