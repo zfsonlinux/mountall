@@ -87,6 +87,7 @@ enum exit {
 };
 
 typedef enum {
+	TAG_UNKNOWN,
 	TAG_LOCAL,
 	TAG_REMOTE,
 	TAG_VIRTUAL,
@@ -157,6 +158,7 @@ void   parse_mountinfo       (void);
 void   parse_filesystems     (void);
 
 void   mount_policy          (void);
+void   tag_mount             (Mount *mnt, Tag tag);
 void   mark_mounted          (void);
 
 void   mounted               (Mount *mnt);
@@ -401,7 +403,7 @@ new_mount (const char *mountpoint,
 	mnt->mount_opts = NULL;
 	mnt->check = check;
 
-	mnt->tag = TAG_LOCAL;
+	mnt->tag = TAG_UNKNOWN;
 	mnt->has_showthrough = FALSE;
 	mnt->showthrough = NULL;
 	nih_list_init (&mnt->deps);
@@ -1077,6 +1079,7 @@ mount_policy (void)
 		 */
 		if (mnt->nodev
 		    && strcmp (mnt->device, "none")
+		    && strcmp (mnt->device, mnt->type)
 		    && (mnt->entry.prev != mounts)
 		    && strcmp (((Mount *)mnt->entry.prev)->device, "none")) {
 			NihListEntry *dep;
@@ -1094,14 +1097,51 @@ mount_policy (void)
 		}
 
 		/* Tag the filesystem so we know which event it blocks */
-		if (! strcmp (mnt->type, "swap")) {
-			mnt->tag = TAG_SWAP;
-			num_swap++;
-			nih_debug ("%s is swap", MOUNT_NAME (mnt));
-		} else if (! strcmp (mnt->mountpoint, "/")) {
-			mnt->tag = TAG_LOCAL;
+		tag_mount (mnt, TAG_UNKNOWN);
+	}
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		switch (mnt->tag) {
+		case TAG_VIRTUAL:
+			nih_debug ("%s is virtual", MOUNT_NAME (mnt));
+			num_virtual++;
+			break;
+		case TAG_LOCAL:
+			nih_debug ("%s is local", MOUNT_NAME (mnt));
 			num_local++;
-			nih_debug ("%s is local (root)", MOUNT_NAME (mnt));
+			break;
+		case TAG_REMOTE:
+			nih_debug ("%s is remote", MOUNT_NAME (mnt));
+			num_remote++;
+			break;
+		case TAG_SWAP:
+			nih_debug ("%s is swap", MOUNT_NAME (mnt));
+			num_swap++;
+			break;
+		case TAG_NOWAIT:
+			nih_debug ("%s is no-wait", MOUNT_NAME (mnt));
+			break;
+		default:
+			nih_assert_not_reached ();
+		}
+	}
+}
+
+void
+tag_mount (Mount *mnt,
+	   Tag    tag)
+{
+	nih_assert (mnt != NULL);
+
+	/* If no tag is given, work it out from the device type */
+	if (tag == TAG_UNKNOWN) {
+		if (! strcmp (mnt->type, "swap")) {
+			tag = TAG_SWAP;
+		} else if (! strcmp (mnt->mountpoint, "/")) {
+			nih_debug ("%s is root filesystem", MOUNT_NAME (mnt));
+			tag = TAG_LOCAL;
 		} else if (is_remote (mnt)) {
 			if ((! strcmp (mnt->mountpoint, "/usr"))
 			    || (! strcmp (mnt->mountpoint, "/var"))
@@ -1109,53 +1149,88 @@ mount_policy (void)
 			    || (! strncmp (mnt->mountpoint, "/var/", 5))
 			    || (has_option (mnt, "bootwait", FALSE)))
 			{
-				mnt->tag = TAG_REMOTE;
-				num_remote++;
-				nih_debug ("%s is remote", MOUNT_NAME (mnt));
+				tag = TAG_REMOTE;
 			} else {
-				mnt->tag = TAG_NOWAIT;
-				nih_debug ("%s is nowait (remote)",
-					   MOUNT_NAME (mnt));
+				tag = TAG_NOWAIT;
 			}
 		} else if (mnt->nodev
 			   && strcmp (mnt->type, "fuse")) {
-			if (mount_parent
-			    && (strcmp (mount_parent->mountpoint, "/")
-				|| (! strcmp (mnt->type, "none")))
-			    && (mount_parent->tag == TAG_REMOTE)) {
-				mnt->tag = TAG_REMOTE;
-				num_remote++;
-				nih_debug ("%s is remote (inherited)",
-					   MOUNT_NAME (mnt));
-			} else if (mount_parent
-				   && (strcmp (mount_parent->mountpoint, "/")
-				       || (! strcmp (mnt->type, "none")))
-				   && (mount_parent->tag == TAG_LOCAL)) {
-				mnt->tag = TAG_LOCAL;
-				num_local++;
-				nih_debug ("%s is local (inherited)",
-					   MOUNT_NAME (mnt));
-			} else {
-				mnt->tag = TAG_VIRTUAL;
-				num_virtual++;
-				nih_debug ("%s is virtual", MOUNT_NAME (mnt));
-			}
-		} else if (mount_parent
-			   && strcmp (mount_parent->mountpoint, "/")
-			   && (mount_parent->tag == TAG_REMOTE)) {
-			mnt->tag = TAG_REMOTE;
-			num_remote++;
-			nih_debug ("%s is remote (inherited)",
-				   MOUNT_NAME (mnt));
+			tag = TAG_VIRTUAL;
 		} else {
 			if (! has_option (mnt, "nobootwait", FALSE)) {
-				mnt->tag = TAG_LOCAL;
-				num_local++;
-				nih_debug ("%s is local", MOUNT_NAME (mnt));
+				tag = TAG_LOCAL;
 			} else {
-				mnt->tag = TAG_NOWAIT;
-				nih_debug ("%s is nowait (local)",
-					   MOUNT_NAME (mnt));
+				tag = TAG_NOWAIT;
+			}
+		}
+	}
+
+	/* If no tag is set, default it from our dependencies */
+	if (mnt->tag == TAG_UNKNOWN) {
+		NIH_LIST_FOREACH (&mnt->deps, dep_iter) {
+			NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+			Mount *       dep = (Mount *)dep_entry->data;
+
+			/* Do not inherit from the root filesystem unless
+			 * this is a placeholder.
+			 */
+			if ((! strcmp (dep->mountpoint, "/"))
+			    && strcmp (mnt->type, "none"))
+				continue;
+
+			if ((dep->tag == TAG_LOCAL)
+			    && (mnt->tag != TAG_REMOTE))
+				mnt->tag = TAG_LOCAL;
+			if (dep->tag == TAG_REMOTE)
+				mnt->tag = TAG_REMOTE;
+		}
+	}
+
+	/* Don't override a more restrictive tag already set from a parent
+	 * mountpoint.
+	 */
+	if ((tag == TAG_VIRTUAL)
+	    && (mnt->tag == TAG_REMOTE)) {
+		nih_debug ("%s is not virtual, inherited remote",
+			   MOUNT_NAME (mnt));
+		return;
+	}
+
+	if ((tag == TAG_VIRTUAL)
+	    && (mnt->tag == TAG_LOCAL)) {
+		nih_debug ("%s is not virtual, inherited local",
+			   MOUNT_NAME (mnt));
+		return;
+	}
+
+	if ((tag == TAG_LOCAL)
+	    && (mnt->tag == TAG_REMOTE)) {
+		nih_debug ("%s is not local, inherited remote",
+			   MOUNT_NAME (mnt));
+	}
+
+	/* Set the tag, then if it's one we'd normally inherit, set it on
+	 * any mount point that depends on this one.
+	 */
+	mnt->tag = tag;
+
+	if ((tag == TAG_LOCAL)
+	    || (tag == TAG_REMOTE)) {
+		NIH_LIST_FOREACH (mounts, iter) {
+			Mount *dep = (Mount *)iter;
+
+			/* Do not inherit from the root filesystem unless
+			 * this is a placeholder.
+			 */
+			if ((! strcmp (mnt->mountpoint, "/"))
+			    && strcmp (dep->type, "none"))
+				continue;
+
+			NIH_LIST_FOREACH (&dep->deps, dep_iter) {
+				NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+
+				if (dep_entry->data == mnt)
+					tag_mount (dep, tag);
 			}
 		}
 	}

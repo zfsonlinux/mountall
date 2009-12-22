@@ -1,3 +1,17 @@
+mountall (2.1) UNRELEASED; urgency=low
+
+  * Still having problems with the mount-point tagging that decides whether
+    a given filesystem is virtual, local or remote.  Apply further fixes
+    in an attempt to reduce problems:
+    - don't use the prior fstab entry of virtual filesystems when the
+      device spec matches the filesystem type (as well as "none")
+    - inherit local and remote tags of device parents and prior fstab entries
+      as well as mountpoint parents
+    - fix inheritance to also work when fstab is out-of-order (e.g. /mnt/proc
+      before /proc)
+
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
+
 mountall (2.0) lucid; urgency=low
 
   [ Scott James Remnant ]
