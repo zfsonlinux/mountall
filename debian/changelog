@@ -9,6 +9,8 @@ mountall (2.1) UNRELEASED; urgency=low
       as well as mountpoint parents
     - fix inheritance to also work when fstab is out-of-order (e.g. /mnt/proc
       before /proc)
+  * Don't assert() when skip_mount() called on a filesystem that needs to
+    be remounted.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
 
