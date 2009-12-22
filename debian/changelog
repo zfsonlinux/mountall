@@ -11,6 +11,7 @@ mountall (2.1) UNRELEASED; urgency=low
       before /proc)
   * Don't assert() when skip_mount() called on a filesystem that needs to
     be remounted.
+  * Don't trigger the swap event more than once.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
 
