@@ -1379,6 +1379,7 @@ trigger_events (void)
 	    && (num_swap_mounted == num_swap)) {
 		nih_info ("swap finished");
 		emit_event ("all-swaps", NULL);
+		swap_triggered = TRUE;
 	}
 
 	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
