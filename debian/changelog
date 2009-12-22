@@ -1,4 +1,4 @@
-mountall (2.1) UNRELEASED; urgency=low
+mountall (2.1) lucid; urgency=low
 
   * Still having problems with the mount-point tagging that decides whether
     a given filesystem is virtual, local or remote.  Apply further fixes
@@ -20,7 +20,7 @@ mountall (2.1) UNRELEASED; urgency=low
     remount them if read-only.
   * Start maintenance shell should mountall crash.
 
- -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 16:31:42 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 22 Dec 2009 18:48:13 +0000
 
 mountall (2.0) lucid; urgency=low
 
