@@ -1158,7 +1158,11 @@ tag_mount (Mount *mnt,
 			}
 		} else if (mnt->nodev
 			   && strcmp (mnt->type, "fuse")) {
-			tag = TAG_VIRTUAL;
+			if (! has_option (mnt, "nobootwait", FALSE)) {
+				tag = TAG_VIRTUAL;
+			} else {
+				tag = TAG_NOWAIT;
+			}
 		} else {
 			if (! has_option (mnt, "nobootwait", FALSE)) {
 				tag = TAG_LOCAL;
