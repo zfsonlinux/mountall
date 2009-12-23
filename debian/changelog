@@ -1,9 +1,9 @@
-mountall (2.2) UNRELEASED; urgency=low
+mountall (2.2) lucid; urgency=low
 
   * Allow the "nobootwait" option for virtual devices too (which we
     ordinarily wait for all of).
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 23 Dec 2009 03:58:50 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 23 Dec 2009 03:59:45 +0000
 
 mountall (2.1) lucid; urgency=low
 
