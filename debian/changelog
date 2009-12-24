@@ -1,9 +1,9 @@
-mountall (2.3) UNRELEASED; urgency=low
+mountall (2.3) lucid; urgency=low
 
   * conf/mounted-dev.conf: even with devtmpfs we need to make a few symlinks
     (/dev/fd, /dev/std{in,out,err})
 
- -- Scott James Remnant <scott@ubuntu.com>  Thu, 24 Dec 2009 02:31:23 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Thu, 24 Dec 2009 02:35:35 +0000
 
 mountall (2.2) lucid; urgency=low
 
