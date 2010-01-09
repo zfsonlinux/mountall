@@ -1292,6 +1292,8 @@ mounted (Mount *mnt)
 		break;
 	case TAG_NOWAIT:
 		break;
+	case TAG_UNKNOWN:
+		break;
 	default:
 		nih_assert_not_reached ();
 	}
@@ -1323,6 +1325,8 @@ skip_mount (Mount *mnt)
 		num_swap--;
 		break;
 	case TAG_NOWAIT:
+		break;
+	case TAG_UNKNOWN:
 		break;
 	default:
 		nih_assert_not_reached ();
