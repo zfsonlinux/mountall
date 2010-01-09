@@ -305,6 +305,14 @@ static ply_boot_client_t *ply_boot_client = NULL;
  **/
 static int plymouth_connected = FALSE;
 
+/**
+ * boredom_timer:
+ *
+ * Having waited over BOREDOM_TIMEOUT seconds for certain mounts, print a
+ * message to the user.
+ **/
+static NihTimer *boredom_timer = NULL;
+
 
 /**
  * daemonise:
@@ -2538,7 +2546,6 @@ fsck_update (void)
 			   ioprio_low;
 
 	int                fsck_running = FALSE;
-	static NihTimer *  boredom_timer = NULL;
 
 	ioprio_normal = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_BE, IOPRIO_NORM);
 	ioprio_low = IOPRIO_PRIO_VALUE (IOPRIO_CLASS_IDLE, 7);
@@ -2598,12 +2605,12 @@ fsck_update (void)
 	/* Reset timeout each pass through, since activity has taken place;
 	 * don't restore the timeout while fsck is running.
 	 */
-	if (boredom_timer)
+	if (boredom_timer) {
 		nih_free (boredom_timer);
-
-	if (fsck_running) {
 		boredom_timer = NULL;
-	} else {
+	}
+
+	if (! fsck_running) {
 		boredom_timer = NIH_MUST (nih_timer_add_timeout (
 						  NULL, BOREDOM_TIMEOUT,
 						  boredom_timeout, NULL));
@@ -2667,6 +2674,8 @@ void
 boredom_timeout (void *    data,
 		 NihTimer *timer)
 {
+	boredom_timer = NULL;
+
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *           mnt = (Mount *)iter;
 		nih_local char *  message = NULL;
