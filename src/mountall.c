@@ -2963,6 +2963,8 @@ main (int   argc,
 		nih_warn (_("Could not connect to Plymouth"));
 	}
 
+	mounts = NIH_MUST (nih_list_new (NULL));
+
 	/* Parse /proc/filesystems to find out which filesystems don't
 	 * have devices.
 	 */
@@ -2972,7 +2974,6 @@ main (int   argc,
 	 * from /etc/fstab and /proc/self/mountinfo to find out what else
 	 * we need to do.
 	 */
-	mounts = NIH_MUST (nih_list_new (NULL));
 	parse_fstab (BUILTIN_FSTAB);
 	parse_fstab (_PATH_MNTTAB);
 	parse_mountinfo ();

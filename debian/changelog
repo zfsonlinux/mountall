@@ -1,3 +1,11 @@
+mountall (2.4~) UNRELEASED; urgency=low
+
+  * src/mountall.c: The mount table needs to exist for parse_filesystems
+    - parse_filesystems() could call mount_proc(), which would call
+      find_mount() and segfault.  LP: #503212.
+
+ -- Johan Kiviniemi <debian@johan.kiviniemi.name>  Sat, 09 Jan 2010 05:48:25 +0200
+
 mountall (2.3) lucid; urgency=low
 
   * conf/mounted-dev.conf: even with devtmpfs we need to make a few symlinks
