@@ -2690,13 +2690,17 @@ boredom_timeout (void *    data,
 		if (mnt->tag == TAG_NOWAIT)
 			continue;
 
+		nih_debug ("Waiting for %s", MOUNT_NAME (mnt));
+
 		message = NIH_MUST (nih_sprintf (NULL, _("Waiting for %s [SM]"),
 						 MOUNT_NAME (mnt)));
 
 		answer = plymouth_prompt (NULL, message, "SsMm");
-		if ((! answer)
-		    || (answer[0] == 'S')
-		    || (answer[0] == 's')) {
+		if (! answer) {
+			nih_debug ("Could not prompt user; no action");
+
+		} else if ((answer[0] == 'S')
+		           || (answer[0] == 's')) {
 			nih_message (_("Skipping %s at user request"),
 				     MOUNT_NAME (mnt));
 			skip_mount (mnt);
