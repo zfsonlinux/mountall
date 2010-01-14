@@ -1,4 +1,4 @@
-mountall (2.4) UNRELEASED; urgency=low
+mountall (2.4) lucid; urgency=low
 
   * conf/mountall-net.conf: only send SIGUSR1 to the main process, not to
     any pre-start or post-stop script we might have; killing the post-stop
@@ -14,7 +14,7 @@ mountall (2.4) UNRELEASED; urgency=low
   * src/mountall.c: Default to no action for boredom query if prompt fails.
     LP: #505530.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 14 Jan 2010 04:25:17 -0800
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 14 Jan 2010 05:30:13 -0800
 
 mountall (2.3) lucid; urgency=low
 
