@@ -5,6 +5,15 @@ mountall (2.4) UNRELEASED; urgency=low
     script with -USR1, though an unlikely race to hit, is definitely wrong.
     LP: #506902.
 
+  [ Johan Kiviniemi ]
+  * src/mountall.c: The mount table needs to exist for parse_filesystems
+    - parse_filesystems() could call mount_proc(), which would call
+      find_mount() and segfault.  LP: #503212.
+  * src/mountall.c: Handle TAG_UNKNOWN.  LP: #505748.
+  * src/mountall.c: Ensure boredom_timer is set to NULL when freeing
+  * src/mountall.c: Default to no action for boredom query if prompt fails.
+    LP: #505530.
+
  -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 14 Jan 2010 04:25:17 -0800
 
 mountall (2.3) lucid; urgency=low
