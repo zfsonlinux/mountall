@@ -1,4 +1,4 @@
-mountall (2.5) UNRELEASED; urgency=low
+mountall (2.5) lucid; urgency=low
 
   * conf/mounted-dev.conf:
     - Go back to copying from /lib/udev/devices, this is much faster for
@@ -9,7 +9,7 @@ mountall (2.5) UNRELEASED; urgency=low
       /dev/null again as otherwise the whole system falls apart (even init).
       LP: #513919. 
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 17 Feb 2010 11:09:08 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 17 Feb 2010 11:56:41 +0000
 
 mountall (2.4) lucid; urgency=low
 
