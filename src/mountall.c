@@ -1277,8 +1277,12 @@ mounted (Mount *mnt)
 	 * system in a way that it's not really going to expect.
 	 */
 	if (! strcmp (mnt->mountpoint, "/dev")) {
+		mode_t mask;
+		
+		mask = umask (0000);
 		mknod ("/dev/console", S_IFCHR | 0600, makedev (5, 1));
 		mknod ("/dev/null", S_IFCHR | 0666, makedev (1, 3));
+		umask (mask);
 	}
 
 	emit_event ("mounted", mnt);
