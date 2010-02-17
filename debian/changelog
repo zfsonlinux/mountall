@@ -1,3 +1,12 @@
+mountall (2.5) UNRELEASED; urgency=low
+
+  * conf/mounted-dev.conf:
+    - Go back to copying from /lib/udev/devices, this is much faster for
+      the devtmpfs case since almost all devices will already exist.
+      LP: #507162.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 17 Feb 2010 11:09:08 +0000
+
 mountall (2.4) lucid; urgency=low
 
   * conf/mountall-net.conf: only send SIGUSR1 to the main process, not to
