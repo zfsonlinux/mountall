@@ -1273,6 +1273,14 @@ mounted (Mount *mnt)
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
 
+	/* This is a completely special case, because we just broke the
+	 * system in a way that it's not really going to expect.
+	 */
+	if (! strcmp (mnt->mountpoint, "/dev")) {
+		mknod ("/dev/console", S_IFCHR | 0600, makedev (5, 1));
+		mknod ("/dev/null", S_IFCHR | 0666, makedev (1, 3));
+	}
+
 	emit_event ("mounted", mnt);
 
 	/* Any previous mount options no longer apply

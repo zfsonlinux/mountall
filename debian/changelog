@@ -4,6 +4,10 @@ mountall (2.5) UNRELEASED; urgency=low
     - Go back to copying from /lib/udev/devices, this is much faster for
       the devtmpfs case since almost all devices will already exist.
       LP: #507162.
+  * src/mountall.c:
+    - If we mount something new over /dev, we need to make /dev/console and
+      /dev/null again as otherwise the whole system falls apart (even init).
+      LP: #513919. 
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 17 Feb 2010 11:09:08 +0000
 
