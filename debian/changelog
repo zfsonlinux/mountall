@@ -1,3 +1,10 @@
+mountall (2.6) lucid; urgency=low
+
+  * debian/control: add versioned-dependency on coreutils to get "cp -n"
+    LP: #527829.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Fri, 26 Feb 2010 16:16:24 +0000
+
 mountall (2.5) lucid; urgency=low
 
   * conf/mounted-dev.conf:
