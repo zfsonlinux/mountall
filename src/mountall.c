@@ -77,6 +77,7 @@
 
 #define BOREDOM_TIMEOUT 3
 
+#define ACTION_MESSAGE_PREFIX "keys:"
 
 enum exit {
 	EXIT_OK = 0,		/* Ok */
@@ -2764,7 +2765,7 @@ plymouth_progress (Mount *mnt,
 					       NULL);
 
 		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"[C]",
+								"keys:Press C to skip the disk check",
 								plymouth_response,
 								plymouth_response,
 								NULL);
@@ -2776,7 +2777,7 @@ plymouth_progress (Mount *mnt,
 								   NULL);
 	} else {
 		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"",
+								"keys:",
 								plymouth_response,
 								plymouth_response,
 								NULL);
@@ -2796,14 +2797,22 @@ plymouth_prompt (const void *parent,
 {
 	char *answer;
 
+	nih_local char *action_message = NULL;
+
 	nih_assert (message != NULL);
 	nih_assert (keys != NULL);
 
 	if (! plymouth_is_connected ())
 		return NULL;
 
+	/* Prepend the prefix so that plymouth knows that the message
+	 * may require an action.
+	 */  
+	action_message = NIH_MUST (nih_sprintf (NULL, "%s%s", ACTION_MESSAGE_PREFIX,
+								message));
+
 	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-							message,
+							action_message,
 							plymouth_response,
 							plymouth_response,
 							NULL);
@@ -2820,7 +2829,7 @@ plymouth_prompt (const void *parent,
 	ply_boot_client_attach_to_event_loop (ply_boot_client, ply_event_loop);
 
 	ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-							"",
+							"keys:",
 							plymouth_response,
 							plymouth_response,
 							NULL);

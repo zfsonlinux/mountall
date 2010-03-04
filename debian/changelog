@@ -1,3 +1,11 @@
+mountall (2.7) lucid; urgency=low
+
+  * src/mountall.c:
+    - Prepend "keys:" to messages which require user interaction in
+      plymouth.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 04 Mar 2010 16:02:04 +0100
+
 mountall (2.6) lucid; urgency=low
 
   * debian/control: add versioned-dependency on coreutils to get "cp -n"
