@@ -3111,6 +3111,8 @@ main (int   argc,
 
 	ret = nih_main_loop ();
 
+	dbus_connection_flush (connection);
+
 	return ret;
 }
 
