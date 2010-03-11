@@ -4,6 +4,7 @@ mountall (2.8) UNRELEASED; urgency=low
     - Flush the D-Bus connection queue before exiting, otherwise we can
       end up leaving important events like "filesystem" in the memory queue
       without ever sending it on the socket.  LP: #533054.
+    - Move the message about disks being checked here from plymouth.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 09 Mar 2010 14:45:57 +0000
 

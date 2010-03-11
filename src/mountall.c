@@ -2765,6 +2765,13 @@ plymouth_progress (Mount *mnt,
 					       NULL);
 
 		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"Your disk drives need to be checked for errors, this may take some time",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
 								"keys:Press C to skip the disk check",
 								plymouth_response,
 								plymouth_response,
