@@ -2784,6 +2784,12 @@ plymouth_progress (Mount *mnt,
 								   NULL);
 	} else {
 		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
+								"",
+								plymouth_response,
+								plymouth_response,
+								NULL);
+
+		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
 								"keys:",
 								plymouth_response,
 								plymouth_response,
