@@ -1,4 +1,4 @@
-mountall (2.8) UNRELEASED; urgency=low
+mountall (2.8) lucid; urgency=low
 
   * src/mountall.c:
     - Flush the D-Bus connection queue before exiting, otherwise we can
@@ -14,7 +14,7 @@ mountall (2.8) UNRELEASED; urgency=low
   * debian/control:
     - Bump build-dependency
 
- -- Scott James Remnant <scott@ubuntu.com>  Tue, 09 Mar 2010 14:45:57 +0000
+ -- Scott James Remnant <scott@ubuntu.com>  Fri, 12 Mar 2010 18:22:51 +0000
 
 mountall (2.7) lucid; urgency=low
 
