@@ -29,7 +29,7 @@ mountall_LDADD = \
 	$(NIH_DBUS_LIBS) \
 	$(DBUS_LIBS) \
 	$(UDEV_LIBS) \
-	$(PLYMOUTH_LIBS) -lplybootclient \
+	$(PLYMOUTH_LIBS) \
 	$(LTLIBINTL)
 
 
