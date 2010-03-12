@@ -5,6 +5,14 @@ mountall (2.8) UNRELEASED; urgency=low
       end up leaving important events like "filesystem" in the memory queue
       without ever sending it on the socket.  LP: #533054.
     - Move the message about disks being checked here from plymouth.
+  * configure.ac:
+    - Now that it's upstream, there's a proper ply-boot-client.pc file for
+      the boot client library we want.
+  * src/Makefile.am:
+    - Which means we don't need to manually include -lplybootclient (the
+      library changed names anyway)
+  * debian/control:
+    - Bump build-dependency
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 09 Mar 2010 14:45:57 +0000
 

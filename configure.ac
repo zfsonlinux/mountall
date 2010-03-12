@@ -29,7 +29,7 @@ PKG_CHECK_MODULES([NIH], [libnih >= 1.0.0])
 PKG_CHECK_MODULES([NIH_DBUS], [libnih-dbus >= 1.0.0])
 PKG_CHECK_MODULES([DBUS], [dbus-1 >= 1.2.16])
 PKG_CHECK_MODULES([UDEV], [libudev >= 146])
-PKG_CHECK_MODULES([PLYMOUTH], [plymouth-1 >= 0.8.0])
+PKG_CHECK_MODULES([PLYMOUTH], [ply-boot-client >= 0.8.0])
 
 # Checks for header files.
 
