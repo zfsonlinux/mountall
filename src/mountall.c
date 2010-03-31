@@ -3292,6 +3292,10 @@ main (int   argc,
 	/* Flush the D-Bus connection to ensure all messages are sent */
 	dbus_connection_flush (connection);
 
+	/* Flush the Plymouth connection to ensure all updates are sent */
+	if (ply_boot_client)
+		ply_boot_client_flush (ply_boot_client);
+
 	return ret;
 }
 
