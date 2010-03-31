@@ -9,6 +9,11 @@ mountall (2.10) UNRELEASED; urgency=low
     presence or not of this struct tells us whether we're connected or not.
     LP: #524708.
 
+  * Replace the modal plymouth prompt for error conditions with code that
+    continues working in the background while prompting.  This most benefits
+    the old "Waiting for" message, which can now allow you to continue to
+    wait and it can solve itself.  LP: #527666.
+
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
 mountall (2.9) lucid; urgency=low
