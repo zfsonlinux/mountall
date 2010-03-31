@@ -255,6 +255,19 @@ size_t num_swap_mounted = 0;
 int newly_mounted = FALSE;
 
 /**
+ * fsck_in_progress:
+ *
+ * Set to TRUE while filesystem checks are in progress, this isn't quite the
+ * same as fsck being running (which fsck_update) checks since fsck might
+ * decide not to check the filesystems.
+ *
+ * Therefore this gets set to TRUE when we receive the first progress
+ * information in fsck_progress(), and reset to FALSE in fsck_update() when
+ * no fsck is running.
+ **/
+int fsck_in_progress = FALSE;
+
+/**
  * filesystems:
  *
  * Array of filesystem information parsed from /proc/filesystems, primarily
@@ -2636,10 +2649,8 @@ fsck_update (void)
 						  boredom_timeout, NULL));
 
 		/* Clear messages from Plymouth */
-		if (plymouth_error == ERROR_FSCK_IN_PROGRESS) {
-			plymouth_error = ERROR_NONE;
-			plymouth_update (FALSE);
-		}
+		fsck_in_progress = FALSE;
+		plymouth_update (FALSE);
 	}
 }
 
@@ -2782,10 +2793,8 @@ plymouth_progress (Mount *mnt,
 	/* When not displaying any other errors, display the fsck in progress
 	 * (which silences other errors until done)
 	 */
-	if (plymouth_error == ERROR_NONE) {
-		plymouth_error = ERROR_FSCK_IN_PROGRESS;
-		plymouth_update (FALSE);
-	}
+	fsck_in_progress = TRUE;
+	plymouth_update (FALSE);
 
 	/* Don't display progress information over top of other errors */
 	if (plymouth_error != ERROR_FSCK_IN_PROGRESS)
@@ -2843,7 +2852,10 @@ plymouth_update (int only_clear)
 	 * clear the message.
 	 */
 	if (plymouth_error != ERROR_NONE) {
-		if ((! plymouth_mnt) || (plymouth_mnt->error == plymouth_error))
+		if (plymouth_mnt && (plymouth_mnt->error == plymouth_error))
+			return;
+		if ((plymouth_error == ERROR_FSCK_IN_PROGRESS)
+		    && fsck_in_progress)
 			return;
 
 		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
@@ -2872,6 +2884,9 @@ plymouth_update (int only_clear)
 
 
 	/* Look for the best message to display */
+	if (fsck_in_progress)
+		plymouth_error = ERROR_FSCK_IN_PROGRESS;
+
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
