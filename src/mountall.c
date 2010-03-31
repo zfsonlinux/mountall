@@ -210,13 +210,10 @@ void   fsck_reader           (Mount *mnt, NihIo *io,
 			      const char *buf, size_t len);
 void   boredom_timeout       (void *data, NihTimer *timer);
 
-void   plymouth_progress     (Mount *mnt, int progress);
-void   plymouth_cancel_fsck  (void *user_data, const char *keys,
-			      ply_boot_client_t *client);
-
 int    plymouth_connect      (void);
 void   plymouth_disconnected (void *user_data, ply_boot_client_t *client);
 
+void   plymouth_progress     (Mount *mnt, int progress);
 void   plymouth_update       (int only_clear);
 
 void   plymouth_response     (void *user_data, ply_boot_client_t *client);
@@ -2605,8 +2602,11 @@ fsck_update (void)
 						  NULL, BOREDOM_TIMEOUT,
 						  boredom_timeout, NULL));
 
-		/* Clear any cancel prompt */
-		plymouth_progress (NULL, 0);
+		/* Clear messages from Plymouth */
+		if (plymouth_error == ERROR_FSCK_IN_PROGRESS) {
+			plymouth_error = ERROR_NONE;
+			plymouth_update (FALSE);
+		}
 	}
 }
 
@@ -2689,87 +2689,6 @@ boredom_timeout (void *    data,
 }
 
 
-void
-plymouth_progress (Mount *mnt,
-		   int    progress)
-{
-	if (! plymouth_connect ())
-		return;
-
-	if (mnt) {
-		nih_local char *update = NULL;
-
-		progress = nih_max (nih_min (progress, 100), 0);
-
-		update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
-						MOUNT_NAME (mnt), progress));
-
-		ply_boot_client_update_daemon (ply_boot_client, update,
-					       plymouth_response,
-					       plymouth_response,
-					       NULL);
-
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"Your disk drives need to be checked for errors, this may take some time",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"keys:Press C to skip the disk check",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-		ply_boot_client_ask_daemon_to_watch_for_keystroke (ply_boot_client,
-								   "Cc",
-								   plymouth_cancel_fsck,
-								   plymouth_response,
-								   NULL);
-	} else {
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-		ply_boot_client_tell_daemon_to_display_message (ply_boot_client,
-								"keys:",
-								plymouth_response,
-								plymouth_response,
-								NULL);
-
-		ply_boot_client_ask_daemon_to_ignore_keystroke (ply_boot_client,
-								"Cc",
-								(ply_boot_client_answer_handler_t)plymouth_response,
-								plymouth_response,
-								NULL);
-	}
-}
-
-void
-plymouth_cancel_fsck (void *             user_data,
-		      const char *       keys,
-		      ply_boot_client_t *client)
-{
-	if (! keys)
-		return;
-	if ((keys[0] != 'C')
-	    && (keys[0] != 'c'))
-		return;
-
-	nih_info (_("User cancelled filesystem check."));
-
-	NIH_LIST_FOREACH (mounts, iter) {
-		Mount *mnt = (Mount *)iter;
-
-		if (mnt->fsck_pid > 0)
-			kill (mnt->fsck_pid, SIGTERM);
-	}
-}
-
-
 int
 plymouth_connect (void)
 {
@@ -2814,6 +2733,42 @@ plymouth_disconnected (void *             user_data,
 	ply_boot_client = NULL;
 }
 
+
+void
+plymouth_progress (Mount *mnt,
+		   int    progress)
+{
+	nih_local char *update = NULL;
+
+	nih_assert (mnt != NULL);
+
+	/* No Plymouth => no progress information */
+	if (! plymouth_connect ())
+		return;
+
+	/* When not displaying any other errors, display the fsck in progress
+	 * (which silences other errors until done)
+	 */
+	if (plymouth_error == ERROR_NONE) {
+		plymouth_error = ERROR_FSCK_IN_PROGRESS;
+		plymouth_update (FALSE);
+	}
+
+	/* Don't display progress information over top of other errors */
+	if (plymouth_error != ERROR_FSCK_IN_PROGRESS)
+		return;
+
+	/* Clamp the progress and sent to plymouth */
+	progress = nih_max (nih_min (progress, 100), 0);
+
+	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
+					MOUNT_NAME (mnt), progress));
+
+	ply_boot_client_update_daemon (ply_boot_client, update,
+				       plymouth_response,
+				       plymouth_failed,
+				       NULL);
+}
 
 void
 plymouth_update (int only_clear)
@@ -2884,7 +2839,7 @@ plymouth_update (int only_clear)
 		}
 	}
 
-	if (! plymouth_mnt)
+	if (plymouth_error == ERROR_NONE)
 		return;
 
 	/* Display that message */
@@ -2916,6 +2871,12 @@ plymouth_update (int only_clear)
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
 						      _("Press S to skip mounting or M for manual recovery")));
 		plymouth_keys = "SsMm";
+		break;
+	case ERROR_FSCK_IN_PROGRESS:
+		message = NIH_MUST (nih_strdup (NULL, _("Your disk drives are being checked for errors, this may take some time")));
+		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
+						      _("Press C to to cancel all checks currently in progress")));
+		plymouth_keys = "Cc";
 		break;
 	default:
 		nih_assert_not_reached ();
@@ -2999,9 +2960,6 @@ plymouth_answer (void *             user_data,
 	case 'S':
 		nih_assert (mnt->error != ERROR_FSCK_IN_PROGRESS);
 
-		mnt->error = ERROR_NONE;
-		plymouth_update (FALSE);
-
 		nih_message (_("Skipping %s at user request"),
 			     MOUNT_NAME (mnt));
 
@@ -3021,6 +2979,22 @@ plymouth_answer (void *             user_data,
 			exit (EXIT_SHELL_REBOOT);
 		} else {
 			exit (EXIT_SHELL);
+		}
+		break;
+	case 'c':
+	case 'C':
+		nih_assert (mnt->error == ERROR_FSCK_IN_PROGRESS);
+
+		mnt->error = ERROR_NONE;
+		plymouth_update (FALSE);
+
+		nih_message (_("User cancelled filesystem checks"));
+
+		NIH_LIST_FOREACH (mounts, iter) {
+			Mount *mnt = (Mount *)iter;
+
+			if (mnt->fsck_pid > 0)
+				kill (mnt->fsck_pid, SIGTERM);
 		}
 		break;
 	default:

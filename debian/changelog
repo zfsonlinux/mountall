@@ -13,6 +13,9 @@ mountall (2.10) UNRELEASED; urgency=low
     continues working in the background while prompting.  This most benefits
     the old "Waiting for" message, which can now allow you to continue to
     wait and it can solve itself.  LP: #527666, #545435.
+  * Integrate fsck progress updates into the same mechanism.
+  * Allow fsck messages to be translated.  LP: #390740.
+  * Change fsck message to be a little less alarming.  LP: #545267.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
