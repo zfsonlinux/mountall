@@ -31,6 +31,8 @@ mountall (2.10) UNRELEASED; urgency=low
   * Wait for Upstart to acknowledge receipt of events, even if we don't
     hang around for them to be handled.
   * Always run through try_mounts() at least once.  LP: #537136.
+  * Don't keep mountall running if the only remaining unmounted filesystems
+    are those the user has explicitly said to skip.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
