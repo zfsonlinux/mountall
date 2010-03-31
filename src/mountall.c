@@ -1728,7 +1728,6 @@ run_mount (Mount *mnt,
 	} else if (mnt->has_showthrough) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
-	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-a"));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-t"));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->type));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-o"));

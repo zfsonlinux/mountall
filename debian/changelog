@@ -23,6 +23,8 @@ mountall (2.10) UNRELEASED; urgency=low
     we try again, and this just spams the console.  LP: #504224. 
 
   * Do not try and update /etc/mtab when it's a symbolic link.  LP: #529993.
+  * Remove odd -a option from mount calls, probably a C&P error from the
+    fsck code long ago.  LP: #537135.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
