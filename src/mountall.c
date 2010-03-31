@@ -1142,23 +1142,23 @@ mount_policy (void)
 
 		switch (mnt->tag) {
 		case TAG_VIRTUAL:
-			nih_debug ("%s is virtual", MOUNT_NAME (mnt));
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "virtual");
 			num_virtual++;
 			break;
 		case TAG_LOCAL:
-			nih_debug ("%s is local", MOUNT_NAME (mnt));
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "local");
 			num_local++;
 			break;
 		case TAG_REMOTE:
-			nih_debug ("%s is remote", MOUNT_NAME (mnt));
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "remote");
 			num_remote++;
 			break;
 		case TAG_SWAP:
-			nih_debug ("%s is swap", MOUNT_NAME (mnt));
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "swap");
 			num_swap++;
 			break;
 		case TAG_NOWAIT:
-			nih_debug ("%s is no-wait", MOUNT_NAME (mnt));
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "nowait");
 			break;
 		default:
 			nih_assert_not_reached ();
@@ -1398,7 +1398,7 @@ trigger_events (void)
 	/* Virtual may be triggered at any time */
 	if ((! virtual_triggered)
 	    && (num_virtual_mounted == num_virtual)) {
-		nih_info ("virtual finished");
+		nih_info (_("%s finished"), "virtual");
 		emit_event ("virtual-filesystems", NULL);
 		virtual_triggered = TRUE;
 	}
@@ -1407,7 +1407,7 @@ trigger_events (void)
 	if ((! local_triggered)
 	    && virtual_triggered
 	    && (num_local_mounted == num_local)) {
-		nih_info ("local finished");
+		nih_info (_("%s finished"), "local");
 		emit_event ("local-filesystems", NULL);
 		local_triggered = TRUE;
 	}
@@ -1416,7 +1416,7 @@ trigger_events (void)
 	if ((! remote_triggered)
 	    && virtual_triggered
 	    && (num_remote_mounted == num_remote)) {
-		nih_info ("remote finished");
+		nih_info (_("%s finished"), "remote");
 		emit_event ("remote-filesystems", NULL);
 		remote_triggered = TRUE;
 	}
@@ -1426,7 +1426,7 @@ trigger_events (void)
 	    && virtual_triggered
 	    && local_triggered
 	    && remote_triggered) {
-		nih_info ("filesystem mounted");
+		nih_info (_("All filesystems mounted"));
 		emit_event ("filesystem", NULL);
 		filesystem_triggered = TRUE;
 	}
@@ -1434,12 +1434,12 @@ trigger_events (void)
 	/* Swaps may be triggered at any time */
 	if ((! swap_triggered)
 	    && (num_swap_mounted == num_swap)) {
-		nih_info ("swap finished");
+		nih_info (_("%s finished"), "swap");
 		emit_event ("all-swaps", NULL);
 		swap_triggered = TRUE;
 	}
 
-	nih_debug ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
+	nih_info ("local %zi/%zi remote %zi/%zi virtual %zi/%zi swap %zi/%zi",
 		   num_local_mounted, num_local,
 		   num_remote_mounted, num_remote,
 		   num_virtual_mounted, num_virtual,
@@ -1557,7 +1557,7 @@ spawn (Mount *         mnt,
 		nih_local char *msg = NULL;
 
 		if (setpgid (0, 0) < 0)
-			nih_warn ("setpgid: %s", strerror (errno));
+			nih_warn (_("setpgid failed: %s"), strerror (errno));
 
 		for (char * const *arg = args; arg && *arg; arg++)
 			NIH_MUST (nih_strcat_sprintf (&msg, NULL, msg ? " %s" : "%s", *arg));
@@ -1637,10 +1637,11 @@ spawn_child_handler (Process *      proc,
 
 		status <<= 8;
 	} else if (status) {
-		nih_warn ("%s %s [%d] terminated with status %d", proc->args[0],
+		nih_warn (_("%s %s [%d] terminated with status %d"),
+			  proc->args[0],
 			  MOUNT_NAME (proc->mnt), pid, status);
 	} else {
-		nih_info ("%s %s [%d] exited normally", proc->args[0],
+		nih_info (_("%s %s [%d] exited normally"), proc->args[0],
 			  MOUNT_NAME (proc->mnt), pid);
 	}
 
@@ -1668,7 +1669,7 @@ run_mount (Mount *mnt,
 		return;
 	} else if (mnt->mounted) {
 		if (needs_remount (mnt)) {
-			nih_info ("remounting %s", MOUNT_NAME (mnt));
+			nih_info (_("remounting %s"), MOUNT_NAME (mnt));
 		} else {
 			nih_debug ("%s: already mounted", MOUNT_NAME (mnt));
 			return;
@@ -1679,7 +1680,7 @@ run_mount (Mount *mnt,
 		mounted (mnt);
 		return;
 	} else {
-		nih_info ("mounting %s", MOUNT_NAME (mnt));
+		nih_info (_("mounting %s"), MOUNT_NAME (mnt));
 	}
 
 	if (mkdir (mnt->mountpoint, 0755) < 0) {
@@ -1777,7 +1778,7 @@ run_mount_finished (Mount *mnt,
 	mnt->mount_pid = -1;
 
 	if (status) {
-		nih_error ("Filesystem could not be mounted: %s",
+		nih_error (_("Filesystem could not be mounted: %s"),
 			   MOUNT_NAME (mnt));
 
 		if (! is_remote (mnt)) {
@@ -1821,7 +1822,7 @@ run_swapon (Mount *mnt)
 		return;
 	}
 
-	nih_info ("activating %s", MOUNT_NAME (mnt));
+	nih_info (_("activating %s"), MOUNT_NAME (mnt));
 
 	args = NIH_MUST (nih_str_array_new (NULL));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "swapon"));
@@ -1851,7 +1852,7 @@ run_swapon_finished (Mount *mnt,
 	 * carry on regardless if it failed.
 	 */
 	if (status)
-		nih_warn ("Problem activating swap: %s", MOUNT_NAME (mnt));
+		nih_warn (_("Problem activating swap: %s"), MOUNT_NAME (mnt));
 
 	mounted (mnt);
 }
@@ -1893,7 +1894,7 @@ run_fsck (Mount *mnt)
 		return;
 	}
 
-	nih_info ("checking %s", MOUNT_NAME (mnt));
+	nih_info (_("checking %s"), MOUNT_NAME (mnt));
 
 	/* Create a pipe to receive progress indication */
 	if (pipe2 (fds, O_CLOEXEC) < 0) {
@@ -1964,7 +1965,7 @@ run_fsck_finished (Mount *mnt,
 
 	/* Handle errors */
 	if (status & 2) {
-		nih_error ("System must be rebooted: %s", MOUNT_NAME (mnt));
+		nih_error (_("System must be rebooted: %s"), MOUNT_NAME (mnt));
 		exit (EXIT_REBOOT);
 
  	} else if ((status & (4 | 8 | 16 | 128)) || (status > 255)) {
@@ -1984,12 +1985,12 @@ run_fsck_finished (Mount *mnt,
 		return;
 
 	} else if ((status & 32) || (status == SIGTERM)) {
-		nih_info ("Filesytem check cancelled: %s", MOUNT_NAME (mnt));
+		nih_info (_("Filesytem check cancelled: %s"), MOUNT_NAME (mnt));
 
 		/* Fall through */
 
 	} else if (status & 1) {
-		nih_info ("Filesystem errors corrected: %s", MOUNT_NAME (mnt));
+		nih_info (_("Filesystem errors corrected: %s"), MOUNT_NAME (mnt));
 
 		/* Fall through */
 
@@ -2089,7 +2090,8 @@ mount_showthrough (Mount *root)
 
 	if ((rmdir (mountpoint) < 0)
 	    && (errno != EEXIST))
-		nih_warn ("rmdir %s: %s", mountpoint, strerror (errno));
+		nih_warn (_("rmdir %s failed: %s"),
+			  mountpoint, strerror (errno));
 
 	if (written_mtab)
 		run_mount (root, TRUE);
@@ -2585,7 +2587,7 @@ fsck_update (void)
 
 		if (ioprio_set (IOPRIO_WHO_PGRP, mnt->fsck_pid,
 				low_prio ? ioprio_low : ioprio_normal) < 0)
-			nih_warn ("ioprio_set %d: %s",
+			nih_warn (_("ioprio_set %d failed: %s"),
 				  mnt->fsck_pid, strerror (errno));
 	}
 
@@ -3221,7 +3223,7 @@ void
 usr1_handler (void *     data,
 	      NihSignal *signal)
 {
-	nih_debug ("Received SIGUSR1 (network device up)");
+	nih_info (_("Received SIGUSR1 (network device up)"));
 
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
