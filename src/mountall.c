@@ -1778,12 +1778,15 @@ run_mount_finished (Mount *mnt,
 	mnt->mount_pid = -1;
 
 	if (status) {
-		nih_error (_("Filesystem could not be mounted: %s"),
-			   MOUNT_NAME (mnt));
-
 		if (! is_remote (mnt)) {
+			nih_error (_("Filesystem could not be mounted: %s"),
+				   MOUNT_NAME (mnt));
+
 			mnt->error = ERROR_MOUNT_FAILED;
 			plymouth_update (FALSE);
+		} else {
+			nih_info (_("Filesystem could not be mounted: %s"),
+				   MOUNT_NAME (mnt));
 		}
 
 		return;
