@@ -2834,6 +2834,8 @@ plymouth_update (int only_clear)
 				}
 			}
 		}
+
+		return;
 	}
 
 	/* If we're already displaying messages, don't change them unless
