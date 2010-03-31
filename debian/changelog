@@ -22,6 +22,8 @@ mountall (2.10) UNRELEASED; urgency=low
   * Reduce priority of failed to mount error for remote filesystems since
     we try again, and this just spams the console.  LP: #504224. 
 
+  * Do not try and update /etc/mtab when it's a symbolic link.  LP: #529993.
+
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
 mountall (2.9) lucid; urgency=low

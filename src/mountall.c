@@ -2009,7 +2009,7 @@ write_mtab (void)
 {
 	int mtab;
 
-	if (((mtab = open (_PATH_MOUNTED, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0)
+	if (((mtab = open (_PATH_MOUNTED, O_CREAT | O_TRUNC | O_NOFOLLOW | O_WRONLY, 0644)) < 0)
 	    || (close (mtab) < 0))
 		return;
 
