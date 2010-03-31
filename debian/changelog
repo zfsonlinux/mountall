@@ -19,6 +19,8 @@ mountall (2.10) UNRELEASED; urgency=low
 
   * Improve set of messages seen with --verbose, and ensure all visible
     messages are marked for translation.  LP: #446592.
+  * Reduce priority of failed to mount error for remote filesystems since
+    we try again, and this just spams the console.  LP: #504224. 
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
