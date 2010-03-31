@@ -2788,7 +2788,14 @@ plymouth_update (int only_clear)
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
-			if (mnt->error != ERROR_NONE) {
+			if (mnt->error == ERROR_BORED) {
+				nih_error (_("Skipping mounting %s since Plymouth is not available"),
+					   MOUNT_NAME (mnt));
+
+				skip_mount (mnt);
+
+				mnt->error = ERROR_NONE;
+			} else if (mnt->error != ERROR_NONE) {
 				nih_error (_("Spawning maintenance shell since Plymouth is not available"));
 
 				if ((mnt->error != ERROR_MOUNT_FAILED)
