@@ -1,6 +1,6 @@
 /* mountall
  *
- * Copyright © 2009 Canonical Ltd.
+ * Copyright © 2010 Canonical Ltd.
  * Author: Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -210,6 +210,8 @@ void   plymouth_answer       (void *user_data, const char *keys,
 void   plymouth_failed       (void *user_data, ply_boot_client_t *client);
 void   plymouth_cancel_fsck  (void *user_data, const char *keys,
 			      ply_boot_client_t *client);
+
+int    plymouth_connect      (void);
 void   plymouth_disconnected (void *user_data, ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
@@ -298,13 +300,6 @@ static ply_event_loop_t *ply_event_loop = NULL;
  * Plymouth boot client.
  **/
 static ply_boot_client_t *ply_boot_client = NULL;
-
-/**
- * plymouth_connected:
- *
- * TRUE when we're connected to the plymouth daemon.
- **/
-static int plymouth_connected = FALSE;
 
 /**
  * boredom_timer:
@@ -2729,26 +2724,11 @@ boredom_timeout (void *    data,
 }
 
 
-static int
-plymouth_is_connected (void)
-{
-	if (plymouth_connected)
-		return TRUE;
-
-	if (ply_boot_client_connect (ply_boot_client,
-				     plymouth_disconnected, NULL)) {
-		plymouth_connected = TRUE;
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
 void
 plymouth_progress (Mount *mnt,
 		   int    progress)
 {
-	if (! plymouth_is_connected ())
+	if (! plymouth_connect ())
 		return;
 
 	if (mnt) {
@@ -2815,7 +2795,7 @@ plymouth_prompt (const void *parent,
 	nih_assert (message != NULL);
 	nih_assert (keys != NULL);
 
-	if (! plymouth_is_connected ())
+	if (! plymouth_connect ())
 		return NULL;
 
 	/* Prepend the prefix so that plymouth knows that the message
@@ -2904,12 +2884,49 @@ plymouth_cancel_fsck (void *             user_data,
 	}
 }
 
+
+int
+plymouth_connect (void)
+{
+	/* If we were already connected, just re-use that connection */
+	if (ply_boot_client)
+		return TRUE;
+
+	ply_boot_client = ply_boot_client_new ();
+
+	/* Connect to the Plymouth daemon */
+	if (! ply_boot_client_connect (ply_boot_client,
+				       plymouth_disconnected, NULL)) {
+		int saved_errno = errno;
+		nih_info (_("Failed to connect to Plymouth: %s"),
+			  strerror (errno));
+
+		ply_boot_client_free (ply_boot_client);
+		ply_boot_client = NULL;
+
+		errno = saved_errno;
+		return FALSE;
+	}
+
+	/* Attach to the event loop */
+	ply_boot_client_attach_to_event_loop (ply_boot_client, ply_event_loop);
+
+	nih_info (_("Connected to Plymouth"));
+
+	return TRUE;
+}
+
 void
 plymouth_disconnected (void *             user_data,
 		       ply_boot_client_t *client)
 {
 	nih_warn (_("Disconnected from Plymouth"));
-	plymouth_connected = FALSE;
+
+	/* Disconnect the client from the daemon, closing the socket */
+	ply_boot_client_disconnect (ply_boot_client);
+
+	ply_boot_client_free (ply_boot_client);
+	ply_boot_client = NULL;
 }
 
 
@@ -2995,7 +3012,10 @@ main (int   argc,
 				    (NihIoWatcher)udev_monitor_watcher,
 				    udev_monitor));
 
-	/* Initialise the connection to plymouth */
+	/* Initialise a Plymouth event loop; this is an epoll instance that
+	 * we can poll within our own main loop and call out to when needs
+	 * be.
+	 */
 	nih_assert (ply_event_loop = ply_event_loop_new ());
 
 	NIH_MUST (nih_io_add_watch (NULL, *(int *)ply_event_loop,
@@ -3003,16 +3023,8 @@ main (int   argc,
 				    (NihIoWatcher)ply_event_loop_process_pending_events,
 				    ply_event_loop));
 
-	nih_assert (ply_boot_client = ply_boot_client_new ());
-	ply_boot_client_attach_to_event_loop (ply_boot_client,
-					      ply_event_loop);
-
-	if (ply_boot_client_connect (ply_boot_client,
-				     plymouth_disconnected, NULL)) {
-		plymouth_connected = TRUE;
-	} else {
-		nih_warn (_("Could not connect to Plymouth"));
-	}
+	/* Attempt an early connection to Plymouth */
+	plymouth_connect ();
 
 	mounts = NIH_MUST (nih_list_new (NULL));
 

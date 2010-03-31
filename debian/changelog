@@ -1,6 +1,13 @@
 mountall (2.10) UNRELEASED; urgency=low
 
-  * 
+  * Rework the Plymouth connection logic; one needs to attach the client to
+    the event loop *after* connection otherwise you don't get disconnection
+    notification, and one needs to actually actively disconnect in the
+    disconnection handler.
+  * For safety and sanity reasons it becomes much simpler to create the
+    ply_boot_client when we connect, and free it on disconnection.  Thus the
+    presence or not of this struct tells us whether we're connected or not.
+    LP: #524708.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
