@@ -17,6 +17,9 @@ mountall (2.10) UNRELEASED; urgency=low
   * Allow fsck messages to be translated.  LP: #390740.
   * Change fsck message to be a little less alarming.  LP: #545267.
 
+  * Improve set of messages seen with --verbose, and ensure all visible
+    messages are marked for translation.  LP: #446592.
+
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
 mountall (2.9) lucid; urgency=low
