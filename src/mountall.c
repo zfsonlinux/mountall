@@ -2980,15 +2980,18 @@ plymouth_answer (void *             user_data,
 {
 	Mount *mnt = plymouth_mnt;
 
-	nih_assert (keys != NULL);
-	nih_assert (plymouth_mnt != NULL);
-	nih_assert (plymouth_error != ERROR_NONE);
-	nih_assert (plymouth_mnt->error == plymouth_error);
+	if (! keys)
+		return;
+	if (plymouth_error == ERROR_NONE)
+		return;
+	if ((plymouth_mnt != NULL) && (plymouth_mnt->error != plymouth_error))
+		return;
 
 	switch (keys[0]) {
 	case 'f':
 	case 'F':
-		nih_assert (mnt->error == ERROR_FSCK_FAILED);
+		if (mnt->error != ERROR_FSCK_FAILED)
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (FALSE);
@@ -3001,8 +3004,9 @@ plymouth_answer (void *             user_data,
 		break;
 	case 'i':
 	case 'I':
-		nih_assert ((mnt->error == ERROR_FSCK_FAILED)
-			    || (mnt->error == ERROR_FSCK_FAILED_HARD));
+		if ((mnt->error != ERROR_FSCK_FAILED)
+		    && (mnt->error == ERROR_FSCK_FAILED_HARD))
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (FALSE);
@@ -3015,7 +3019,8 @@ plymouth_answer (void *             user_data,
 		break;
 	case 's':
 	case 'S':
-		nih_assert (mnt->error != ERROR_FSCK_IN_PROGRESS);
+		if (mnt->error == ERROR_FSCK_IN_PROGRESS)
+			break;
 
 		nih_message (_("Skipping %s at user request"),
 			     MOUNT_NAME (mnt));
@@ -3024,7 +3029,8 @@ plymouth_answer (void *             user_data,
 		break;
 	case 'm':
 	case 'M':
-		nih_assert (mnt->error != ERROR_FSCK_IN_PROGRESS);
+		if (mnt->error == ERROR_FSCK_IN_PROGRESS)
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (TRUE);
@@ -3040,7 +3046,8 @@ plymouth_answer (void *             user_data,
 		break;
 	case 'c':
 	case 'C':
-		nih_assert (mnt->error == ERROR_FSCK_IN_PROGRESS);
+		if (mnt->error != ERROR_FSCK_IN_PROGRESS)
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (FALSE);
@@ -3055,7 +3062,8 @@ plymouth_answer (void *             user_data,
 		}
 		break;
 	default:
-		nih_assert_not_reached ();
+		nih_debug ("Received odd keys '%s'", keys);
+		break;
 	}
 }
 
