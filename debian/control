@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 7.3.15ubuntu2~boot7), pkg-config (>= 0.22), libnih-
 
 Package: mountall
 Architecture: any
-Depends: makedev, udev, coreutils (>= 7.1), ${shlibs:Depends}, ${misc:Depends}
+Depends: makedev, udev, plymouth, coreutils (>= 7.1), ${shlibs:Depends}, ${misc:Depends}
 Replaces: upstart (<< 0.6.3-2)
 Breaks: usplash (<< 0.5.47), policycoreutils (<< 2.0.69-2ubuntu4)
 Description: filesystem mounting tool

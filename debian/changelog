@@ -19,6 +19,10 @@ mountall (2.10) UNRELEASED; urgency=low
   * Integrate fsck progress updates into the same mechanism.
   * Allow fsck messages to be translated.  LP: #390740.
   * Change fsck message to be a little less alarming.  LP: #545267.
+  * Add hard dependency on Plymouth; without it running, mountall will
+    ignore any filesystem which doesn't show up within a few seconds or that
+    fails to fsck or mount.  If you don't want graphical splash, you simply
+    need not install themes.
 
   * Improve set of messages seen with --verbose, and ensure all visible
     messages are marked for translation.  LP: #446592.
@@ -35,7 +39,7 @@ mountall (2.10) UNRELEASED; urgency=low
     hang around for them to be handled.
   * Always run through try_mounts() at least once.  LP: #537136.
   * Don't keep mountall running if the only remaining unmounted filesystems
-    are those the user has explicitly said to skip.
+  * 
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
 
