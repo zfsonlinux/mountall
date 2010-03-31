@@ -111,6 +111,7 @@ struct mount {
 	char *              mountpoint;
 	pid_t               mount_pid;
 	int                 mounted;
+	dev_t               mounted_dev;
 
 	char *              device;
 	struct udev_device *udev_device;
@@ -420,6 +421,7 @@ new_mount (const char *mountpoint,
 
 	mnt->mount_pid = -1;
 	mnt->mounted = FALSE;
+	mnt->mounted_dev = -1;
 
 	mnt->device = NULL;
 	mnt->udev_device = NULL;
@@ -723,9 +725,11 @@ parse_mountinfo_file (int reparsed)
 	while (fgets (buf, bufsz, mountinfo) != NULL) {
 		char * saveptr;
 		char * ptr;
+		char * dev;
 		char * mountpoint;
 		char * type;
 		char * device;
+		int    maj, min;
 		char * mount_opts;
 		char * super_opts;
 		char * opts;
@@ -749,8 +753,8 @@ parse_mountinfo_file (int reparsed)
 			continue;
 
 		/* major:minor */
-		ptr = strtok_r (NULL, " \t\n", &saveptr);
-		if (! ptr)
+		dev = strtok_r (NULL, " \t\n", &saveptr);
+		if (! dev)
 			continue;
 
 		/* root */
@@ -813,6 +817,9 @@ parse_mountinfo_file (int reparsed)
 			mnt = new_mount (mountpoint, device, FALSE, type, opts);
 			mnt->mount_opts = opts;
 		}
+
+		if (sscanf (dev, "%d:%d", &maj, &min) == 2)
+			mnt->mounted_dev = makedev (maj, min);
 
 		if (reparsed && (! mnt->mounted)) {
 			mounted (mnt);
@@ -1307,11 +1314,33 @@ mounted (Mount *mnt)
 	 */
 	if (! strcmp (mnt->mountpoint, "/dev")) {
 		mode_t mask;
+		Mount *root;
 
 		mask = umask (0000);
 		mknod ("/dev/console", S_IFCHR | 0600, makedev (5, 1));
 		mknod ("/dev/null", S_IFCHR | 0666, makedev (1, 3));
 		umask (mask);
+
+		/* And while we're in here, let's make sure we get a
+		 * /dev/root symlink for the right device too ;-)
+		 */
+		root = find_mount ("/");
+		if (root->mounted_dev != -1) {
+			FILE *rules;
+
+			mkdir ("/dev/.udev", 0755);
+			mkdir ("/dev/.udev/rules.d", 0755);
+			rules = fopen ("/dev/.udev/rules.d/root.rules", "w");
+			if (rules) {
+				fprintf (rules, ("SUBSYSTEM==\"block\", "
+						 "ENV{MAJOR}==\"%d\", "
+						 "ENV{MINOR}==\"%d\", "
+						 "SYMLINK+=\"root\"\n"),
+					 major (root->mounted_dev),
+					 minor (root->mounted_dev));
+				fclose (rules);
+			}
+		}
 	}
 
 	emit_event ("mounted", mnt);
