@@ -1,4 +1,4 @@
-mountall (2.10) UNRELEASED; urgency=low
+mountall (2.10) lucid; urgency=low
 
   * Rework the Plymouth connection logic; one needs to attach the client to
     the event loop *after* connection otherwise you don't get disconnection
@@ -41,7 +41,7 @@ mountall (2.10) UNRELEASED; urgency=low
   * Don't keep mountall running if the only remaining unmounted filesystems
   * 
 
- -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 11:45:27 +0100
+ -- Scott James Remnant <scott@ubuntu.com>  Wed, 31 Mar 2010 19:37:31 +0100
 
 mountall (2.9) lucid; urgency=low
 
