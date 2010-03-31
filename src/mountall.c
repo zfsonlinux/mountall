@@ -92,6 +92,7 @@ typedef enum {
 	TAG_VIRTUAL,
 	TAG_SWAP,
 	TAG_NOWAIT,
+	TAG_SKIPPED,
 } Tag;
 
 typedef enum {
@@ -1180,6 +1181,9 @@ mount_policy (void)
 		case TAG_NOWAIT:
 			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "nowait");
 			break;
+		case TAG_SKIPPED:
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "skipped");
+			break;
 		default:
 			nih_assert_not_reached ();
 		}
@@ -1383,6 +1387,8 @@ mounted (Mount *mnt)
 		break;
 	case TAG_NOWAIT:
 		break;
+	case TAG_SKIPPED:
+		break;
 	case TAG_UNKNOWN:
 		break;
 	default:
@@ -1417,13 +1423,15 @@ skip_mount (Mount *mnt)
 		break;
 	case TAG_NOWAIT:
 		break;
+	case TAG_SKIPPED:
+		break;
 	case TAG_UNKNOWN:
 		break;
 	default:
 		nih_assert_not_reached ();
 	}
 
-	mnt->tag = TAG_NOWAIT;
+	mnt->tag = TAG_SKIPPED;
 	newly_mounted = TRUE;
 
 	trigger_events ();
@@ -1504,7 +1512,8 @@ try_mounts (void)
 			Mount *mnt = (Mount *)iter;
 
 			if ((! mnt->mounted) || needs_remount (mnt)) {
-				all = FALSE;
+				if (mnt->tag != TAG_SKIPPED)
+					all = FALSE;
 				try_mount (mnt, FALSE);
 			}
 		}
@@ -2722,6 +2731,8 @@ boredom_timeout (void *    data,
 		if (mnt->mount_pid > 0)
 			continue;
 		if (mnt->tag == TAG_NOWAIT)
+			continue;
+		if (mnt->tag == TAG_SKIPPED)
 			continue;
 		if (mnt->error != ERROR_NONE)
 			continue;
