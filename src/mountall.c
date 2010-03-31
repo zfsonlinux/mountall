@@ -252,7 +252,7 @@ size_t num_swap_mounted = 0;
  * Set to TRUE if we've successfully mounted something, informs the main loop
  * to try and mount non-mounted things again.
  **/
-int newly_mounted = FALSE;
+int newly_mounted = TRUE;
 
 /**
  * fsck_in_progress:
