@@ -3022,6 +3022,9 @@ plymouth_answer (void *             user_data,
 		if (mnt->error == ERROR_FSCK_IN_PROGRESS)
 			break;
 
+		mnt->error = ERROR_NONE;
+		plymouth_update (FALSE);
+
 		nih_message (_("Skipping %s at user request"),
 			     MOUNT_NAME (mnt));
 
