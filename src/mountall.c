@@ -1424,6 +1424,7 @@ skip_mount (Mount *mnt)
 	}
 
 	mnt->tag = TAG_NOWAIT;
+	newly_mounted = TRUE;
 
 	trigger_events ();
 }
