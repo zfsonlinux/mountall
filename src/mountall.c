@@ -2203,8 +2203,7 @@ emit_event (const char *name,
 		return;
 	}
 
-	if (mnt)
-		dbus_pending_call_block (pending_call);
+	dbus_pending_call_block (pending_call);
 
 	dbus_pending_call_unref (pending_call);
 }
