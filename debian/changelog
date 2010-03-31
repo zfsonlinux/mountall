@@ -8,6 +8,9 @@ mountall (2.10) UNRELEASED; urgency=low
     ply_boot_client when we connect, and free it on disconnection.  Thus the
     presence or not of this struct tells us whether we're connected or not.
     LP: #524708.
+  * Flush the plymouth connection before closing it and exiting, otherwise
+    updates may be pending and the screen have messages that confuse people
+    while X is starting (like fsck at 90%).  LP: #487744.
 
   * Replace the modal plymouth prompt for error conditions with code that
     continues working in the background while prompting.  This most benefits
