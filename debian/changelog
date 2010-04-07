@@ -1,6 +1,7 @@
 mountall (2.11) UNRELEASED; urgency=low
 
-  * 
+  * conf/mounted-*.conf: Add defaults for $MOUNTPOINT just in case somebody
+    tries to run this by hand.  LP: #557177.
 
  -- Scott James Remnant <scott@ubuntu.com>  Wed, 07 Apr 2010 18:37:39 +0100
 
