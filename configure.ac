@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.62)
-AC_INIT([mountall], [2.10], [ubuntu-devel@lists.ubuntu.com])
+AC_INIT([mountall], [2.11], [ubuntu-devel@lists.ubuntu.com])
 AC_COPYRIGHT([[Copyright © 2010 Canonical Ltd.]])
 AC_CONFIG_SRCDIR([src/mountall.c])
 AC_CONFIG_MACRO_DIR([m4])
