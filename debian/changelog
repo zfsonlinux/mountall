@@ -1,4 +1,4 @@
-mountall (2.11) UNRELEASED; urgency=low
+mountall (2.11) lucid; urgency=low
 
   [ Scott James Remnant ]
   * conf/mounted-*.conf: Add defaults for $MOUNTPOINT just in case somebody
@@ -10,7 +10,7 @@ mountall (2.11) UNRELEASED; urgency=low
     this part specifically handled by base-files's 00-header,
     LP: #516293
 
- -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 09 Apr 2010 13:14:24 -0500
+ -- Dustin Kirkland <kirkland@ubuntu.com>  Fri, 09 Apr 2010 13:50:29 -0500
 
 mountall (2.10) lucid; urgency=low
 
