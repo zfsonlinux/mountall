@@ -2,6 +2,8 @@ mountall (2.12) UNRELEASED; urgency=low
 
   * Generate mountall.pot file at build-time, rather than shipping a
     hopelessly out of date copy in the source package.  LP: #559997.
+  * Once a mountpoint has been skipped, don't try and mount it again
+    (unless the udev device actually shows up).  LP: #553290.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 13 Apr 2010 17:36:43 -0700
 
