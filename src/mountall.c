@@ -1511,9 +1511,10 @@ try_mounts (void)
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
+			if (mnt->tag == TAG_SKIPPED)
+				continue;
+
 			if ((! mnt->mounted) || needs_remount (mnt)) {
-				if (mnt->tag != TAG_SKIPPED)
-					all = FALSE;
 				try_mount (mnt, FALSE);
 			}
 		}
