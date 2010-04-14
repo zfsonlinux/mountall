@@ -18,3 +18,4 @@ endif
 override_dh_auto_configure:
 	dh_auto_configure -- CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" \
 		--exec-prefix=
+	make -C po update-po
