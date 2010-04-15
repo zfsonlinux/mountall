@@ -1,11 +1,15 @@
 mountall (2.12) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * Generate mountall.pot file at build-time, rather than shipping a
     hopelessly out of date copy in the source package.  LP: #559997.
   * Once a mountpoint has been skipped, don't try and mount it again
     (unless the udev device actually shows up).  LP: #553290.
   * Skipping a filesystem means we should also skip anything that depends
     on that (ie. skip /usr/local when skipping /usr).
+
+  [ Colin Watson ]
+  * Fix typo in "Press C" message.
 
  -- Scott James Remnant <scott@ubuntu.com>  Tue, 13 Apr 2010 17:36:43 -0700
 
