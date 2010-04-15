@@ -1,4 +1,4 @@
-mountall (2.12) UNRELEASED; urgency=low
+mountall (2.12) lucid; urgency=low
 
   [ Scott James Remnant ]
   * Generate mountall.pot file at build-time, rather than shipping a
@@ -10,7 +10,7 @@ mountall (2.12) UNRELEASED; urgency=low
   [ Alberto Milone ]
   * Pass a localised string to plymouth in plymouth_progress (LP: #553954).
 
- -- Scott James Remnant <scott@ubuntu.com>  Tue, 13 Apr 2010 17:36:43 -0700
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 15 Apr 2010 08:42:10 +0000
 
 mountall (2.11) lucid; urgency=low
 
