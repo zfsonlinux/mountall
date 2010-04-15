@@ -2829,8 +2829,12 @@ plymouth_progress (Mount *mnt,
 	/* Clamp the progress and sent to plymouth */
 	progress = nih_max (nih_min (progress, 100), 0);
 
-	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d",
-					MOUNT_NAME (mnt), progress));
+	/* The localised string for plymouth
+	 * For example: "fsck:sda1:50:Checking disk 1 of 3 (50 % complete)"
+	 */
+	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d:%s",
+					MOUNT_NAME (mnt), progress,
+					_("Checking disk %1$d of %2$d (%3$d %% complete)")));
 
 	ply_boot_client_update_daemon (ply_boot_client, update,
 				       plymouth_response,
