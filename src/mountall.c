@@ -1434,6 +1434,20 @@ skip_mount (Mount *mnt)
 	mnt->tag = TAG_SKIPPED;
 	newly_mounted = TRUE;
 
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *dep = (Mount *)iter;
+
+		if (dep->mounted && (! needs_remount (dep)))
+			continue;
+
+		NIH_LIST_FOREACH (&dep->deps, dep_iter) {
+			NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+
+			if (dep_entry->data == mnt)
+				skip_mount (dep);
+		}
+	}
+	
 	trigger_events ();
 }
 
@@ -1511,9 +1525,10 @@ try_mounts (void)
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
+			if (mnt->tag == TAG_SKIPPED)
+				continue;
+
 			if ((! mnt->mounted) || needs_remount (mnt)) {
-				if (mnt->tag != TAG_SKIPPED)
-					all = FALSE;
 				try_mount (mnt, FALSE);
 			}
 		}
