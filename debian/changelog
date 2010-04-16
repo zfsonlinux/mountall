@@ -8,6 +8,8 @@ mountall (2.13) UNRELEASED; urgency=low
 
   * Don't run mount, swapon or fsck while there's an uncleared error on
     the filesystem.  LP: #501801.
+  * Flush updates to Plymouth before emitting Upstart events, in case
+    the event kills Plymouth.  LP: #559761.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 
