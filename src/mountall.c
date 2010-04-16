@@ -1735,6 +1735,9 @@ run_mount (Mount *mnt,
 	} else if (mnt->mount_pid > 0) {
 		nih_debug ("%s: already mounting", MOUNT_NAME (mnt));
 		return;
+	} else if (mnt->error > ERROR_BORED) {
+		nih_debug ("%s still has uncleared errors", MOUNT_NAME (mnt));
+		return;
 	} else if (mnt->mounted) {
 		if (needs_remount (mnt)) {
 			nih_info (_("remounting %s"), MOUNT_NAME (mnt));
@@ -1890,6 +1893,9 @@ run_swapon (Mount *mnt)
 	} else if (mnt->mount_pid > 0) {
 		nih_debug ("%s: already activating", MOUNT_NAME (mnt));
 		return;
+	} else if (mnt->error > ERROR_BORED) {
+		nih_debug ("%s still has uncleared errors", MOUNT_NAME (mnt));
+		return;
 	}
 
 	nih_info (_("activating %s"), MOUNT_NAME (mnt));
@@ -1961,6 +1967,9 @@ run_fsck (Mount *mnt)
 		return;
 	} else if (mnt->fsck_pid > 0) {
 		nih_debug ("%s: already checking", MOUNT_NAME (mnt));
+		return;
+	} else if (mnt->error > ERROR_BORED) {
+		nih_debug ("%s still has uncleared errors", MOUNT_NAME (mnt));
 		return;
 	}
 
@@ -2856,9 +2865,7 @@ plymouth_update (int only_clear)
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
-			if (mnt->error == ERROR_NONE)
-				continue;
-			if (mnt->error == ERROR_BORED)
+			if (mnt->error <= ERROR_BORED)
 				continue;
 
 			nih_error (_("Skipping mounting %s since Plymouth is not available"),

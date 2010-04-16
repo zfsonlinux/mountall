@@ -6,6 +6,9 @@ mountall (2.13) UNRELEASED; urgency=low
     on that (ie. skip /usr/local when skipping /usr).
   * Don't skip filesystems due to timeout when Plymouth not available.
 
+  * Don't run mount, swapon or fsck while there's an uncleared error on
+    the filesystem.  LP: #501801.
+
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 
 mountall (2.12) lucid; urgency=low
