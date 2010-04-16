@@ -2849,13 +2849,15 @@ plymouth_update (int only_clear)
 	nih_local char *keys_message = NULL;
 
 	/* If we're not connected to Plymouth, and can't connect, deal with
-	 * all errors by breaking to a shell.
+	 * all errors (except boredom) by ignoring the filesystem.
 	 */
 	if (! plymouth_connect ()) {
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
 			if (mnt->error == ERROR_NONE)
+				continue;
+			if (mnt->error == ERROR_BORED)
 				continue;
 
 			nih_error (_("Skipping mounting %s since Plymouth is not available"),

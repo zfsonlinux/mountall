@@ -4,6 +4,7 @@ mountall (2.13) UNRELEASED; urgency=low
     (unless the udev device actually shows up).  LP: #553290.
   * Skipping a filesystem means we should also skip anything that depends
     on that (ie. skip /usr/local when skipping /usr).
+  * Don't skip filesystems due to timeout when Plymouth not available.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 
