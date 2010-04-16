@@ -1529,6 +1529,7 @@ try_mounts (void)
 				continue;
 
 			if ((! mnt->mounted) || needs_remount (mnt)) {
+				all = FALSE;
 				try_mount (mnt, FALSE);
 			}
 		}
