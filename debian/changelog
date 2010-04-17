@@ -11,6 +11,9 @@ mountall (2.13) UNRELEASED; urgency=low
   * Flush updates to Plymouth before emitting Upstart events, in case
     the event kills Plymouth.  LP: #559761.
 
+  * Don't display the filesystem check message when an fsck completes
+    without needing to check the filesystem.  LP: #564434.
+
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 
 mountall (2.12) lucid; urgency=low
