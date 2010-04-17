@@ -2832,18 +2832,19 @@ plymouth_progress (Mount *mnt,
 	if (! plymouth_connect ())
 		return;
 
+	/* Clamp the progress and sent to plymouth */
+	progress = nih_max (nih_min (progress, 100), 0);
+
 	/* When not displaying any other errors, display the fsck in progress
 	 * (which silences other errors until done)
 	 */
-	fsck_in_progress = TRUE;
+	if (progress < 100)
+		fsck_in_progress = TRUE;
 	plymouth_update (FALSE);
 
 	/* Don't display progress information over top of other errors */
 	if (plymouth_error != ERROR_FSCK_IN_PROGRESS)
 		return;
-
-	/* Clamp the progress and sent to plymouth */
-	progress = nih_max (nih_min (progress, 100), 0);
 
 	/* The localised string for plymouth
 	 * For example: "fsck:sda1:50:Checking disk 1 of 3 (50 % complete)"
