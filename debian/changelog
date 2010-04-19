@@ -1,5 +1,6 @@
-mountall (2.13) UNRELEASED; urgency=low
+mountall (2.13) lucid; urgency=low
 
+  [ Scott James Remnant ]
   * Once a mountpoint has been skipped, don't try and mount it again
     (unless the udev device actually shows up).  LP: #553290.
   * Skipping a filesystem means we should also skip anything that depends
@@ -12,7 +13,7 @@ mountall (2.13) UNRELEASED; urgency=low
   * Don't display the filesystem check message when an fsck completes
     without needing to check the filesystem.  LP: #564434.
 
- -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 19 Apr 2010 00:15:58 -0700
 
 mountall (2.12) lucid; urgency=low
 
