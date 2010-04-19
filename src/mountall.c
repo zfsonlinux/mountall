@@ -2197,6 +2197,12 @@ emit_event (const char *name,
 	if (no_events)
 		return;
 
+	/* Flush the Plymouth connection to ensure all updates are sent,
+	 * since the event may kill plymouth.
+	 */
+	if (ply_boot_client)
+		ply_boot_client_flush (ply_boot_client);
+
 	env = NIH_MUST (nih_str_array_new (NULL));
 
 	if (mnt) {
