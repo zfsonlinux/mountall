@@ -11,6 +11,8 @@ mountall (2.14) UNRELEASED; urgency=low
   * If we're not marking all nodev filesystems as virtual, we need to
     at least mark our placeholder filesystem entries (type=none && dev=none)
     this way.
+  * When an fsck is in progress, record this properly so it's possible to
+    cancel the fsck later.  LP: #562811.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 

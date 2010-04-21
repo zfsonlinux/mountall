@@ -2014,7 +2014,7 @@ run_fsck (Mount *mnt)
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->type));
 	NIH_MUST (nih_str_array_add (&args, NULL, &args_len, mnt->device));
 
-	mnt->error = ERROR_NONE;
+	mnt->error = ERROR_FSCK_IN_PROGRESS;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
 
 	fsck_update ();
@@ -2931,7 +2931,7 @@ plymouth_update (int only_clear)
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 
-		if (mnt->error > plymouth_error) {
+		if (mnt->error >= plymouth_error) {
 			plymouth_mnt = mnt;
 			plymouth_error = mnt->error;
 		}
