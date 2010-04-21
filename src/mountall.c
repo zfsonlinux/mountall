@@ -1013,12 +1013,6 @@ mount_policy (void)
 			continue;
 		}
 
-		/* Otherwise If there's no device, it's implicitly
-		 * nodev whether or not we know about the filesystem.
-		 */
-		if (! strcmp (mnt->device, "none"))
-			mnt->nodev = TRUE;
-
 		/* Drop anything with ignore as its type. */
 		if (! strcmp (mnt->type, "ignore")) {
 			nih_debug ("%s: dropping ignored filesystem",
