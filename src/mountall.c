@@ -1013,6 +1013,14 @@ mount_policy (void)
 			continue;
 		}
 
+		/* Otherwise if there's no device and the mountpoint is
+		 * /tmp, special-case it as a "nodev" virtual filesystem -
+		 * it's already being special-cased in /lib/init/fstab.
+		 */
+		if (! strcmp (mnt->device, "none")
+		    && ! strcmp (mnt->mountpoint, "/tmp"))
+			mnt->nodev = TRUE;
+
 		/* Drop anything with ignore as its type. */
 		if (! strcmp (mnt->type, "ignore")) {
 			nih_debug ("%s: dropping ignored filesystem",
