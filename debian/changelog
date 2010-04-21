@@ -1,10 +1,16 @@
 mountall (2.14) UNRELEASED; urgency=low
 
+  [ Scott James Remnant ]
   * Flush updates to Plymouth before emitting Upstart events, in case
     the event kills Plymouth.  LP: #559761.
   * Don't mark a filesystem "nodev" just because it's got "none" in the
     device column; this will block the "virtual-filesystems" event which
     is the one that can't use Plymouth to prompt.  LP: #507881.
+
+  [ Steve Langasek ]
+  * If we're not marking all nodev filesystems as virtual, we need to
+    special-case /tmp - which is already special-cased in /lib/init/fstab,
+    so I don't feel too guilty.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 
