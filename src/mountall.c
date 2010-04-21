@@ -3090,10 +3090,13 @@ plymouth_answer (void *             user_data,
 		break;
 	case 'c':
 	case 'C':
-		if (mnt->error != ERROR_FSCK_IN_PROGRESS)
+		/* mnt is always NULL since multiple fsck may be in
+		 * progress.
+		 */
+		if (plymouth_error != ERROR_FSCK_IN_PROGRESS)
 			break;
 
-		mnt->error = ERROR_NONE;
+		fsck_in_progress = FALSE;
 		plymouth_update (FALSE);
 
 		nih_message (_("User cancelled filesystem checks"));
@@ -3103,6 +3106,8 @@ plymouth_answer (void *             user_data,
 
 			if (mnt->fsck_pid > 0)
 				kill (mnt->fsck_pid, SIGTERM);
+			if (mnt->error == ERROR_FSCK_IN_PROGRESS)
+				mnt->error = ERROR_NONE;
 		}
 		break;
 	default:

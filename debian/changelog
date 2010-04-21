@@ -6,6 +6,8 @@ mountall (2.14) UNRELEASED; urgency=low
   * Don't mark a filesystem "nodev" just because it's got "none" in the
     device column; this will block the "virtual-filesystems" event which
     is the one that can't use Plymouth to prompt.  LP: #507881.
+  * When cancelling in-progress fsck, don't deference the NULL mount
+    record.  LP: #562811.
 
   [ Steve Langasek ]
   * If we're not marking all nodev filesystems as virtual, we need to
