@@ -9,8 +9,8 @@ mountall (2.14) UNRELEASED; urgency=low
 
   [ Steve Langasek ]
   * If we're not marking all nodev filesystems as virtual, we need to
-    special-case /tmp - which is already special-cased in /lib/init/fstab,
-    so I don't feel too guilty.
+    at least mark our placeholder filesystem entries (type=none && dev=none)
+    this way.
 
  -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
 

@@ -1013,12 +1013,12 @@ mount_policy (void)
 			continue;
 		}
 
-		/* Otherwise if there's no device and the mountpoint is
-		 * /tmp, special-case it as a "nodev" virtual filesystem -
-		 * it's already being special-cased in /lib/init/fstab.
+		/* Otherwise if there's no device and the type is also "none",
+		 * special-case it as a "nodev" virtual filesystem so our
+		 * placeholder handling kicks in.
 		 */
 		if (! strcmp (mnt->device, "none")
-		    && ! strcmp (mnt->mountpoint, "/tmp"))
+		    && ! strcmp (mnt->type, "none"))
 			mnt->nodev = TRUE;
 
 		/* Drop anything with ignore as its type. */
