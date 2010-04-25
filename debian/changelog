@@ -1,4 +1,4 @@
-mountall (2.14) UNRELEASED; urgency=low
+mountall (2.14) lucid; urgency=low
 
   [ Scott James Remnant ]
   * Flush updates to Plymouth before emitting Upstart events, in case
@@ -17,7 +17,7 @@ mountall (2.14) UNRELEASED; urgency=low
     at least mark our placeholder filesystem entries (type=none && dev=none)
     this way.
 
- -- Scott James Remnant <scott@ubuntu.com>  Fri, 16 Apr 2010 14:36:49 -0700
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 25 Apr 2010 23:36:01 +0100
 
 mountall (2.13) lucid; urgency=low
 
