@@ -3046,7 +3046,7 @@ plymouth_answer (void *             user_data,
 	case 'i':
 	case 'I':
 		if ((mnt->error != ERROR_FSCK_FAILED)
-		    && (mnt->error == ERROR_FSCK_FAILED_HARD))
+		    && (mnt->error != ERROR_FSCK_FAILED_HARD))
 			break;
 
 		mnt->error = ERROR_NONE;

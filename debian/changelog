@@ -1,6 +1,7 @@
 mountall (2.15) UNRELEASED; urgency=low
 
-  * 
+  * Fix an obvious thinko error that meant that the "I"gnore fsck error key
+    for a "hard" failure was ignored.
 
  -- Scott James Remnant <scott@ubuntu.com>  Sun, 25 Apr 2010 23:02:05 -0700
 
