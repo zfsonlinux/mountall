@@ -3039,6 +3039,8 @@ plymouth_answer (void *             user_data,
 	case 'F':
 		if (mnt->error != ERROR_FSCK_FAILED)
 			break;
+		if (plymouth_error == ERROR_FSCK_IN_PROGRESS)
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (FALSE);
@@ -3054,6 +3056,8 @@ plymouth_answer (void *             user_data,
 		if ((mnt->error != ERROR_FSCK_FAILED)
 		    && (mnt->error != ERROR_FSCK_FAILED_HARD))
 			break;
+		if (plymouth_error == ERROR_FSCK_IN_PROGRESS)
+			break;
 
 		mnt->error = ERROR_NONE;
 		plymouth_update (FALSE);
@@ -3066,7 +3070,7 @@ plymouth_answer (void *             user_data,
 		break;
 	case 's':
 	case 'S':
-		if (mnt->error == ERROR_FSCK_IN_PROGRESS)
+		if (plymouth_error == ERROR_FSCK_IN_PROGRESS)
 			break;
 
 		mnt->error = ERROR_NONE;
@@ -3079,7 +3083,7 @@ plymouth_answer (void *             user_data,
 		break;
 	case 'm':
 	case 'M':
-		if (mnt->error == ERROR_FSCK_IN_PROGRESS)
+		if (plymouth_error == ERROR_FSCK_IN_PROGRESS)
 			break;
 
 		mnt->error = ERROR_NONE;
@@ -3113,8 +3117,6 @@ plymouth_answer (void *             user_data,
 			if ((mnt->fsck_pid > 0)
 			    && (mnt->fsck_progress >= 0))
 				kill (mnt->fsck_pid, SIGTERM);
-			if (mnt->error == ERROR_FSCK_IN_PROGRESS)
-				mnt->error = ERROR_NONE;
 		}
 		break;
 	default:
