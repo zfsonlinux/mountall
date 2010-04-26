@@ -119,6 +119,7 @@ struct mount {
 	NihHash *           physical_dev_ids;
 	int                 physical_dev_ids_needed;
 	pid_t               fsck_pid;
+	int                 fsck_progress;
 	int                 fsck_fix;
 	int                 ready;
 
@@ -442,6 +443,7 @@ new_mount (const char *mountpoint,
 	mnt->physical_dev_ids = NULL;
 	mnt->physical_dev_ids_needed = TRUE;
 	mnt->fsck_pid = -1;
+	mnt->fsck_progress = -1;
 	mnt->fsck_fix = FALSE;
 	mnt->ready = FALSE;
 
@@ -2016,6 +2018,7 @@ run_fsck (Mount *mnt)
 
 	mnt->error = ERROR_NONE;
 	mnt->fsck_pid = spawn (mnt, args, FALSE, run_fsck_finished);
+	mnt->fsck_progress = -1;
 
 	fsck_update ();
 
@@ -2041,6 +2044,7 @@ run_fsck_finished (Mount *mnt,
 	/* The check is done */
 	mnt->error = ERROR_NONE;
 	mnt->fsck_pid = -1;
+	mnt->fsck_progress = -1;
 
  	fsck_update ();
 
@@ -2741,6 +2745,8 @@ fsck_reader (Mount *     mnt,
 			nih_assert_not_reached ();
 		}
 
+		mnt->fsck_progress = progress;
+
 		plymouth_progress (mnt, progress);
 	}
 }
@@ -3104,7 +3110,8 @@ plymouth_answer (void *             user_data,
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *mnt = (Mount *)iter;
 
-			if (mnt->fsck_pid > 0)
+			if ((mnt->fsck_pid > 0)
+			    && (mnt->fsck_progress >= 0))
 				kill (mnt->fsck_pid, SIGTERM);
 			if (mnt->error == ERROR_FSCK_IN_PROGRESS)
 				mnt->error = ERROR_NONE;

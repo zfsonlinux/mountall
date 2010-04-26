@@ -2,6 +2,9 @@ mountall (2.15) UNRELEASED; urgency=low
 
   * Fix an obvious thinko error that meant that the "I"gnore fsck error key
     for a "hard" failure was ignored.
+  * When cancelling filesystem checks, only cancel those that are actually
+    checking filesystems; otherwise those that are merely verifying the
+    superblock will return an "unrecoverable error" rather than "cancelled".
 
  -- Scott James Remnant <scott@ubuntu.com>  Sun, 25 Apr 2010 23:02:05 -0700
 
