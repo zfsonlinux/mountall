@@ -1,4 +1,4 @@
-mountall (2.15) UNRELEASED; urgency=low
+mountall (2.15) lucid-proposed; urgency=low
 
   [ Scott James Remnant ]
   * Fix an obvious thinko error that meant that the "I"gnore fsck error key
@@ -14,7 +14,7 @@ mountall (2.15) UNRELEASED; urgency=low
     progress will spin for minutes after the fsck itself is finished.  Thanks
     to Tero Mononen and Anders Kaseorg for the patch.  LP: #571707.
 
- -- Scott James Remnant <scott@ubuntu.com>  Sun, 25 Apr 2010 23:02:05 -0700
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Sun, 09 May 2010 01:04:24 +0200
 
 mountall (2.14) lucid; urgency=low
 
