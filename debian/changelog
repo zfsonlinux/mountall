@@ -6,6 +6,7 @@ mountall (2.15) UNRELEASED; urgency=low
   * When cancelling filesystem checks, only cancel those that are actually
     checking filesystems; otherwise those that are merely verifying the
     superblock will return an "unrecoverable error" rather than "cancelled".
+    LP: #577331.
 
   [ Steve Langasek ]
   * Only send plymouth a progress update when there's actual progress to
