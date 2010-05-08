@@ -2745,9 +2745,10 @@ fsck_reader (Mount *     mnt,
 			nih_assert_not_reached ();
 		}
 
-		mnt->fsck_progress = progress;
-
-		plymouth_progress (mnt, progress);
+		if (mnt->fsck_progress != progress) {
+			plymouth_progress (mnt, progress);
+			mnt->fsck_progress = progress;
+		}
 	}
 }
 
