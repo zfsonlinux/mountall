@@ -14,6 +14,10 @@ mountall (2.15) UNRELEASED; urgency=low
     progress will spin for minutes after the fsck itself is finished.  Thanks
     to Tero Mononen and Anders Kaseorg for the patch.  LP: #571707.
 
+  [ Dustin Kirkland ]
+  * conf/mounted-varrun.conf: seed /var/run/motd on boot, to ensure that
+    initial logins are quick, LP: #587858
+
  -- Scott James Remnant <scott@ubuntu.com>  Sun, 25 Apr 2010 23:02:05 -0700
 
 mountall (2.14) lucid; urgency=low
