@@ -1,3 +1,11 @@
+mountall (2.16) maverick; urgency=low
+
+  * conf/mountall.conf: set $LANG so that messages appearing in plymouth are
+    translated (LP: #569365); this is a temporary workaround until upstart is
+    fixed to pass the appropriate env vars to all init scripts
+
+ -- Adrien Cunin <adri2000@ubuntu.com>  Tue, 24 Aug 2010 20:47:33 +0200
+
 mountall (2.15) lucid-proposed; urgency=low
 
   [ Scott James Remnant ]
