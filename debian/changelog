@@ -7,6 +7,7 @@ mountall (2.17) UNRELEASED; urgency=low
   [ Steve Langasek ]
   * Don't check /etc/environment for locale settings; this is an obsolete
     usage we transitioned away from years ago.
+  * Add LC_ALL to the list of exported locale variables.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 25 Aug 2010 23:04:22 -0700
 
