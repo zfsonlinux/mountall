@@ -1,3 +1,11 @@
+mountall (2.17) UNRELEASED; urgency=low
+
+  [ Dustin Kirkland ]
+  * conf/mounted-varrun.conf: seed /var/run/motd on boot, to ensure that
+    initial logins are quick, LP: #587858
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 25 Aug 2010 23:04:22 -0700
+
 mountall (2.16) maverick; urgency=low
 
   * conf/mountall.conf: set $LANG so that messages appearing in plymouth are
