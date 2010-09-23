@@ -3256,6 +3256,9 @@ main (int   argc,
 	if (daemonise) {
 		pid_t pid;
 
+		fflush (stdout);
+		fflush (stderr);
+
 		/* Fork once because Upstart makes us a session leader,
 		 * or we may be a session leader of an existing process
 		 * group.

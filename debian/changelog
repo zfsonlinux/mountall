@@ -9,6 +9,10 @@ mountall (2.18) UNRELEASED; urgency=low
     usage we transitioned away from years ago.
   * Add LC_ALL to the list of exported locale variables.
 
+  [ Colin Watson ]
+  * Flush standard output and error before daemonising, so that we don't get
+    three copies of our early debug output.
+
  -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 25 Aug 2010 23:04:22 -0700
 
 mountall (2.17) maverick; urgency=low
