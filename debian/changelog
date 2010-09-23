@@ -1,3 +1,12 @@
+mountall (2.17) maverick; urgency=low
+
+  * SECURITY UPDATE: do not leave writable udev rules file around.
+    - src/mountall.c: set umask correctly (LP: #591807).
+    - debian/preinst: remove boot-time udev rules file.
+    - CVE-2010-2961
+
+ -- Kees Cook <kees@ubuntu.com>  Wed, 01 Sep 2010 15:20:14 -0700
+
 mountall (2.16) maverick; urgency=low
 
   * conf/mountall.conf: set $LANG so that messages appearing in plymouth are
