@@ -1349,6 +1349,7 @@ mounted (Mount *mnt)
 		if (root->mounted_dev != -1) {
 			FILE *rules;
 
+			mask = umask (0022);
 			mkdir ("/dev/.udev", 0755);
 			mkdir ("/dev/.udev/rules.d", 0755);
 			rules = fopen ("/dev/.udev/rules.d/root.rules", "w");
@@ -1361,6 +1362,7 @@ mounted (Mount *mnt)
 					 minor (root->mounted_dev));
 				fclose (rules);
 			}
+			umask (mask);
 		}
 	}
 
