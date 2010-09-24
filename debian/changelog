@@ -1,4 +1,4 @@
-mountall (2.18) UNRELEASED; urgency=low
+mountall (2.18) maverick; urgency=low
 
   [ Dustin Kirkland ]
   * conf/mounted-varrun.conf: seed /var/run/motd on boot, to ensure that
@@ -16,7 +16,7 @@ mountall (2.18) UNRELEASED; urgency=low
     the link target rather than trying to mount it again and failing
     (LP: #541512).
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 25 Aug 2010 23:04:22 -0700
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 24 Sep 2010 10:52:20 +0100
 
 mountall (2.17) maverick; urgency=low
 
