@@ -134,6 +134,8 @@ struct mount {
 	Tag                 tag;
 	int                 has_showthrough;
 	Mount *             showthrough;
+	int                 checked_link;
+	Mount *             link_target;
 	NihList             deps;
 };
 
@@ -433,6 +435,8 @@ new_mount (const char *mountpoint,
 
 	mnt->mountpoint = NIH_MUST (nih_strdup (mounts, mountpoint));
 	strip_slashes (mnt->mountpoint);
+	mnt->checked_link = FALSE;
+	mnt->link_target = NULL;
 
 	mnt->mount_pid = -1;
 	mnt->mounted = FALSE;
@@ -1549,6 +1553,8 @@ void
 try_mount (Mount *mnt,
 	   int    force)
 {
+	struct stat sb;
+
 	nih_assert (mnt != NULL);
 
 	NIH_LIST_FOREACH (&mnt->deps, dep_iter) {
@@ -1576,6 +1582,66 @@ try_mount (Mount *mnt,
 	{
 		nih_debug ("%s waiting for device", MOUNT_NAME (mnt));
 
+		return;
+	}
+
+	/* By this point any parent mounts have appeared, so we can check
+	 * whether the mountpoint is a symlink to somewhere else.
+	 */
+	if (! mnt->checked_link
+	    && strcmp (mnt->type, "swap")
+	    && strcmp (mnt->mountpoint, "none")
+	    && ! lstat (mnt->mountpoint, &sb)
+	    && S_ISLNK (sb.st_mode))
+	{
+		nih_local char *buf = NULL;
+		size_t          bufsz;
+		ssize_t         linksz;
+		Mount          *target = NULL;
+
+		bufsz = 4096;
+		buf = NIH_MUST (nih_alloc (NULL, bufsz));
+
+		linksz = readlink (mnt->mountpoint, buf, bufsz);
+		if (linksz > 0)
+		{
+			buf[linksz] = '\0';
+			target = find_mount (buf);
+		}
+
+		if (target)
+		{
+			NihListEntry *dep;
+
+			dep = NIH_MUST (nih_list_entry_new (mnt));
+			dep->data = target;
+			nih_ref (target, dep);
+
+			nih_list_add (&mnt->deps, &dep->entry);
+			nih_debug ("%s symlink to %s",
+				   MOUNT_NAME (mnt),
+				   MOUNT_NAME (target));
+
+			mnt->link_target = target;
+
+			if ((! target->mounted) || needs_remount (target))
+			{
+				mnt->checked_link = TRUE;
+				nih_debug ("%s waiting for %s",
+					   MOUNT_NAME (mnt),
+					   MOUNT_NAME (target));
+				return;
+			}
+		}
+	}
+	mnt->checked_link = TRUE;
+
+	if (mnt->link_target)
+	{
+		nih_debug ("considering %s mounted, as a symlink to %s",
+			   MOUNT_NAME (mnt), MOUNT_NAME (mnt->link_target));
+		mnt->ready = TRUE;
+		mounted (mnt);
 		return;
 	}
 
@@ -2108,6 +2174,8 @@ write_mtab (void)
 		    && (! strcmp (mnt->type, "none")))
 			continue;
 		if (! strcmp (mnt->type, "swap"))
+			continue;
+		if (mnt->link_target)
 			continue;
 
 		run_mount (mnt, TRUE);
