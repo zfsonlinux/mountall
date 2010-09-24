@@ -12,6 +12,9 @@ mountall (2.18) UNRELEASED; urgency=low
   [ Colin Watson ]
   * Flush standard output and error before daemonising, so that we don't get
     three copies of our early debug output.
+  * If a mountpoint is a symlink to another mountpoint, add a dependency on
+    the link target rather than trying to mount it again and failing
+    (LP: #541512).
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 25 Aug 2010 23:04:22 -0700
 
