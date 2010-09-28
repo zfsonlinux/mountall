@@ -630,7 +630,7 @@ cut_options (const void *parent,
 
 		va_copy (options, args);
 		while ((option = va_arg (options, const char *)) != NULL) {
-			if (! strncmp (opts + i, option, j))
+			if (j && ! strncmp (opts + i, option, j))
 				break;
 		}
 		va_end (options);
@@ -638,8 +638,6 @@ cut_options (const void *parent,
 		if (option) {
 			memmove (opts + (i ? i - 1 : 0), opts + i + j + k,
 				 strlen (opts) - i - j - k + 1);
-			if (i)
-				i--;
 		} else {
 			i += j + k + 1;
 		}
