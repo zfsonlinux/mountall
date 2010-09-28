@@ -1,3 +1,11 @@
+mountall (2.19) UNRELEASED; urgency=low
+
+  * Fix infinite loop when one of mountall's private mount options is
+    followed by a comma, and guard against other reasons why cut_options
+    might end up comparing a zero-length option (LP: #649591).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 28 Sep 2010 09:31:22 +0100
+
 mountall (2.18) maverick; urgency=low
 
   [ Dustin Kirkland ]
