@@ -979,7 +979,8 @@ is_remote (Mount *mnt)
 	    || (! strcmp (mnt->type, "ncp"))
 	    || (! strcmp (mnt->type, "ncpfs"))
 	    || (! strcmp (mnt->type, "ocfs2"))
-	    || (! strcmp (mnt->type, "gfs"))) {
+	    || (! strcmp (mnt->type, "gfs"))
+	    || (! strcmp (mnt->type, "gfs2"))) {
 		return TRUE;
 	} else {
 		return FALSE;
