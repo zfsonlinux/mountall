@@ -4,6 +4,8 @@ mountall (2.20) UNRELEASED; urgency=low
     fakechroot (thanks, Piotr Roszatycki; LP: #675269).
   * Consider gfs2 filesystems to be remote (thanks, Steve Wilson;
     LP: #582278).
+  * Consider ceph filesystems to be remote (thanks, Ravi Pinjala;
+    LP: #677960).
 
  -- Colin Watson <cjwatson@ubuntu.com>  Mon, 29 Nov 2010 16:10:12 +0000
 
