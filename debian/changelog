@@ -1,4 +1,4 @@
-mountall (2.20) UNRELEASED; urgency=low
+mountall (2.20) natty; urgency=low
 
   * Don't try to remove /dev/.udev/rules.d/root.rules when running inside
     fakechroot (thanks, Piotr Roszatycki; LP: #675269).
@@ -7,7 +7,7 @@ mountall (2.20) UNRELEASED; urgency=low
   * Consider ceph filesystems to be remote (thanks, Ravi Pinjala;
     LP: #677960).
 
- -- Colin Watson <cjwatson@ubuntu.com>  Mon, 29 Nov 2010 16:10:12 +0000
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 29 Nov 2010 16:44:44 +0000
 
 mountall (2.19) maverick; urgency=low
 
