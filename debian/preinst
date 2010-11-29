@@ -15,7 +15,8 @@ set -e
 
 case "$1" in
     install|upgrade)
-        if dpkg --compare-versions "$2" lt 2.17; then
+        if dpkg --compare-versions "$2" lt 2.17 && \
+           [ "$FAKECHROOT" != true ]; then
             rm -f /dev/.udev/rules.d/root.rules
         fi
     ;;
