@@ -2,7 +2,7 @@ mountall (2.20+nmu1) natty; urgency=low
 
   * Non-maintainer upload.
   * src/mountall Change an output string to be grammatically correct;
-    LP: #675269
+    (thanks, Julie Lyrae; LP: #675269).
 
  -- Chris Wilson <afrowildo@gmail.com>  Wed, 15 Dec 2010 19:50:48 +0000
 
