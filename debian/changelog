@@ -1,3 +1,10 @@
+mountall (2.21) natty; urgency=low
+
+  * conf/mounted-tmp.conf: find is needed from /usr, so delay this and
+    try again when /usr is mounted. LP: #655447
+
+ -- Clint Byrum <clint@ubuntu.com>  Fri, 04 Feb 2011 15:47:59 -0800
+
 mountall (2.20+nmu1) natty; urgency=low
 
   * Non-maintainer upload.
