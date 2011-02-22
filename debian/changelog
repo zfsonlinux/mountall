@@ -1,3 +1,12 @@
+mountall (2.22) natty; urgency=low
+
+  * conf/mounted-debugfs.conf: since this filesystem should not be used on
+    production systems (https://lkml.org/lkml/2011/2/22/372) we should
+    transition to removing it. As a first step, make the tree only
+    accessible to the root user.
+
+ -- Kees Cook <kees@ubuntu.com>  Tue, 22 Feb 2011 13:25:25 -0800
+
 mountall (2.21) natty; urgency=low
 
   * conf/mounted-tmp.conf: find is needed from /usr, so delay this and
