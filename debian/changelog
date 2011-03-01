@@ -1,3 +1,9 @@
+mountall (2.23) UNRELEASED; urgency=low
+
+  * Update mountall's version number; it was last updated at 2.15.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 01 Mar 2011 21:32:48 +0000
+
 mountall (2.22) natty; urgency=low
 
   * conf/mounted-debugfs.conf: since this filesystem should not be used on
