@@ -76,6 +76,7 @@
 #define BUILTIN_FSTAB   "/lib/init/fstab"
 
 #define BOREDOM_TIMEOUT 3
+#define ROOTDELAY 30
 
 enum exit {
 	EXIT_OK = 0,		/* Ok */
@@ -93,6 +94,7 @@ typedef enum {
 	TAG_SWAP,
 	TAG_NOWAIT,
 	TAG_SKIPPED,
+	TAG_TIMEOUT,
 } Tag;
 
 typedef enum {
@@ -249,6 +251,8 @@ size_t num_virtual = 0;
 size_t num_virtual_mounted = 0;
 size_t num_swap = 0;
 size_t num_swap_mounted = 0;
+size_t num_timeout = 0;
+size_t num_timeout_mounted = 0;
 
 /**
  * newly_mounted:
@@ -355,6 +359,14 @@ static const char *plymouth_keys = NULL;
  **/
 static NihTimer *boredom_timer = NULL;
 
+/**
+ * device_ready_timer:
+ *
+ * Having waited over ROOTDELAY seconds for certain devices to get ready,
+ * exit mountall and trigger the upstart jobs for bringing up the device
+ **/
+
+NihTimer *device_ready_timer = NULL;
 
 /**
  * daemonise:
@@ -1178,6 +1190,11 @@ mount_policy (void)
 			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "local");
 			num_local++;
 			break;
+		case TAG_TIMEOUT:
+			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "local with timeout");
+			num_local++;
+			num_timeout++;
+			break;
 		case TAG_REMOTE:
 			nih_info (_("%s is %s"), MOUNT_NAME (mnt), "remote");
 			num_remote++;
@@ -1231,7 +1248,13 @@ tag_mount (Mount *mnt,
 			}
 		} else {
 			if (! has_option (mnt, "nobootwait", FALSE)) {
-				tag = TAG_LOCAL;
+				if ( has_option (mnt, "timeout", FALSE))
+				{
+					tag = TAG_TIMEOUT; 
+				}
+				else
+					tag = TAG_LOCAL;
+	
 			} else {
 				tag = TAG_NOWAIT;
 			}
@@ -1252,6 +1275,9 @@ tag_mount (Mount *mnt,
 				continue;
 
 			if ((dep->tag == TAG_LOCAL)
+			    && (mnt->tag != TAG_REMOTE))
+				mnt->tag = TAG_LOCAL;
+			if ((dep->tag == TAG_TIMEOUT)
 			    && (mnt->tag != TAG_REMOTE))
 				mnt->tag = TAG_LOCAL;
 			if (dep->tag == TAG_REMOTE)
@@ -1276,9 +1302,22 @@ tag_mount (Mount *mnt,
 		return;
 	}
 
+	if ((tag == TAG_VIRTUAL)
+	    && (mnt->tag == TAG_TIMEOUT)) {
+		nih_debug ("%s is not virtual, inherited local (with timeout)",
+			   MOUNT_NAME (mnt));
+		return;
+	}
+
 	if ((tag == TAG_LOCAL)
 	    && (mnt->tag == TAG_REMOTE)) {
 		nih_debug ("%s is not local, inherited remote",
+			   MOUNT_NAME (mnt));
+	}
+
+	if ((tag == TAG_TIMEOUT)
+	    && (mnt->tag == TAG_REMOTE)) {
+		nih_debug ("%s is not local (with timeout), inherited remote",
 			   MOUNT_NAME (mnt));
 	}
 
@@ -1286,6 +1325,11 @@ tag_mount (Mount *mnt,
 	 * any mount point that depends on this one.
 	 */
 	mnt->tag = tag;
+
+	/* TAG_TIMEOUT is TAG_LOCAL with a timeout. timeout cannot be
+	 * inherited but local could be */
+	if(tag == TAG_TIMEOUT)
+		tag = TAG_LOCAL;
 
 	if ((tag == TAG_LOCAL)
 	    || (tag == TAG_REMOTE)) {
@@ -1386,6 +1430,19 @@ mounted (Mount *mnt)
 	case TAG_LOCAL:
 		num_local_mounted++;
 		break;
+	case TAG_TIMEOUT:
+		num_local_mounted++;
+		num_timeout_mounted++;
+		if (num_timeout_mounted == num_timeout) {
+			nih_message(_("\n %s finished! "), "local_timeout");
+			/* Stop the timeout waiting for device to get ready"
+			 */
+			if (device_ready_timer) {
+				nih_free (device_ready_timer);
+				device_ready_timer = NULL;
+			}
+		}
+		break;
 	case TAG_REMOTE:
 		num_remote_mounted++;
 		break;
@@ -1421,6 +1478,10 @@ skip_mount (Mount *mnt)
 	switch (mnt->tag) {
 	case TAG_LOCAL:
 		num_local--;
+		break;
+	case TAG_TIMEOUT:
+		num_local--;
+		num_timeout--;
 		break;
 	case TAG_REMOTE:
 		num_remote--;
@@ -1521,6 +1582,67 @@ trigger_events (void)
 		   num_swap_mounted, num_swap);
 }
 
+
+void
+is_device_ready(void *    data, NihTimer *timer)
+{
+	device_ready_timer = NULL;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->mounted)
+			continue;
+		if (mnt->tag != TAG_TIMEOUT)
+			continue;
+		/* If udev was not able to identify the expected device within
+		 * ROOTDELAY time, something is wrong */
+		if ((! mnt->ready)
+		    && (! mnt->nodev)
+		    && (! is_remote (mnt))
+		    && ((! strncmp (mnt->device, "/dev/", 5))
+			|| (! strncmp (mnt->device, "UUID=", 5))
+			|| (! strncmp (mnt->device, "LABEL=", 6))))
+		{
+			nih_message("%s device not ready in ROOTDELAY sec", MOUNT_NAME (mnt));
+			emit_event("device-not-ready", mnt);
+			break;
+
+		}
+
+	}
+	
+}
+
+void activate_timer()
+{
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->mounted)
+			continue;
+		if (mnt->tag != TAG_TIMEOUT)
+			continue;
+		/* If there's an underlying device that udev is going to deal with,
+		 * and it's not a virtual or remote filesystem, we wait for the udev
+		 * watcher to mark it ready within ROOTDELAY time.
+		 */
+		if ((! mnt->ready)
+		    && (! mnt->nodev)
+		    && (! is_remote (mnt))
+		    && ((! strncmp (mnt->device, "/dev/", 5))
+			|| (! strncmp (mnt->device, "UUID=", 5))
+			|| (! strncmp (mnt->device, "LABEL=", 6))))
+		{
+			nih_message("%s waiting for device, starting timer", MOUNT_NAME (mnt));
+			device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 
+						ROOTDELAY, is_device_ready, NULL));
+			break;
+
+		}
+
+	}
+
+}
 
 void
 try_mounts (void)
@@ -1841,7 +1963,7 @@ run_mount (Mount *mnt,
 	}
 
 	opts = cut_options (NULL, mnt, "showthrough", "optional",
-			    "bootwait", "nobootwait",
+			    "bootwait", "nobootwait", "timeout",
 			    NULL);
 	if (mnt->mounted && (! fake)) {
 		char *tmp;
@@ -3396,6 +3518,10 @@ main (int   argc,
 
 	/* See what's already mounted */
 	mark_mounted ();
+	/* Activate the timer for a fs that is local, unmounted and waits for
+	 * a device to be ready, before it can be mounted onto it. Timer on
+	 * only for fs not marked with a "nobootwait=1" */
+	activate_timer();
 
 	/* See what we can mount straight away, and then schedule the same
 	 * function to be run each time through the main loop.
