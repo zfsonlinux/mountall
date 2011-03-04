@@ -229,6 +229,7 @@ void   plymouth_answer       (void *user_data, const char *keys,
 			      ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
+int    set_dev_wait_time        (NihOption *option, const char *arg);
 
 
 /**
@@ -396,6 +397,16 @@ static int fsck_fix = FALSE;
  * Set to TRUE if we should not emit events.
  **/
 static int no_events = FALSE;
+
+/**
+ ** dev-wait-time
+ **
+ ** Set to ROOTDELAY if not set. 
+ ** Legal values are between 1sec to 2147483647 seconds.
+ **/
+static int dev_wait_time = FALSE;
+
+
 
 
 static void
@@ -1633,9 +1644,11 @@ void activate_timer()
 			|| (! strncmp (mnt->device, "UUID=", 5))
 			|| (! strncmp (mnt->device, "LABEL=", 6))))
 		{
-			nih_message("%s waiting for device, starting timer", MOUNT_NAME (mnt));
+			nih_message(_("Shall wait for device: %s for %d seconds, starting timer"), MOUNT_NAME (mnt), dev_wait_time);
+			if(!dev_wait_time)
+				dev_wait_time = ROOTDELAY;
 			device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 
-						ROOTDELAY, is_device_ready, NULL));
+						dev_wait_time, is_device_ready, NULL));
 			break;
 
 		}
@@ -3318,6 +3331,25 @@ plymouth_answer (void *             user_data,
 	}
 }
 
+int set_dev_wait_time(NihOption *option, const char *arg)
+{
+        char * end_ptr;
+        dev_wait_time = strtol(arg, &end_ptr, 10);
+        int err = 0;
+        if(dev_wait_time <= 0) {
+                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+                err = -1;
+        }
+        else if ((dev_wait_time == LONG_MIN) || (dev_wait_time == LONG_MAX)) {
+                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+                err = -1;
+        }
+        else if (*end_ptr != '\0') {
+                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+                err = -1;
+        }
+        return err;
+}
 
 
 /**
@@ -3334,7 +3366,8 @@ static NihOption options[] = {
 	  NULL, NULL, &fsck_fix, NULL },
 	{ 0, "no-events", N_("Do not emit events after mounting filesystems"),
 	  NULL, NULL, &no_events, NULL },
-
+	{ 0, "dev-wait-time", N_("In case of (bootwait,timeout): specify the time to wait for device to be detected"),
+          NULL, N_("value in seconds (Default is 30 seconds, Legal value between 1second to 2147483647 seconds)"), &dev_wait_time, set_dev_wait_time},
 	NIH_OPTION_LAST
 };
 
