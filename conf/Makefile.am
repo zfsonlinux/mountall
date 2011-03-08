@@ -9,4 +9,5 @@ dist_init_DATA = \
 	mounted-debugfs.conf \
 	mounted-dev.conf \
 	mounted-varrun.conf \
+	mounted-proc.conf \
 	mounted-tmp.conf
