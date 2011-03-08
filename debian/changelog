@@ -1,4 +1,4 @@
-mountall (2.23) natty; urgency=low
+mountall (2.24) natty; urgency=low
 
   [ Colin Watson ]
   * Update mountall's version number; it was last updated at 2.15.
@@ -9,7 +9,14 @@ mountall (2.23) natty; urgency=low
     wait is 30 seconds.
     (LP: #595904)
 
- -- Bryce Harrington <bryce@ubuntu.com>  Mon, 07 Mar 2011 16:21:24 -0800
+ -- Bryce Harrington <bryce@ubuntu.com>  Mon, 07 Mar 2011 16:50:04 -0800
+
+mountall (2.23) natty; urgency=low
+
+  * conf/mounted-proc.conf: switch sensitive entries in /proc to be
+    mode 0400 to help slightly resist certain kernel heap attacks.
+
+ -- Kees Cook <kees@ubuntu.com>  Mon, 07 Mar 2011 10:12:18 -0800
 
 mountall (2.22) natty; urgency=low
 
