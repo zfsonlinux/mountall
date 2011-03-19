@@ -835,6 +835,9 @@ parse_mountinfo_file (int reparsed)
 		if (! super_opts)
 			continue;
 
+		/* ignore ureadahead's mounting of debugfs */
+		if (! strcmp (mountpoint, "/var/lib/ureadahead/debugfs"))
+			continue;
 
 		opts = NIH_MUST (nih_sprintf (mounts, "%s,%s",
 					      mount_opts, super_opts));
