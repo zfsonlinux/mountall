@@ -1,3 +1,12 @@
+mountall (2.25ubuntu1) natty; urgency=low
+
+  * Fixed two errors found while browsing the code: 1) find_mount("/") returns
+    NULL when / is not found, so cannot access root->mounted. 2) the
+    information message about the dev_wait_timeout should be printed after
+    dev_wait_timeout is initialized properly.
+
+ -- Surbhi Palande <surbhi.palande@canonical.com>  Wed, 13 Apr 2011 12:59:22 +0300
+
 mountall (2.25) natty; urgency=low
 
   * src/mountall.c: ignore ureadahead's potential mount of

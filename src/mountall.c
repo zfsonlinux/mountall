@@ -1647,9 +1647,9 @@ void activate_timer()
 			|| (! strncmp (mnt->device, "UUID=", 5))
 			|| (! strncmp (mnt->device, "LABEL=", 6))))
 		{
-			nih_message(_("Shall wait for device: %s for %d seconds, starting timer"), MOUNT_NAME (mnt), dev_wait_time);
 			if(!dev_wait_time)
 				dev_wait_time = ROOTDELAY;
+			nih_message(_("Shall wait for device: %s for %d seconds, starting timer"), MOUNT_NAME (mnt), dev_wait_time);
 			device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 
 						dev_wait_time, is_device_ready, NULL));
 			break;
@@ -3473,7 +3473,7 @@ main (int   argc,
 
 	/* Sanity check, the root filesystem should be already mounted */
 	root = find_mount ("/");
-	if (! root->mounted) {
+	if (! root || !root->mounted ) {
 		nih_fatal ("%s", _("root filesystem isn't mounted"));
 		exit (EXIT_ERROR);
 	}
