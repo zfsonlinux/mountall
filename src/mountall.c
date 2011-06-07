@@ -1971,7 +1971,7 @@ run_mount (Mount *mnt,
 		 */
 		if ((errno != EEXIST)
 		    && has_option (mnt, "optional", FALSE)) {
-			nih_debug ("%s: mountpoint doesn't exist, ignoring",
+			nih_debug ("%s: mountpoint doesn't exist; ignoring",
 				   MOUNT_NAME (mnt));
 			mounted (mnt);
 			return;
@@ -3158,37 +3158,37 @@ plymouth_update (int only_clear)
 	/* Display that message */
 	switch (plymouth_error) {
 	case ERROR_BORED:
-		message = NIH_MUST (nih_sprintf (NULL,_("The disk drive for %s is not ready yet or not present"),
+		message = NIH_MUST (nih_sprintf (NULL,_("The disk drive for %s is not ready yet or not present."),
 						 MOUNT_NAME (plymouth_mnt)));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
-						      _("Continue to wait; or Press S to skip mounting or M for manual recovery")));
+						      _("Continue to wait, or Press S to skip mounting or M for manual recovery")));
 		plymouth_keys = "SsMm";
 		break;
 	case ERROR_FSCK_FAILED:
-		message = NIH_MUST (nih_sprintf (NULL,_("Errors were found while checking the disk drive for %s"),
+		message = NIH_MUST (nih_sprintf (NULL,_("Errors were found while checking the disk drive for %s."),
 						 MOUNT_NAME (plymouth_mnt)));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
-						      _("Press F to attempt to fix the errors, I to ignore, S to skip mounting or M for manual recovery")));
+						      _("Press F to attempt to fix the errors, I to ignore, S to skip mounting, or M for manual recovery")));
 		plymouth_keys = "FfIiSsMm";
 		break;
 	case ERROR_FSCK_FAILED_HARD:
-		message = NIH_MUST (nih_sprintf (NULL,_("Serious errors were found while checking the disk drive for %s"),
+		message = NIH_MUST (nih_sprintf (NULL,_("Serious errors were found while checking the disk drive for %s."),
 						 MOUNT_NAME (plymouth_mnt)));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
-						      _("Press I to ignore, S to skip mounting or M for manual recovery")));
+						      _("Press I to ignore, S to skip mounting, or M for manual recovery")));
 		plymouth_keys = "IiSsMm";
 		break;
 	case ERROR_MOUNT_FAILED:
-		message = NIH_MUST (nih_sprintf (NULL, _("An error occurred while mounting %s"),
+		message = NIH_MUST (nih_sprintf (NULL, _("An error occurred while mounting %s."),
 						 MOUNT_NAME (plymouth_mnt)));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
 						      _("Press S to skip mounting or M for manual recovery")));
 		plymouth_keys = "SsMm";
 		break;
 	case ERROR_FSCK_IN_PROGRESS:
-		message = NIH_MUST (nih_strdup (NULL, _("Your disk drives are being checked for errors. This may take some time")));
+		message = NIH_MUST (nih_strdup (NULL, _("Checking disk drives are for errors. This may take several minutes.")));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
-						      _("Press C to cancel all checks currently in progress")));
+						      _("Press C to cancel all checks in progress")));
 		plymouth_keys = "Cc";
 		break;
 	default:
