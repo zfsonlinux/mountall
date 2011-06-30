@@ -1,3 +1,9 @@
+mountall (2.27) oneiric; urgency=low
+
+  * Resolve wording error when checking disks
+
+ -- Brian Murray <brian@ubuntu.com>  Thu, 30 Jun 2011 09:08:18 +0100
+
 mountall (2.26) oneiric; urgency=low
 
   * Correct grammar on user-visible strings
