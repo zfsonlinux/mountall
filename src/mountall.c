@@ -3186,7 +3186,7 @@ plymouth_update (int only_clear)
 		plymouth_keys = "SsMm";
 		break;
 	case ERROR_FSCK_IN_PROGRESS:
-		message = NIH_MUST (nih_strdup (NULL, _("Checking disk drives are for errors. This may take several minutes.")));
+		message = NIH_MUST (nih_strdup (NULL, _("Checking disk drives for errors. This may take several minutes.")));
 		keys_message = NIH_MUST (nih_sprintf (NULL, "keys:%s",
 						      _("Press C to cancel all checks in progress")));
 		plymouth_keys = "Cc";
