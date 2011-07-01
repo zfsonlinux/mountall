@@ -68,9 +68,10 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(initdir)"
 PROGRAMS = $(sbin_PROGRAMS)
-am_mountall_OBJECTS = mountall.$(OBJEXT)
+am_mountall_OBJECTS = control.$(OBJEXT) mountall.$(OBJEXT)
 am__objects_1 = com.ubuntu.Upstart.$(OBJEXT)
-nodist_mountall_OBJECTS = $(am__objects_1)
+am__objects_2 = com.ubuntu.Mountall.Server.$(OBJEXT)
+nodist_mountall_OBJECTS = $(am__objects_1) $(am__objects_2)
 mountall_OBJECTS = $(am_mountall_OBJECTS) $(nodist_mountall_OBJECTS)
 am__DEPENDENCIES_1 =
 mountall_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -321,10 +322,11 @@ AM_CPPFLAGS = \
 initdir = $(libdir)/init
 dist_init_DATA = fstab
 mountall_SOURCES = \
-	mountall.c
+	control.c control.h mountall.c
 
 nodist_mountall_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
 
 mountall_LDADD = \
 	$(NIH_LIBS) \
@@ -341,14 +343,23 @@ com_ubuntu_Upstart_OUTPUTS = \
 com_ubuntu_Upstart_XML = \
 	../dbus/com.ubuntu.Upstart.xml
 
+com_ubuntu_Mountall_Server_OUTPUTS = \
+	com.ubuntu.Mountall.Server.c \
+	com.ubuntu.Mountall.Server.h
+
+com_ubuntu_Mountall_Server_XML = \
+	../dbus/com.ubuntu.Mountall.Server.xml
+
 
 # These have to be built sources because we can't compile object files
 # without the header file existing first
 BUILT_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
 
 CLEANFILES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
 
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -438,7 +449,9 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/com.ubuntu.Mountall.Server.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/com.ubuntu.Upstart.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/control.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mountall.Po@am__quote@
 
 .c.o:
@@ -701,9 +714,16 @@ uninstall-am: uninstall-dist_initDATA uninstall-sbinPROGRAMS
 
 $(com_ubuntu_Upstart_OUTPUTS): $(com_ubuntu_Upstart_XML)
 	$(NIH_DBUS_TOOL) \
-		--package=$(PACAKGE) \
+		--package=$(PACKAGE) \
 		--mode=proxy --prefix=upstart \
 		--default-interface=com.ubuntu.Upstart0_6 \
+		--output=$@ $<
+
+$(com_ubuntu_Mountall_Server_OUTPUTS): $(com_ubuntu_Mountall_Server_XML)
+	$(NIH_DBUS_TOOL) \
+		--package=$(PACKAGE) \
+		--mode=object --prefix=control \
+		--default-interface=com.ubuntu.Mountall0_1.Server \
 		--output=$@ $<
 
 clean-local:
