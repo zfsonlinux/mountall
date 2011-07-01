@@ -1,3 +1,11 @@
+mountall (2.26ubuntu1) maverick; urgency=low
+
+  * Added com.ubuntu.Mountall.server interface. Implemented the mntctl command
+    with 4 commands: 1. StopTimer 2. RestartTimer 3. ChangeMountDevice 4.
+    Version.
+    
+ -- Surbhi Palande <surbhi.palande@canonical.com>  Wed, 29 Jun 2011 16:40:01 +0300
+
 mountall (2.26) oneiric; urgency=low
 
   * Correct grammar on user-visible strings

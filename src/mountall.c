@@ -71,6 +71,7 @@
 
 #include "dbus/upstart.h"
 #include "com.ubuntu.Upstart.h"
+#include "control.h"
 
 
 #define BUILTIN_FSTAB   "/lib/init/fstab"
@@ -229,6 +230,7 @@ void   plymouth_answer       (void *user_data, const char *keys,
 			      ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
+void   term_handler          (void *data, NihSignal *signal);
 int    set_dev_wait_time        (NihOption *option, const char *arg);
 
 
@@ -1682,8 +1684,11 @@ try_mounts (void)
 			}
 		}
 
-		if (all)
+		if (all) {
+			dbus_server_disconnect (control_server);
+			dbus_server_unref (control_server);
 			nih_main_loop_exit (EXIT_OK);
+		}
 	}
 }
 
@@ -3354,6 +3359,194 @@ int set_dev_wait_time(NihOption *option, const char *arg)
         return err;
 }
 
+/**
+ * stop_dev_timer:
+ * @devname: Name of the device whose timer you want to stop.
+ *
+ * This function is called to stop a previously started timer of a device.
+ * Note that for this function to be successful, @devname should be a device
+ * that mountall found with the "timeout" option enabled in the fstab.
+ *
+ * Returns 0 on stopping the timer and -1 on not doing so.
+ *
+ **/
+int
+stop_dev_timer (const char *devname)
+{
+	int ret = -1;
+
+	nih_assert (devname != NULL);
+
+	if (strlen (devname) == 0) {
+		nih_message (_("Empty device name specified"));
+		return ret;
+	}
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->mounted)
+			continue;
+		if (mnt->tag != TAG_TIMEOUT)
+			continue;
+
+                if ((! mnt->ready)
+                    && (! mnt->nodev)
+                    && (! is_remote (mnt))
+                    && ((! strncmp (mnt->device, "/dev/", 5))
+                        || (! strncmp (mnt->device, "UUID=", 5))
+                        || (! strncmp (mnt->device, "LABEL=", 6)))
+                    && (! strcmp (mnt->device, devname)))
+                {
+			if (device_ready_timer) {
+				nih_debug("Stopping the timer for the device:"
+					"%s for %d seconds, starting timer", 
+					MOUNT_NAME (mnt), dev_wait_time);
+	                        nih_free (device_ready_timer);
+				device_ready_timer = NULL;
+				ret = 0;
+			}
+                        break;
+
+                }
+	}
+	nih_message (_("stop_dev_timer returning: %d"), ret);
+	return ret;
+}
+
+/**
+ * restart_dev_timer:
+ * @devname: Name of the device whose timer you want to restart.
+ *
+ * This function is called to restart a previously stopped timer of a device.
+ * Note that for this function to be successful, @devname should be a device
+ * that mountall found with the "timeout" option enabled in the fstab.
+ *
+ * Returns 0 on restarting the timer and -1 on not doing so.
+ *
+ **/
+int
+restart_dev_timer (const char *devname)
+{
+	int ret = -1;
+
+	nih_assert (devname != NULL);
+
+	if (strlen (devname) == 0) {
+		nih_message (_("Empty device name specified"));
+		return ret;
+	}
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->mounted)
+			continue;
+		if (mnt->tag != TAG_TIMEOUT)
+			continue;
+
+                if ((! mnt->ready)
+                    && (! mnt->nodev)
+                    && (! is_remote (mnt))
+                    && ((! strncmp (mnt->device, "/dev/", 5))
+                        || (! strncmp (mnt->device, "UUID=", 5))
+                        || (! strncmp (mnt->device, "LABEL=", 6)))
+                    && (! strcmp (mnt->device, devname)))
+                {
+
+			if(!dev_wait_time)
+				dev_wait_time = ROOTDELAY;
+			if (!device_ready_timer) {
+				nih_debug("Shall wait for device: %s for %d "
+					"seconds, starting timer", 
+					MOUNT_NAME (mnt), dev_wait_time);
+				device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 
+					dev_wait_time, is_device_ready, NULL));
+				ret = 0;
+			} 
+			break;
+
+                }
+	}
+	nih_message (_("restart_dev_timer returns: %d"), ret);
+	return ret;
+}
+
+/**
+ * change_mount_device:
+ * @devname: name of the new device.
+ * @path: full path to a previously existing mountpoint.
+ *
+ *  This function is called to change the device that would be mounted at a
+ *  given mountpoint without calling this function. Note that @path should be
+ *  what mountall has read from fstab or what mountall already knows for
+ *  mounting a device.
+ *
+ *  Return 0 on successfully changing the device and -1 on not doing so.
+ **/
+int
+change_mount_device (const char *devname,
+	             const char *path)
+{
+	int ret = -1;
+
+	nih_assert (devname != NULL);
+	nih_assert (path != NULL);
+
+	if (strlen (devname) == 0) {
+		nih_error(_("Empty device name specified"));
+		return ret;
+	}
+	if (strlen (path) == 0) {
+		nih_error (_("Empty mount point specified"));
+		return ret;
+	}
+
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+
+		if (mnt->mounted)
+			continue;
+		if (mnt->tag != TAG_TIMEOUT)
+			continue;
+
+                if ((! mnt->ready)
+                    && (!mnt->nodev)
+                    && (!is_remote (mnt))
+                    && ((!strncmp (mnt->device, "/dev/", 5))
+                        || (!strncmp (mnt->device, "UUID=", 5))
+                        || (!strncmp (mnt->device, "LABEL=", 6)))
+                    )
+                {
+			/* Change the device to be mounted on a pre-registered
+			 * mountpoint
+			 */
+			if ((!strcmp (mnt->mountpoint, path))) {
+				/* Change only if the requested device is
+				 * really any different than whats stored
+				 */
+				if (!strcmp (mnt->device, devname)) {
+					char * newdev;
+					ret = 0;
+					newdev  = nih_strdup (mounts, devname);
+					if (!newdev)  {
+						nih_error_raise_no_memory ();
+						nih_error (("Could not change the mountpoint "
+								"for device: %s"), devname);
+						ret = -1;
+					}
+					else {
+						nih_free (mnt->device);
+						mnt->device = newdev;
+						emit_event ("changed-device", mnt);
+					}
+				}
+				break;
+			}
+                }
+	}
+	return ret;
+}
 
 /**
  * options:
@@ -3529,7 +3722,10 @@ main (int   argc,
 
 	/* Handle TERM signal gracefully */
 	nih_signal_set_handler (SIGTERM, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, nih_main_term_signal, NULL));
+	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, term_handler, NULL));
+
+	nih_signal_set_handler (SIGABRT, nih_signal_handler);
+	NIH_MUST (nih_signal_add_handler (NULL, SIGABRT, term_handler, NULL));
 
 	/* SIGUSR1 tells us that a network device came up */
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
@@ -3554,6 +3750,21 @@ main (int   argc,
 
 	/* See what's already mounted */
 	mark_mounted ();
+	/* Create a listening server for private connections. */
+	while ((ret = control_server_open ()) < 0) {
+		NihError *err;
+
+		err = nih_error_get ();
+		if (err->number != ENOMEM) {
+			nih_warn ("%s: %s", _("Unable to listen for private"
+						"connections"), err->message);
+			nih_free (err);
+			break;
+		}
+		nih_free (err);
+	}
+	if (!ret)
+		emit_event("mountallServer", NULL);
 	/* Activate the timer for a fs that is local, unmounted and waits for
 	 * a device to be ready, before it can be mounted onto it. Timer on
 	 * only for fs not marked with a "nobootwait=1" */
@@ -3589,4 +3800,13 @@ usr1_handler (void *     data,
 
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
+}
+
+void term_handler (void * data,
+		   NihSignal *signal)
+{
+
+	dbus_server_disconnect (control_server);
+	dbus_server_unref (control_server);
+	nih_main_term_signal (data, signal);
 }

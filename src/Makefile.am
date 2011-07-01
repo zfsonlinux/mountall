@@ -21,9 +21,13 @@ sbin_PROGRAMS = \
 	mountall
 
 mountall_SOURCES = \
-	mountall.c
+	control.c control.h mountall.c
+
 nodist_mountall_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
+
+
 mountall_LDADD = \
 	$(NIH_LIBS) \
 	$(NIH_DBUS_LIBS) \
@@ -31,7 +35,6 @@ mountall_LDADD = \
 	$(UDEV_LIBS) \
 	$(PLYMOUTH_LIBS) \
 	$(LTLIBINTL)
-
 
 com_ubuntu_Upstart_OUTPUTS = \
 	com.ubuntu.Upstart.c \
@@ -42,19 +45,35 @@ com_ubuntu_Upstart_XML = \
 
 $(com_ubuntu_Upstart_OUTPUTS): $(com_ubuntu_Upstart_XML)
 	$(NIH_DBUS_TOOL) \
-		--package=$(PACAKGE) \
+		--package=$(PACKAGE) \
 		--mode=proxy --prefix=upstart \
 		--default-interface=com.ubuntu.Upstart0_6 \
+		--output=$@ $<
+
+com_ubuntu_Mountall_Server_OUTPUTS = \
+	com.ubuntu.Mountall.Server.c \
+	com.ubuntu.Mountall.Server.h
+
+com_ubuntu_Mountall_Server_XML = \
+	../dbus/com.ubuntu.Mountall.Server.xml
+
+$(com_ubuntu_Mountall_Server_OUTPUTS): $(com_ubuntu_Mountall_Server_XML)
+	$(NIH_DBUS_TOOL) \
+		--package=$(PACKAGE) \
+		--mode=object --prefix=control \
+		--default-interface=com.ubuntu.Mountall0_1.Server \
 		--output=$@ $<
 
 
 # These have to be built sources because we can't compile object files
 # without the header file existing first
 BUILT_SOURCES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
 
 CLEANFILES = \
-	$(com_ubuntu_Upstart_OUTPUTS)
+	$(com_ubuntu_Upstart_OUTPUTS) \
+	$(com_ubuntu_Mountall_Server_OUTPUTS)
 
 
 clean-local:
