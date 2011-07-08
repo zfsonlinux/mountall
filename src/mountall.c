@@ -1344,7 +1344,7 @@ tag_mount (Mount *mnt,
 
 	/* TAG_TIMEOUT is TAG_LOCAL with a timeout. timeout cannot be
 	 * inherited but local could be */
-	if(tag == TAG_TIMEOUT)
+	if (tag == TAG_TIMEOUT)
 		tag = TAG_LOCAL;
 
 	if ((tag == TAG_LOCAL)
@@ -1450,7 +1450,7 @@ mounted (Mount *mnt)
 		num_local_mounted++;
 		num_timeout_mounted++;
 		if (num_timeout_mounted == num_timeout) {
-			nih_message(_("\n %s finished! "), "local_timeout");
+			nih_message (_("\n %s finished! "), "local_timeout");
 			/* Stop the timeout waiting for device to get ready"
 			 */
 			if (device_ready_timer) {
@@ -1598,9 +1598,22 @@ trigger_events (void)
 		   num_swap_mounted, num_swap);
 }
 
-
+/* 
+ * is_device_ready:
+ *
+ * @data: Not used
+ * @timer: timer which was preconfigured and on the expiry of which this
+ * function is called.
+ *
+ * This function is called to check if any device marked with the "timeout"
+ * option in the /etc/fstab is not ready when the preconfigured @timer
+ * expires.
+ * It emits a "device-not-ready" event when it finds that such a device is not
+ * yet ready.
+ */
 void
-is_device_ready(void *    data, NihTimer *timer)
+is_device_ready (void * data,
+		 NihTimer *timer)
 {
 	device_ready_timer = NULL;
 	NIH_LIST_FOREACH (mounts, iter) {
@@ -1619,17 +1632,20 @@ is_device_ready(void *    data, NihTimer *timer)
 			|| (! strncmp (mnt->device, "UUID=", 5))
 			|| (! strncmp (mnt->device, "LABEL=", 6))))
 		{
-			nih_message("%s device not ready in ROOTDELAY sec", MOUNT_NAME (mnt));
-			emit_event("device-not-ready", mnt);
-			break;
-
+			nih_message ("%s device not ready in ROOTDELAY sec", MOUNT_NAME (mnt));
+			emit_event ("device-not-ready", mnt);
 		}
-
 	}
-	
 }
 
-void activate_timer()
+/* 
+ * activate_timer:
+ *
+ * This function is called to start a timer when the first device with
+ * "timeout" option is found.
+ */
+void 
+activate_timer (void)
 {
 	NIH_LIST_FOREACH (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
@@ -1649,9 +1665,9 @@ void activate_timer()
 			|| (! strncmp (mnt->device, "UUID=", 5))
 			|| (! strncmp (mnt->device, "LABEL=", 6))))
 		{
-			if(!dev_wait_time)
+			if (!dev_wait_time)
 				dev_wait_time = ROOTDELAY;
-			nih_message(_("Shall wait for device: %s for %d seconds, starting timer"), MOUNT_NAME (mnt), dev_wait_time);
+			nih_debug ("Shall wait for device: %s for %d seconds, starting timer", MOUNT_NAME (mnt), dev_wait_time);
 			device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 
 						dev_wait_time, is_device_ready, NULL));
 			break;
@@ -3339,21 +3355,35 @@ plymouth_answer (void *             user_data,
 	}
 }
 
-int set_dev_wait_time(NihOption *option, const char *arg)
+/*
+ * set_dev_wait_time:
+ *
+ * @option: Not used
+ * @arg: String receieved at the mountall command line by nih_option_parser
+ * and passed to this function for parsing.
+ *
+ * This function is used to set the "dev_wait_time option" argument specified
+ * at the mountall command line. It is called by the nih_option_parser for
+ * parsing the argument string specified by @arg
+ *
+ */
+int
+set_dev_wait_time (NihOption *option,
+		   const char *arg)
 {
         char * end_ptr;
-        dev_wait_time = strtol(arg, &end_ptr, 10);
+        dev_wait_time = strtol (arg, &end_ptr, 10);
         int err = 0;
-        if(dev_wait_time <= 0) {
-                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+        if (dev_wait_time <= 0) {
+                nih_error (_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
                 err = -1;
         }
         else if ((dev_wait_time == LONG_MIN) || (dev_wait_time == LONG_MAX)) {
-                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+                nih_error (_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
                 err = -1;
         }
         else if (*end_ptr != '\0') {
-                nih_error(_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
+                nih_error (_("\n Legal values of dev-wait-time lie between 1sec to 2147483647 sec"));
                 err = -1;
         }
         return err;
@@ -3399,7 +3429,7 @@ stop_dev_timer (const char *devname)
                     && (! strcmp (mnt->device, devname)))
                 {
 			if (device_ready_timer) {
-				nih_debug("Stopping the timer for the device:"
+				nih_debug ("Stopping the timer for the device:"
 					"%s for %d seconds, starting timer", 
 					MOUNT_NAME (mnt), dev_wait_time);
 	                        nih_free (device_ready_timer);
@@ -3454,10 +3484,10 @@ restart_dev_timer (const char *devname)
                     && (! strcmp (mnt->device, devname)))
                 {
 
-			if(!dev_wait_time)
+			if (!dev_wait_time)
 				dev_wait_time = ROOTDELAY;
 			if (!device_ready_timer) {
-				nih_debug("Shall wait for device: %s for %d "
+				nih_debug ("Shall wait for device: %s for %d "
 					"seconds, starting timer", 
 					MOUNT_NAME (mnt), dev_wait_time);
 				device_ready_timer = NIH_MUST (nih_timer_add_timeout (NULL, 

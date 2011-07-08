@@ -3,6 +3,10 @@ mountall (2.26ubuntu1) maverick; urgency=low
   * Added com.ubuntu.Mountall.server interface. Implemented the mntctl command
     with 4 commands: 1. StopTimer 2. RestartTimer 3. ChangeMountDevice 4.
     Version.
+  * Fixed the coding style bugs in the "timeout" option related code. Also
+    removed a break from the is_device_ready () to get the "device-not-ready"
+    event for all the devices which are marked with the timeout option and
+    which are not ready by the time the timer expires.
     
  -- Surbhi Palande <surbhi.palande@canonical.com>  Wed, 29 Jun 2011 16:40:01 +0300
 
