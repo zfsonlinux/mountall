@@ -1,4 +1,4 @@
-mountall (2.26ubuntu1) maverick; urgency=low
+mountall (2.26ubuntu1) oneiric; urgency=low
 
   * Added com.ubuntu.Mountall.server interface. Implemented the mntctl command
     with 4 commands: 1. StopTimer 2. RestartTimer 3. ChangeMountDevice 4.
