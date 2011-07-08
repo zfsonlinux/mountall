@@ -49,6 +49,8 @@ NIH_LINKER_OPTIMISATIONS
 
 AC_CONFIG_FILES([ Makefile intl/Makefile
 		  dbus/Makefile src/Makefile conf/Makefile
-		  util/Makefile man/Makefile po/Makefile.in ])
+		  util/Makefile man/Makefile po/Makefile.in 
+		  debian/initramfs/Makefile 
+		  debian/initramfs/upstart-jobs/Makefile])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT

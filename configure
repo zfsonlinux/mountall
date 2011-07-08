@@ -17545,7 +17545,7 @@ fi
 
 
 
-ac_config_files="$ac_config_files Makefile intl/Makefile dbus/Makefile src/Makefile conf/Makefile util/Makefile man/Makefile po/Makefile.in"
+ac_config_files="$ac_config_files Makefile intl/Makefile dbus/Makefile src/Makefile conf/Makefile util/Makefile man/Makefile po/Makefile.in debian/initramfs/Makefile debian/initramfs/upstart-jobs/Makefile"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -18543,6 +18543,8 @@ do
     "util/Makefile") CONFIG_FILES="$CONFIG_FILES util/Makefile" ;;
     "man/Makefile") CONFIG_FILES="$CONFIG_FILES man/Makefile" ;;
     "po/Makefile.in") CONFIG_FILES="$CONFIG_FILES po/Makefile.in" ;;
+    "debian/initramfs/Makefile") CONFIG_FILES="$CONFIG_FILES debian/initramfs/Makefile" ;;
+    "debian/initramfs/upstart-jobs/Makefile") CONFIG_FILES="$CONFIG_FILES debian/initramfs/upstart-jobs/Makefile" ;;
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5 ;;
