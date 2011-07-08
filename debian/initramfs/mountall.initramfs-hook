@@ -1,0 +1,46 @@
+#/bin/sh -e
+#event-driven initramfs hook for mountall
+
+PREREQ=""
+
+#Output prequisites
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+if [ !$event_driven ]; then
+	exit 0;
+fi
+
+
+case $1 in
+    prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+copy_exec /sbin/mountall /sbin/
+copy_exec /sbin/mntctl /sbin/
+mkdir -p ${DESTDIR}/lib/init/
+cp /lib/etc/fstab ${DESTDIR}/lib/init/fstab
+mkdir -p ${DESTDIR}/etc/dbus-1/system.d/
+cp /etc/dbus-1/system.d/Mountall.Server.conf ${DESTDIR}/etc/dbus-1/system.d/
+
+# Following is needed for mountall authentication with dbus
+cp 	  /etc/nsswitch.conf	${DESTDIR}/etc/
+cp	  /etc/passwd		${DESTDIR}/etc/
+libnss_compat = `dpkg -L libc6 | grep libnss_compat.so`
+
+if [ -f $libnss_compat ]; then
+	cp -p $libnss_compat ${DESTDIR}/lib/
+else
+	echo "libnss_compat.so not found"
+	echo "warning: mountall would not be able to connect to upstart"
+	exit 1
+fi
+
+
