@@ -1,9 +1,10 @@
-mountall (2.28) UNRELEASED; urgency=low
+mountall (2.28) oneiric; urgency=low
 
+  [ Colin Watson ]
   * Mount /run, /run/lock, and /run/shm rather than /var/run, /var/lock, and
     /var/shm.  Handle migration of the old locations to symlinks.
 
- -- Colin Watson <cjwatson@ubuntu.com>  Wed, 13 Jul 2011 15:46:19 +0100
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 13 Jul 2011 13:30:31 -0700
 
 mountall (2.27) oneiric; urgency=low
 
