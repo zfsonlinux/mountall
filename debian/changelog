@@ -1,11 +1,11 @@
-mountall (2.29) UNRELEASED; urgency=low
+mountall (2.29) oneiric; urgency=low
 
   * Don't actually try to migrate /var/run in /etc/init/mounted-run.conf,
     since / isn't guaranteed to be mounted read-write at the time /run is
     mounted.  Handle this in the initscripts shutdown scripts instead.
   * Handle clean up of the obsolete /etc/init/mounted-varrun.conf conffile.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 13 Jul 2011 16:38:15 -0700
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 13 Jul 2011 23:53:09 +0000
 
 mountall (2.28) oneiric; urgency=low
 
