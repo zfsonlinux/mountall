@@ -3,6 +3,7 @@ mountall (2.29) UNRELEASED; urgency=low
   * Don't actually try to migrate /var/run in /etc/init/mounted-run.conf,
     since / isn't guaranteed to be mounted read-write at the time /run is
     mounted.  Handle this in the initscripts shutdown scripts instead.
+  * Handle clean up of the obsolete /etc/init/mounted-varrun.conf conffile.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 13 Jul 2011 16:38:15 -0700
 
