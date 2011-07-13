@@ -8,6 +8,7 @@ dist_init_DATA = \
 	mountall-shell.conf \
 	mounted-debugfs.conf \
 	mounted-dev.conf \
-	mounted-varrun.conf \
+	mounted-run.conf \
 	mounted-proc.conf \
-	mounted-tmp.conf
+	mounted-tmp.conf \
+	mounted-var.conf

@@ -15,8 +15,8 @@ none            /sys/kernel/security      securityfs      optional              
 none            /spu                      spufs           gid=spu,optional                  0 0
 none            /dev                      devtmpfs,tmpfs  mode=0755                         0 0
 none            /dev/pts                  devpts          noexec,nosuid,gid=tty,mode=0620   0 0
-none            /dev/shm                  tmpfs           nosuid,nodev                      0 0
 none            /tmp                      none            defaults                          0 0
-none            /var/run                  tmpfs           mode=0755,nosuid,showthrough      0 0
-none            /var/lock                 tmpfs           nodev,noexec,nosuid,showthrough   0 0
+none            /run                      tmpfs           noexec,nosuid,size=10%,mode=0755  0 0
+none            /run/lock                 tmpfs           nodev,noexec,nosuid,size=5242880  0 0
+none            /run/shm                  tmpfs           nosuid,nodev                      0 0
 none            /lib/init/rw              tmpfs           mode=0755,nosuid,optional         0 0

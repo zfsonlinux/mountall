@@ -1,3 +1,10 @@
+mountall (2.28) UNRELEASED; urgency=low
+
+  * Mount /run, /run/lock, and /run/shm rather than /var/run, /var/lock, and
+    /var/shm.  Handle migration of the old locations to symlinks.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 13 Jul 2011 15:46:19 +0100
+
 mountall (2.27) oneiric; urgency=low
 
   * Resolve wording error when checking disks.
