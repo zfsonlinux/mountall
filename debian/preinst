@@ -13,7 +13,7 @@ set -e
 # for details, see http://www.debian.org/doc/debian-policy/ or
 # the debian-policy package
 
-dpkg-maintscript-helper rm_conffile /etc/init/mounted-varrun.conf 2.27 -- "$@"
+dpkg-maintscript-helper rm_conffile /etc/init/mounted-varrun.conf 2.28 -- "$@"
 
 case "$1" in
     install|upgrade)
