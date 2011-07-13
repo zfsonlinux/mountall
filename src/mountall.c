@@ -692,6 +692,15 @@ parse_fstab (const char *filename)
 		Mount *         mnt;
 		nih_local char *fsname = NULL;
 
+		/* These are always symlinks into /run now.  Ignore any
+		 * explicit attempts to mount them because it vastly
+		 * complicates matters when trying to ensure that /run and
+		 * /var/run point to the same place.
+		 */
+		if (! strcmp (mntent->mnt_dir, "/var/run") ||
+		    ! strcmp (mntent->mnt_dir, "/var/lock"))
+			continue;
+
 		mnt = find_mount (mntent->mnt_dir);
 		if (mnt
 		    && strcmp (mntent->mnt_type, "swap")) {
