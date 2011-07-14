@@ -1,3 +1,10 @@
+mountall (2.30) UNRELEASED; urgency=low
+
+  * conf/mounted-dev.conf: Stop copying /lib/udev/devices/. udevd already does
+    that, and with devtmpfs it's obsolete now anyway.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 14 Jul 2011 09:03:33 +0200
+
 mountall (2.29) oneiric; urgency=low
 
   * Don't actually try to migrate /var/run in /etc/init/mounted-run.conf,
