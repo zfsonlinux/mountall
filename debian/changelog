@@ -1,4 +1,4 @@
-mountall (2.31) UNRELEASED; urgency=low
+mountall (2.31) oneiric; urgency=low
 
   * Added com.ubuntu.Mountall.server interface. Implemented the mntctl command
     with 4 commands: 1. StopTimer 2. RestartTimer 3. ChangeMountDevice 4.
@@ -15,7 +15,7 @@ mountall (2.31) UNRELEASED; urgency=low
     mountall.conf execute as an upstart job in place of the "local" script in
     the non-event driven initramfs
     
- -- Surbhi Palande <surbhi.palande@canonical.com>  Wed, 29 Jun 2011 16:40:01 +0300
+ -- Surbhi Palande <surbhi.palande@canonical.com>  Fri, 15 Jul 2011 13:32:33 +0100
 
 mountall (2.30) oneiric; urgency=low
 
