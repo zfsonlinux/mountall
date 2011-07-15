@@ -3,7 +3,7 @@
 AC_PREREQ(2.62)
 AC_INIT([mountall], [2.27], [ubuntu-devel@lists.ubuntu.com])
 AC_COPYRIGHT([[Copyright © 2010 Canonical Ltd.]])
-AC_CONFIG_SRCDIR([src/mountall.c])
+AC_CONFIG_SRCDIR([util/mntctl.c])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_GNU_SOURCE
@@ -49,6 +49,8 @@ NIH_LINKER_OPTIMISATIONS
 
 AC_CONFIG_FILES([ Makefile intl/Makefile
 		  dbus/Makefile src/Makefile conf/Makefile
-		  man/Makefile po/Makefile.in ])
+		  util/Makefile man/Makefile po/Makefile.in 
+		  debian/initramfs/Makefile 
+		  debian/initramfs/upstart-jobs/Makefile])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT

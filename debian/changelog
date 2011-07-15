@@ -1,3 +1,22 @@
+mountall (2.31) UNRELEASED; urgency=low
+
+  * Added com.ubuntu.Mountall.server interface. Implemented the mntctl command
+    with 4 commands: 1. StopTimer 2. RestartTimer 3. ChangeMountDevice 4.
+    Version.
+  * Fixed the coding style bugs in the "timeout" option related code. Also
+    removed a break from the is_device_ready () to get the "device-not-ready"
+    event for all the devices which are marked with the timeout option and
+    which are not ready by the time the timer expires.
+  * Added debian/initramfs/Makefile.am to install mountall.initramfs-hook as
+    an initramfs hook that installs mntctl, mountall and other files needed by
+    an event driven initramfs. Also added
+    debian/initramfs/upstart-jobs/Makefile.am to install the upstart-jobs
+    related to mountall in the event driven initramfs. The current
+    mountall.conf execute as an upstart job in place of the "local" script in
+    the non-event driven initramfs
+    
+ -- Surbhi Palande <surbhi.palande@canonical.com>  Wed, 29 Jun 2011 16:40:01 +0300
+
 mountall (2.30) oneiric; urgency=low
 
   * conf/mounted-dev.conf: Stop copying /lib/udev/devices/. udevd already does
