@@ -149,57 +149,59 @@ control_disconnected (DBusConnection *conn)
 
 /**
  * control_stop_timer:
- * @devname: Name of the device whose timer you want to stop.
+ * @mountpoint: the mountpoint corresponding to the device for which the
+ * timeout option has to be disabled.
  *
  * Implements the StopTimer method of com.ubuntu.Moutall01_Server
  * interface.
  *
  * This function is called for stopping a previously started timer for a
- * @device. Stopping a timer has the effect that mountall would no longer
- * expect the device to be ready within a previously registered stipulated
- * time period. After this call, mountall will wait endlessly till the device
- * becomes ready! Use this function only when you know that you might restart
- * the timer later or that you really want to wait endlessly for the device to
- * become available. 
+ * mountpoint. Stopping a timer has the effect that mountall would no longer
+ * expect the corresponding device to be ready within a previously registered
+ * stiplulated time period. After this call, mountall will wait endlessly till
+ * the device becomes ready. Use this function only when you know that you
+ * might restart the timer later or that you really want to wait endlessly
+ * till the device becomes available.
  *
  * Returns 0 on success and -1 on failure.
  **/
 int
 control_stop_timer  (void *data, 
 		     NihDBusMessage *message,
-		     const char *devname)
+		     const char *mountpoint)
 {
 
-	nih_assert (devname != NULL);
+	nih_assert (mountpoint != NULL);
 	nih_assert (message != NULL);
 
-	return stop_dev_timer (devname);
+	return stop_dev_timer (mountpoint);
 }
 
 /**
  * control_restart_timer:
- * @devname: Name of the device whose timer you want to stop.
+ * @mountpoint: the mountpoint corresponding to the device for which the
+ * timeout option has to be disabled.
  *
  * Implements the RestartTimer method of com.ubuntu.Moutall01_Server
  * interface.
  *
  * This function is called for restarting a previously stopped timer for a
- * @device. After successfully restarting a timer, mountall will expect the
- * device to become ready for mounting within the previously configured
- * timeout or the default of 30 seconds.
+ * mountpoint. After successfully restarting a timer, mountall will expect the
+ * corresponding device to become ready for mounting within the previously
+ * configured timeout or the default of 30 seconds.
  *
  * Returns 0 on success and -1 on failure.
  **/
 int
 control_restart_timer (void *data,
 		       NihDBusMessage *message,
-		       const char *devname)
+		       const char *mountpoint)
 {
 
-	nih_assert (devname != NULL);
+	nih_assert (mountpoint != NULL);
 	nih_assert (message != NULL);
 
-	return restart_dev_timer (devname);
+	return restart_dev_timer (mountpoint);
 }
 
 /**

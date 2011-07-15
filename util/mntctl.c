@@ -340,17 +340,17 @@ static NihCommandGroup mount_commands = { N_("Mounts") };
  * Commands accepts as the first non-option argument, or program name.
  **/
 static NihCommand commands[] = {
-	{ "stop-timer", N_("DEVICE-NAME"),
+	{ "stop-timer", N_("MOUNTPOINT"),
 	  N_("Stop a timer associated with the specified device"),
-	  N_("DEVICE-NAME is the name of the device whose timer you want to "
-	     "stop so that it can become ready whenever possible"),
+	  N_("MOUNTPOINT is the mountpoint corresponding to a device whose "
+	     "timer you want to stop"),
 	  &timer_commands, stop_timer_options, stop_timer_action },
 
-	{ "restart-timer", N_("DEVICE-NAME"),
+	{ "restart-timer", N_("MOUNTPOINT"),
 	  N_("Restart a timer associated with the specified device"),
-	  N_("DEVICE-NAME is the name of the device which should become "
-	     "ready within the default wait time or the time specified "
-	     "explicitly as a command line argument to mountall") ,
+	  N_("MOUNTPOINT is the mountpoint corresponding to a device that "
+	     "should become ready withing the default wait time or the time "
+	     "specified explicitly as a command line argument to mountall") ,
 	  &timer_commands, restart_timer_options, restart_timer_action },
 
 	{ "change-mount", N_("DEVICE-NAME PATH"),
