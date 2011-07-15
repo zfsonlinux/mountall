@@ -1,4 +1,4 @@
-#/bin/sh -e
+#!/bin/sh -e
 #event-driven initramfs hook for mountall
 
 PREREQ=""
