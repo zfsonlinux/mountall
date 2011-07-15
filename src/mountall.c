@@ -230,7 +230,6 @@ void   plymouth_answer       (void *user_data, const char *keys,
 			      ply_boot_client_t *client);
 
 void   usr1_handler          (void *data, NihSignal *signal);
-void   term_handler          (void *data, NihSignal *signal);
 int    set_dev_wait_time        (NihOption *option, const char *arg);
 
 
@@ -3752,10 +3751,10 @@ main (int   argc,
 
 	/* Handle TERM signal gracefully */
 	nih_signal_set_handler (SIGTERM, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, term_handler, NULL));
+	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, nih_main_term_signal, NULL));
 
 	nih_signal_set_handler (SIGABRT, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGABRT, term_handler, NULL));
+	NIH_MUST (nih_signal_add_handler (NULL, SIGABRT, nih_main_term_signal, NULL));
 
 	/* SIGUSR1 tells us that a network device came up */
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
@@ -3830,13 +3829,4 @@ usr1_handler (void *     data,
 
 	newly_mounted = TRUE;
 	nih_main_loop_interrupt ();
-}
-
-void term_handler (void * data,
-		   NihSignal *signal)
-{
-
-	dbus_server_disconnect (control_server);
-	dbus_server_unref (control_server);
-	nih_main_term_signal (data, signal);
 }
