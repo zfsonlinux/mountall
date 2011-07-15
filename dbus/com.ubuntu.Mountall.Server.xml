@@ -22,11 +22,11 @@
     <!-- Get object paths for jobs, while you can figure them out, it's
          better form to use these -->
     <method name="StopTimer">
-      <arg name="devname" type="s" direction="in" />
+      <arg name="mountpoint" type="s" direction="in" />
     </method>
 
     <method name="RestartTimer">
-      <arg name="devname" type="s" direction="in" />
+      <arg name="mountpoint" type="s" direction="in" />
     </method>
 
     <method name="ChangeMountDevice">

@@ -3390,26 +3390,28 @@ set_dev_wait_time (NihOption *option,
         return err;
 }
 
+
 /**
- * stop_dev_timer:
- * @devname: Name of the device whose timer you want to stop.
+ * stop_mountpoint_timer:
+ * @mountpoint: mountpoint whose timer you want to stop.
  *
- * This function is called to stop a previously started timer of a device.
- * Note that for this function to be successful, @devname should be a device
- * that mountall found with the "timeout" option enabled in the fstab.
+ * This function is called to stop a previously started timer of a device
+ * Note that for this function to be successful, @mountpoint should be a
+ * mountpoint corresponding to a device whose "timeout" option is set in the
+ * /etc/fstab.
  *
  * Returns 0 on stopping the timer and -1 on not doing so.
  *
  **/
 int
-stop_dev_timer (const char *devname)
+stop_dev_timer (const char *mountpoint)
 {
 	int ret = -1;
 
-	nih_assert (devname != NULL);
+	nih_assert (mountpoint != NULL);
 
-	if (strlen (devname) == 0) {
-		nih_message (_("Empty device name specified"));
+	if (strlen (mountpoint) == 0) {
+		nih_message (_("Empty mountpoint specified"));
 		return ret;
 	}
 
@@ -3427,7 +3429,7 @@ stop_dev_timer (const char *devname)
                     && ((! strncmp (mnt->device, "/dev/", 5))
                         || (! strncmp (mnt->device, "UUID=", 5))
                         || (! strncmp (mnt->device, "LABEL=", 6)))
-                    && (! strcmp (mnt->device, devname)))
+                    && (! strcmp (mnt->mountpoint, mountpoint)))
                 {
 			if (device_ready_timer) {
 				nih_debug ("Stopping the timer for the device:"
@@ -3441,30 +3443,30 @@ stop_dev_timer (const char *devname)
 
                 }
 	}
-	nih_message (_("stop_dev_timer returning: %d"), ret);
 	return ret;
 }
 
 /**
  * restart_dev_timer:
- * @devname: Name of the device whose timer you want to restart.
+ ** @mountpoint: mountpoint whose timer you want to stop.
  *
- * This function is called to restart a previously stopped timer of a device.
- * Note that for this function to be successful, @devname should be a device
- * that mountall found with the "timeout" option enabled in the fstab.
+ * This function is called to restart a previously stopped timer of a device
+ * Note that for this function to be successful, @mountpoint should be a
+ * mountpoint corresponding to a device whose "timeout" option is set in the
+ * /etc/fstab.
  *
  * Returns 0 on restarting the timer and -1 on not doing so.
  *
  **/
 int
-restart_dev_timer (const char *devname)
+restart_dev_timer (const char *mountpoint)
 {
 	int ret = -1;
 
-	nih_assert (devname != NULL);
+	nih_assert (mountpoint != NULL);
 
-	if (strlen (devname) == 0) {
-		nih_message (_("Empty device name specified"));
+	if (strlen (mountpoint) == 0) {
+		nih_message (_("Empty mountpoint specified"));
 		return ret;
 	}
 
@@ -3482,7 +3484,7 @@ restart_dev_timer (const char *devname)
                     && ((! strncmp (mnt->device, "/dev/", 5))
                         || (! strncmp (mnt->device, "UUID=", 5))
                         || (! strncmp (mnt->device, "LABEL=", 6)))
-                    && (! strcmp (mnt->device, devname)))
+                    && (! strcmp (mnt->mountpoint, mountpoint)))
                 {
 
 			if (!dev_wait_time)
@@ -3499,7 +3501,6 @@ restart_dev_timer (const char *devname)
 
                 }
 	}
-	nih_message (_("restart_dev_timer returns: %d"), ret);
 	return ret;
 }
 

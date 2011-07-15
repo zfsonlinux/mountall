@@ -16,11 +16,9 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-int stop_dev_timer (const char * devname)
+int stop_dev_timer (const char * mountpoint)
 	__attribute__ ((warn_unused_result));
-int restart_dev_timer (const char * devname)
+int restart_dev_timer (const char * mountpoint)
 	__attribute__ ((warn_unused_result));
 int change_mount_device (const char * devname, const char * path)
-	__attribute__ ((warn_unused_result));
-int get_mount_devices (NihDBusMessage *message, char *** devs, char *** mntpoints)
 	__attribute__ ((warn_unused_result));

@@ -23,17 +23,14 @@ extern const NihDBusInterface *control_interfaces[];
 
 int control_server_open (void);
 int control_stop_timer  (void *data, NihDBusMessage *message, 
-						const char *devname)
+						const char *mountpoint)
 	__attribute__ ((warn_unused_result));
 int control_restart_timer (void *data, NihDBusMessage *message,
-	       					const char *devname)
+	       					const char *mountpoint)
 	__attribute__ ((warn_unused_result));
 int control_change_mount_device (void *data, NihDBusMessage *message, 
 				const char *devname, const char *path)
 	__attribute__ ((warn_unused_result));
 int control_get_version (void *data, NihDBusMessage *message, 
 						char **value)
-	__attribute__ ((warn_unused_result));
-int control_get_mount_devices (void *data, NihDBusMessage *message,
-				char ***devs, char ***mntpoints)
 	__attribute__ ((warn_unused_result));
