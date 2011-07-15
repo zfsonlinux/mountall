@@ -22,9 +22,8 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
-
-copy_exec /sbin/mountall /sbin/
-copy_exec /sbin/mntctl /sbin/
+copy_exec /sbin/mountall
+copy_exec /sbin/mntctl
 mkdir -p ${DESTDIR}/lib/init/
 mkdir -p ${DESTDIR}/etc/dbus-1/system.d/
 cp /etc/dbus-1/system.d/Mountall.Server.conf ${DESTDIR}/etc/dbus-1/system.d/
@@ -50,7 +49,6 @@ else
 fi
 
 libnss_files=`dpkg -L libc6 | grep libnss_files.so.2`
-echo "*$libnss_files*"
 if [ -f $libnss_files ]; then
 	cp -uv $libnss_files ${DESTDIR}/lib/libnss_files.so.2
 else
@@ -69,6 +67,3 @@ else
 fi
 
 cp /etc/blkid.conf ${DESTDIR}/etc/
-
-echo "exiting hook for mountall"
-
