@@ -1700,8 +1700,10 @@ try_mounts (void)
 		}
 
 		if (all) {
-			dbus_server_disconnect (control_server);
-			dbus_server_unref (control_server);
+			if (control_server) {
+				dbus_server_disconnect (control_server);
+				dbus_server_unref (control_server);
+			}
 			nih_main_loop_exit (EXIT_OK);
 		}
 	}
