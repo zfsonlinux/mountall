@@ -19,8 +19,6 @@
 
 <node>
   <interface name="com.ubuntu.Mountall0_1.Server">
-    <!-- Get object paths for jobs, while you can figure them out, it's
-         better form to use these -->
     <method name="StopTimer">
       <arg name="mountpoint" type="s" direction="in" />
     </method>
@@ -34,7 +32,7 @@
       <arg name="path" type="s" direction="in" />
     </method>
 
-    <!-- Basic information about Upstart -->
+    <!-- Basic information about Mountall-->
     <property name="version" type="s" access="read" />
   </interface>
 </node>

@@ -3756,9 +3756,6 @@ main (int   argc,
 	nih_signal_set_handler (SIGTERM, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, nih_main_term_signal, NULL));
 
-	nih_signal_set_handler (SIGABRT, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGABRT, nih_main_term_signal, NULL));
-
 	/* SIGUSR1 tells us that a network device came up */
 	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
