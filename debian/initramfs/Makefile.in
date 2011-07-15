@@ -34,9 +34,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = dbus
-DIST_COMMON = $(dist_dbus_config_DATA) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in
+subdir = debian/initramfs
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/codeset.m4 \
 	$(top_srcdir)/m4/gettext.m4 $(top_srcdir)/m4/glibc2.m4 \
@@ -64,14 +63,6 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-AM_V_GEN = $(am__v_GEN_$(V))
-am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
-am__v_GEN_0 = @echo "  GEN   " $@;
-AM_V_at = $(am__v_at_$(V))
-am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
-am__v_at_0 = @
-SOURCES =
-DIST_SOURCES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -93,8 +84,16 @@ am__nobase_list = $(am__nobase_strip_setup); \
 am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(dbus_configdir)"
-DATA = $(dist_dbus_config_DATA)
+am__installdirs = "$(DESTDIR)$(initramfshookdir)"
+SCRIPTS = $(initramfshook_SCRIPTS)
+AM_V_GEN = $(am__v_GEN_$(V))
+am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
+am__v_GEN_0 = @echo "  GEN   " $@;
+AM_V_at = $(am__v_at_$(V))
+am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
+am__v_at_0 = @
+SOURCES =
+DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 ALLOCA = @ALLOCA@
@@ -119,7 +118,6 @@ DBUS_CFLAGS = @DBUS_CFLAGS@
 DBUS_LIBS = @DBUS_LIBS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
-DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -173,7 +171,6 @@ LTLIBPTH = @LTLIBPTH@
 LTLIBTHREAD = @LTLIBTHREAD@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
-MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
 MSGFMT = @MSGFMT@
 MSGFMT_015 = @MSGFMT_015@
@@ -224,7 +221,6 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
-ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
@@ -257,6 +253,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -272,12 +269,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-dbus_configdir = $(sysconfdir)/dbus-1/system.d
-dist_dbus_config_DATA = Mountall.Server.conf
-EXTRA_DIST = \
-	upstart.h \
-	com.ubuntu.Upstart.xml
-
+initramfshookdir = /usr/share/initramfs-tools/hooks
+initramfshook_SCRIPTS = mountall
 all: all-am
 
 .SUFFIXES:
@@ -290,9 +283,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign dbus/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign debian/initramfs/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign dbus/Makefile
+	  $(AUTOMAKE) --foreign debian/initramfs/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -311,32 +304,46 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+install-initramfshookSCRIPTS: $(initramfshook_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	test -z "$(initramfshookdir)" || $(MKDIR_P) "$(DESTDIR)$(initramfshookdir)"
+	@list='$(initramfshook_SCRIPTS)'; test -n "$(initramfshookdir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n' \
+	    -e 'h;s|.*|.|' \
+	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
+	      if (++n[d] == $(am__install_max)) { \
+		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
+	    else { print "f", d "/" $$4, $$1 } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	     test -z "$$files" || { \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(initramfshookdir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(initramfshookdir)$$dir" || exit $$?; \
+	     } \
+	; done
+
+uninstall-initramfshookSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(initramfshook_SCRIPTS)'; test -n "$(initramfshookdir)" || exit 0; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	       sed -e 's,.*/,,;$(transform)'`; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(initramfshookdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(initramfshookdir)" && rm -f $$files
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-dist_dbus_configDATA: $(dist_dbus_config_DATA)
-	@$(NORMAL_INSTALL)
-	test -z "$(dbus_configdir)" || $(MKDIR_P) "$(DESTDIR)$(dbus_configdir)"
-	@list='$(dist_dbus_config_DATA)'; test -n "$(dbus_configdir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(dbus_configdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(dbus_configdir)" || exit $$?; \
-	done
-
-uninstall-dist_dbus_configDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(dist_dbus_config_DATA)'; test -n "$(dbus_configdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(dbus_configdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(dbus_configdir)" && rm -f $$files
 tags: TAGS
 TAGS:
 
@@ -376,9 +383,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(DATA)
+all-am: Makefile $(SCRIPTS)
 installdirs:
-	for dir in "$(DESTDIR)$(dbus_configdir)"; do \
+	for dir in "$(DESTDIR)$(initramfshookdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -426,7 +433,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_dbus_configDATA
+install-data-am: install-initramfshookSCRIPTS
 
 install-dvi: install-dvi-am
 
@@ -470,21 +477,21 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_dbus_configDATA
+uninstall-am: uninstall-initramfshookSCRIPTS
 
 .MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	distclean distclean-generic distclean-libtool distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dist_dbus_configDATA \
-	install-dvi install-dvi-am install-exec install-exec-am \
-	install-html install-html-am install-info install-info-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-initramfshookSCRIPTS \
 	install-man install-pdf install-pdf-am install-ps \
 	install-ps-am install-strip installcheck installcheck-am \
 	installdirs maintainer-clean maintainer-clean-generic \
 	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
-	ps ps-am uninstall uninstall-am uninstall-dist_dbus_configDATA
+	ps ps-am uninstall uninstall-am uninstall-initramfshookSCRIPTS
 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

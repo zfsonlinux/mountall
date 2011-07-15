@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- mountall 
+
+     com.ubuntu.Mountall.Server.xml - interface definition for Mountall Server
+
+     Copyright © 2011 Canonical Ltd.
+
+     This file is free software; Canonical Ltd gives unlimited permission
+     to copy and/or distribute it, with or without modifications, as long
+     as this notice is preserved.
+
+     Communication and interaction with Mountall through this interface is
+     permitted without restriction.
+  -->
+
+<!DOCTYPE node PUBLIC
+  "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+
+<node>
+  <interface name="com.ubuntu.Mountall0_1.Server">
+    <method name="StopTimer">
+      <arg name="mountpoint" type="s" direction="in" />
+    </method>
+
+    <method name="RestartTimer">
+      <arg name="mountpoint" type="s" direction="in" />
+    </method>
+
+    <method name="ChangeMountDevice">
+      <arg name="devname" type="s" direction="in" />
+      <arg name="path" type="s" direction="in" />
+    </method>
+
+    <!-- Basic information about Mountall-->
+    <property name="version" type="s" access="read" />
+  </interface>
+</node>
