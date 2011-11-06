@@ -178,6 +178,7 @@ char * get_option            (const void *parent, Mount *mnt, const char *option
 char * cut_options           (const void *parent, Mount *mnt, ...);
 
 void   parse_fstab           (const char *filename);
+void   parse_zfs_list        (void);
 void   parse_mountinfo       (void);
 
 void   parse_filesystems     (void);
@@ -751,6 +752,90 @@ parse_fstab (const char *filename)
 	}
 
 	endmntent (fstab);
+}
+
+/**
+ * parse_zfs_list:
+ *
+ * Add the output of `/sbin/zfs list` to the internal mounts list
+ * and pretend that these filesystems were in the /etc/fstab file.
+ *
+ * @TODO: Check whether Canonical agrees that libzfs, which is
+ * subject to the CDDL, should get the GPL system library exemption
+ * like it usually does on BSD and Solaris systems.
+ *
+ * @TODO: Subtitute the call to popen with a libzfs routine.
+ *
+ **/
+void
+parse_zfs_list (void)
+{
+	nih_local char *buf = NULL;
+	size_t bufsz = 4096;
+	FILE *zfs_stream;
+	const char zfs_command[] =
+	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount,mounted";
+	int zfs_result;
+
+	nih_debug ("parsing ZFS list");
+
+	fflush (stdout);
+	fflush (stderr);
+	zfs_stream = popen (zfs_command, "r");
+
+	if (zfs_stream == NULL) {
+		nih_debug ("popen /sbin/zfs: %s", strerror (errno));
+		return;
+	}
+
+	buf = NIH_MUST (nih_alloc (NULL, bufsz));
+
+	/* Read one line from the pipe into the buffer. */
+	while (fgets (buf, bufsz, zfs_stream) != NULL) {
+		char *saveptr;
+		char *zfs_name, *zfs_mountpoint, *zfs_canmount, *zfs_mounted;
+
+		/* If the line didn't fit, then enlarge the buffer and retry. */
+		while ((! strchr (buf, '\n')) && (! feof (zfs_stream))) {
+			buf = NIH_MUST (nih_realloc (buf, NULL, bufsz + 4096));
+			if (! fgets (buf + bufsz - 1, 4097, zfs_stream)) {
+				break;
+			}
+			bufsz += 4096;
+		}
+
+		zfs_name = strtok_r (buf, "\t", &saveptr);
+		if (! zfs_name) {
+			continue;
+		}
+
+		/* ASSERT: mountpoint[0] = '/' OR mountpoint = none | legacy */
+		zfs_mountpoint = strtok_r (NULL, "\t", &saveptr);
+		if (! zfs_mountpoint || zfs_mountpoint[0] != '/') {
+			continue;
+		}
+
+		/* ASSERT: canmount = on | off | noauto */
+		zfs_canmount = strtok_r (NULL, "\t", &saveptr);
+		if (! zfs_canmount || strcmp (zfs_canmount, "on")) {
+			continue;
+		}
+
+		/* ASSERT: mounted = yes | no */
+		zfs_mounted = strtok_r (NULL, "\t\n", &saveptr);
+		if (! zfs_mounted || strcmp (zfs_mounted, "no")) {
+			continue;
+		}
+
+		new_mount (zfs_mountpoint, zfs_name, FALSE, "zfs", "zfsutil,nobootwait");
+	}
+
+	zfs_result = pclose (zfs_stream);
+
+	if (zfs_result)
+	{
+		nih_debug ("pclose /sbin/zfs: %i %s", zfs_result, strerror (errno));
+	}
 }
 
 static int
@@ -3996,6 +4081,7 @@ main (int   argc,
 	 */
 	parse_fstab (BUILTIN_FSTAB);
 	parse_fstab (_PATH_MNTTAB);
+	parse_zfs_list ();
 	parse_mountinfo ();
 
 	/* Apply policy as to what waits for what, etc. */
