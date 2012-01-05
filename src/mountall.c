@@ -1027,6 +1027,23 @@ is_remote (Mount *mnt)
 void
 mount_policy (void)
 {
+	nih_local NihList  *already_mounted = NULL;
+	NihListEntry       *entry;
+
+	/* Build a list of mountpoints of already mounted
+	 * file systems. Used later to avoid hiding existing
+	 * mounted file systems.
+	 */
+	already_mounted = NIH_MUST (nih_list_new (NULL));
+ 	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *mnt = (Mount *)iter;
+		if (mnt->mountpoint && mnt->mounted) {
+			entry = NIH_MUST (nih_list_entry_new (already_mounted));
+			entry->str = NIH_MUST (nih_strdup (entry, mnt->mountpoint));
+			nih_list_add (already_mounted, &entry->entry);
+		}
+	}
+
  	NIH_LIST_FOREACH_SAFE (mounts, iter) {
 		Mount *mnt = (Mount *)iter;
 		size_t j;
@@ -1080,6 +1097,23 @@ mount_policy (void)
 				   MOUNT_NAME (mnt));
 			nih_free (mnt);
 			continue;
+		}
+
+		/* Check if our current mount entry would hide
+		 * an existing mountpoint. If so, skip it.
+		 */
+		NIH_LIST_FOREACH (already_mounted, iter) {
+			NihListEntry *e = (NihListEntry *)iter;
+			if (mnt->mountpoint
+			    && mnt->mountpoint != e->str
+			    && ! mnt->mounted
+			    && is_parent (mnt->mountpoint, e->str)) {
+				nih_debug (
+				    "%s: dropping filesystem because it has an already mounted child (%s)\n",
+				    mnt->mountpoint, e->str);
+				nih_free (mnt);
+				break;
+			}
 		}
 	}
 
@@ -1418,7 +1452,7 @@ mounted (Mount *mnt)
 		 * /dev/root symlink for the right device too ;-)
 		 */
 		root = find_mount ("/");
-		if (root->mounted_dev != -1) {
+		if (root->mounted_dev != (dev_t)-1) {
 			FILE *rules;
 
 			mask = umask (0022);
