@@ -1,9 +1,13 @@
 mountall (2.32) UNRELEASED; urgency=low
 
+  [ Steve Langasek ]
   * Drop /lib/init/rw from /lib/init/fstab, since this is now always a symlink
     to /run.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Fri, 22 Jul 2011 17:37:52 +0200
+  [ James Hunt ]
+  * src/mountall.c: mounted(): Add cast to appease gcc 4.6.2.
+
+ -- James Hunt <james.hunt@ubuntu.com>  Thu, 05 Jan 2012 16:03:20 +0000
 
 mountall (2.31) oneiric; urgency=low
 
