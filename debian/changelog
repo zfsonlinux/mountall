@@ -1,4 +1,4 @@
-mountall (2.32) UNRELEASED; urgency=low
+mountall (2.32) precise; urgency=low
 
   [ Steve Langasek ]
   * Drop /lib/init/rw from /lib/init/fstab, since this is now always a symlink
