@@ -7,7 +7,11 @@ mountall (2.32) UNRELEASED; urgency=low
   [ James Hunt ]
   * src/mountall.c: mounted(): Add cast to appease gcc 4.6.2.
 
- -- James Hunt <james.hunt@ubuntu.com>  Thu, 05 Jan 2012 16:03:20 +0000
+  [ Stéphane Graber ]
+  * src/mountall.c: mount_policy(): Ignore mount points if there is already a
+    mounted child (required for lxc(7) to ignore mounts such as /dev). 
+
+ -- James Hunt <james.hunt@ubuntu.com>  Thu, 05 Jan 2012 16:07:12 +0000
 
 mountall (2.31) oneiric; urgency=low
 
