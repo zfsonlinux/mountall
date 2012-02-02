@@ -11,6 +11,7 @@ Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: makedev, udev, plymouth, coreutils (>= 7.1), ${shlibs:Depends}, ${misc:Depends}
 Replaces: upstart (<< 0.6.3-2)
 Breaks: usplash (<< 0.5.47), policycoreutils (<< 2.0.69-2ubuntu4), initscripts (<< 2.88dsf-13.3)
+Multi-Arch: foreign
 Description: filesystem mounting tool
  mountall mounts filesystems when the underlying block devices are
  ready, or when network interfaces come up, checking the filesystems
