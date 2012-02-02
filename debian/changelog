@@ -1,3 +1,10 @@
+mountall (2.33) precise; urgency=low
+
+  * Mark mountall as Multi-Arch: foreign to allow for upstart to be
+    installable with multi-arch (needed for armhf containers on x86)
+
+ -- Stéphane Graber <stgraber@ubuntu.com>  Thu, 02 Feb 2012 13:09:51 -0500
+
 mountall (2.32) precise; urgency=low
 
   [ Steve Langasek ]
