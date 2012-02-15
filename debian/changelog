@@ -1,3 +1,14 @@
+mountall (2.34) precise; urgency=low
+
+  * Change conf/mounted-debugfs.conf to run the chmod in a || true.
+    This is to avoid showing an "Event failed" message in containers
+    where apparmor denies access to /sys/kernel/debug.
+    Having that job always success shouldn't make any difference as it's
+    not running anything after that chmod and /sys/kernel/debug is indeed
+    mounted.
+
+ -- Stéphane Graber <stgraber@ubuntu.com>  Wed, 15 Feb 2012 12:54:40 -0500
+
 mountall (2.33) precise; urgency=low
 
   * Mark mountall as Multi-Arch: foreign to allow for upstart to be
