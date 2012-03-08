@@ -1,11 +1,11 @@
-mountall (2.35) UNRELEASED; urgency=low
+mountall (2.35) precise; urgency=low
 
   * conf/mounted-tmp.conf: Mount an 1 MiB tmpfs on /tmp/ if /tmp has less than
     1 MB of space, so that booting has a chance of succeeding with a full
     disk. Ubuntu up to 8.04 LTS already had this, but this got lost in
     between. (LP: #932598)
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 08 Mar 2012 11:50:33 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 08 Mar 2012 11:57:29 +0100
 
 mountall (2.34) precise; urgency=low
 
