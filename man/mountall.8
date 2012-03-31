@@ -25,6 +25,39 @@ This is a temporary tool until
 itself gains the necessary flexibility to perform this processing; you
 should not rely on its behaviour.
 .\"
+.SH OPTIONS
+
+.BR      --daemon
+\               Detach and run in the background
+
+.BR      --force-fsck
+\           Force check of all filesystems
+
+.BR      --fsck-fix
+\             Attempt to fix all fsck errors
+
+.BR      --no-events
+\            Do not emit events after mounting filesystems
+
+.BR      --dev-wait-time=value (in seconds)
+                        (Default is 30 seconds, Legal value 
+                         is between 1 to 2147483647)
+                        In case of (bootwait,timeout): specify
+                        the time to wait for device to be detected
+
+.BR      -q, --quiet
+\             Reduce output to errors only
+
+.BR      -v, --verbose
+\           Increase output to include informational
+                        messages
+
+.BR      --help
+\                 Display this help and exit
+
+.BR      --version
+\              Output version information and exit
+.\"
 .SH AUTHOR
 Written by Scott James Remnant
 .RB < scott@netsplit.com >
