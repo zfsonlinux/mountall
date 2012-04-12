@@ -1,3 +1,13 @@
+mountall (2.36) UNRELEASED; urgency=low
+
+  * If no specific fsck.* checker is found for a given filesystem type
+    (except for a short list where we know that checkers really should be
+    present), skip checking that filesystem rather than emitting scary error
+    messages (LP: #838091).  This duplicates some logic from 'fsck -A', but
+    that seems reasonable given mountall's purpose.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 12 Apr 2012 16:26:06 +0100
+
 mountall (2.35) precise; urgency=low
 
   * conf/mounted-tmp.conf: Mount an 1 MiB tmpfs on /tmp/ if /tmp has less than
