@@ -1,4 +1,4 @@
-mountall (2.36) UNRELEASED; urgency=low
+mountall (2.36) precise; urgency=low
 
   * If no specific fsck.* checker is found for a given filesystem type
     (except for a short list where we know that checkers really should be
@@ -6,7 +6,7 @@ mountall (2.36) UNRELEASED; urgency=low
     messages (LP: #838091).  This duplicates some logic from 'fsck -A', but
     that seems reasonable given mountall's purpose.
 
- -- Colin Watson <cjwatson@ubuntu.com>  Thu, 12 Apr 2012 16:26:06 +0100
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 12 Apr 2012 18:58:16 +0100
 
 mountall (2.35) precise; urgency=low
 
