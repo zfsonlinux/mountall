@@ -186,6 +186,9 @@ void   trigger_events        (void);
 void   try_mounts            (void);
 void   try_mount             (Mount *mnt, int force);
 
+int    find_on_path          (const char *name);
+int    find_fsck             (const char *type);
+
 pid_t  spawn                 (Mount *mnt, char * const *args, int wait,
 			      void (*handler) (Mount *mnt, pid_t pid, int status));
 void   spawn_child_handler   (Process *proc, pid_t pid,
@@ -197,6 +200,7 @@ void   run_mount_finished    (Mount *mnt, pid_t pid, int status);
 void   run_swapon            (Mount *mnt);
 void   run_swapon_finished   (Mount *mnt, pid_t pid, int status);
 
+int    missing_fsck          (Mount *mnt);
 void   run_fsck              (Mount *mnt);
 void   run_fsck_finished     (Mount *mnt, pid_t pid, int status);
 
@@ -1864,6 +1868,58 @@ try_mount (Mount *mnt,
 }
 
 
+/**
+ * find_on_path:
+ *
+ * Returns TRUE if the given name is on the executable search path.
+ **/
+int
+find_on_path (const char *name)
+{
+	nih_local char *path = NULL;
+	char *          pathtok;
+	const char *    element;
+
+	path = getenv ("PATH");
+	if (!path)
+		return FALSE;
+	pathtok = path = NIH_MUST (nih_strdup (NULL, path));
+
+	do {
+		nih_local char *filename = NULL;
+		struct stat     st;
+
+		element = strsep (&pathtok, ":");
+		filename = NIH_MUST (nih_sprintf (NULL, "%s/%s",
+						  element, name));
+		if (stat (filename, &st) == 0)
+			return TRUE;
+	} while (element);
+
+	return FALSE;
+}
+
+
+/**
+ * find_fsck:
+ *
+ * Returns TRUE if the given filesystem type has a fsck.* checker on the
+ * executable search path.
+ **/
+int
+find_fsck (const char *type)
+{
+	if (strncmp (type, "fsck.", 5) == 0)
+		return find_on_path (type);
+	else {
+		nih_local char *fsck_type = NULL;
+
+		fsck_type = NIH_MUST (nih_sprintf (NULL, "fsck.%s", type));
+		return find_on_path (fsck_type);
+	}
+}
+
+
 pid_t
 spawn (Mount *         mnt,
        char * const *  args,
@@ -2209,6 +2265,45 @@ run_swapon_finished (Mount *mnt,
 }
 
 
+static const char *disregard_missing_fsck[] = {
+	"ext2",
+	"ext3",
+	"ext4",
+	"ext4dev",
+	"jfs",
+	"reiserfs",
+	"xfs",
+	NULL
+};
+
+/**
+ * missing_fsck:
+ *
+ * Returns TRUE if fsck on this mount should be skipped due to a missing
+ * fsck.* checker.
+ */
+int
+missing_fsck (Mount *mnt)
+{
+	const char * const *disregard;
+
+	for (disregard = disregard_missing_fsck; *disregard; ++disregard) {
+		if (strcmp (mnt->type, *disregard) == 0)
+			/* For this filesystem type, it isn't OK to just
+			 * ignore a missing checker, so pretend that it's
+			 * present for the time being in order that
+			 * run_fsck_finished will display an error message.
+			 */
+			return FALSE;
+	}
+
+	if (find_fsck (mnt->type))
+		return FALSE;
+
+	return TRUE;
+}
+
+
 void
 run_fsck (Mount *mnt)
 {
@@ -2226,6 +2321,12 @@ run_fsck (Mount *mnt)
 	} else if (! mnt->check
 		   && (! force_fsck || strcmp (mnt->mountpoint, "/"))) {
 		nih_debug ("%s: no check required", MOUNT_NAME (mnt));
+		mnt->ready = TRUE;
+		try_mount (mnt, FALSE);
+		return;
+	} else if (missing_fsck (mnt)) {
+		nih_debug ("%s: no appropriate fsck.* present",
+			   MOUNT_NAME (mnt));
 		mnt->ready = TRUE;
 		try_mount (mnt, FALSE);
 		return;
