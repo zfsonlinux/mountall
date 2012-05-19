@@ -1291,11 +1291,12 @@ tag_mount (Mount *mnt,
 			nih_debug ("%s is root filesystem", MOUNT_NAME (mnt));
 			tag = TAG_LOCAL;
 		} else if (is_remote (mnt)) {
-			if ((! strcmp (mnt->mountpoint, "/usr"))
-			    || (! strcmp (mnt->mountpoint, "/var"))
-			    || (! strncmp (mnt->mountpoint, "/usr/", 5))
-			    || (! strncmp (mnt->mountpoint, "/var/", 5))
-			    || (has_option (mnt, "bootwait", FALSE)))
+			if (((! strcmp (mnt->mountpoint, "/usr"))
+			     || (! strcmp (mnt->mountpoint, "/var"))
+			     || (! strncmp (mnt->mountpoint, "/usr/", 5))
+			     || (! strncmp (mnt->mountpoint, "/var/", 5))
+			     || (has_option (mnt, "bootwait", FALSE)))
+			    && ! has_option (mnt, "nobootwait", FALSE))
 			{
 				tag = TAG_REMOTE;
 			} else {
