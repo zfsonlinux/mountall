@@ -3235,7 +3235,7 @@ plymouth_progress (Mount *mnt,
 	 */
 	update = NIH_MUST (nih_sprintf (NULL, "fsck:%s:%d:%s",
 					MOUNT_NAME (mnt), progress,
-					_("Checking disk %1$d of %2$d (%3$d %% complete)")));
+					_("Checking disk %1$d of %2$d (%3$d%% complete)")));
 
 	ply_boot_client_update_daemon (ply_boot_client, update,
 				       plymouth_response,
