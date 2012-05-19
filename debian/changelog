@@ -1,6 +1,7 @@
 mountall (2.37) UNRELEASED; urgency=low
 
   * Document the branch location with Vcs-Bzr.
+  * Mark myself as maintainer, with Scott and James as uploaders.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Fri, 18 May 2012 22:38:55 -0700
 
