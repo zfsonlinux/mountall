@@ -3848,6 +3848,12 @@ main (int   argc,
 		exit (EXIT_ERROR);
 	}
 
+	/* SIGUSR1 tells us that a network device came up.  Install
+           the handler before daemonising so that the mountall-net job
+           won't kill us by sending USR1. */
+	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
+	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
+
 	/* Become daemon */
 	if (daemonise) {
 		pid_t pid;
@@ -3900,10 +3906,6 @@ main (int   argc,
 	/* Handle TERM signal gracefully */
 	nih_signal_set_handler (SIGTERM, nih_signal_handler);
 	NIH_MUST (nih_signal_add_handler (NULL, SIGTERM, nih_main_term_signal, NULL));
-
-	/* SIGUSR1 tells us that a network device came up */
-	nih_signal_set_handler (SIGUSR1, nih_signal_handler);
-	NIH_MUST (nih_signal_add_handler (NULL, SIGUSR1, usr1_handler, NULL));
 
 	/* Check for force-fsck on the kernel command line */
 	cmdline = fopen ("/proc/cmdline", "r");
