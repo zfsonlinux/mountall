@@ -1,3 +1,9 @@
+mountall (2.37) UNRELEASED; urgency=low
+
+  * Document the branch location with Vcs-Bzr.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Fri, 18 May 2012 22:38:55 -0700
+
 mountall (2.36) precise; urgency=low
 
   * If no specific fsck.* checker is found for a given filesystem type
