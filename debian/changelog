@@ -7,6 +7,7 @@ mountall (2.37) UNRELEASED; urgency=low
     and no longer relevant post-precise.
   * Replace build flag handling in debian/rules with debhelper compat 9 and
     dpkg-buildflags.
+  * Remove extra space in fsck progress message.  LP: #573304.
 
   [ Raphaël Pinson ]
   * Honor nobootwait option for /var/* and /usr/* remote filesystems.
