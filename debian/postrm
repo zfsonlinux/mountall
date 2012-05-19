@@ -1,7 +1,0 @@
-#!/bin/sh
-
-set -e
-
-dpkg-maintscript-helper rm_conffile /etc/init/mounted-varrun.conf 2.28 -- "$@"
-
-#DEBHELPER#
