@@ -1,11 +1,15 @@
 mountall (2.37) UNRELEASED; urgency=low
 
+  [ Steve Langasek ]
   * Document the branch location with Vcs-Bzr.
   * Mark myself as maintainer, with Scott and James as uploaders.
   * Drop maintainer scripts, only used for upgrades from natty and earlier
     and no longer relevant post-precise.
   * Replace build flag handling in debian/rules with debhelper compat 9 and
     dpkg-buildflags.
+
+  [ Adam Gleichsner ]
+  * Add options to mountall(8) manual page.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Fri, 18 May 2012 22:38:55 -0700
 
