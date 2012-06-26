@@ -3702,7 +3702,7 @@ change_mount_device (const char *devname,
 				/* Change only if the requested device is
 				 * really any different than whats stored
 				 */
-				if (!strcmp (mnt->device, devname)) {
+				if (strcmp (mnt->device, devname)) {
 					char * newdev;
 					ret = 0;
 					newdev  = nih_strdup (mounts, devname);
