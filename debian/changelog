@@ -9,8 +9,7 @@ mountall (2.37) UNRELEASED; urgency=low
     dpkg-buildflags.
   * Remove extra space in fsck progress message.  LP: #573304.
   * Adjust build-dependencies for the differing plymouth -dev package name
-    in Debian vs. Ubuntu (assumes the next maintainer upload of plymouth to
-    Debian includes our needed API addition).
+    in Debian vs. Ubuntu.
   * Fix an inverted check for whether the change-mount mntctl has a
     different device name.
 
