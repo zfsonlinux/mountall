@@ -1,4 +1,4 @@
-mountall (2.37) UNRELEASED; urgency=low
+mountall (2.37) unstable; urgency=low
 
   * Initial upload to Debian.
   * Document the branch location with Vcs-Bzr.
@@ -28,7 +28,7 @@ mountall (2.37) UNRELEASED; urgency=low
   [ Adam Gleichsner ]
   * Add options to mountall(8) manual page.  LP: #805509.
 
- -- Steve Langasek <vorlon@debian.org>  Fri, 18 May 2012 22:38:55 -0700
+ -- Steve Langasek <vorlon@debian.org>  Thu, 28 Jun 2012 19:35:33 +0000
 
 mountall (2.36) precise; urgency=low
 
