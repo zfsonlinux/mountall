@@ -12,6 +12,7 @@ mountall (2.37) UNRELEASED; urgency=low
     in Debian vs. Ubuntu.
   * Fix an inverted check for whether the change-mount mntctl has a
     different device name.
+  * Update standards-version to 3.9.3.
 
   [ Raphaël Pinson ]
   * Honor nobootwait option for /var/* and /usr/* remote filesystems.
