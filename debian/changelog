@@ -13,6 +13,8 @@ mountall (2.37) UNRELEASED; urgency=low
   * Fix an inverted check for whether the change-mount mntctl has a
     different device name.
   * Update standards-version to 3.9.3.
+  * debian/copyright: copyright-format 1.0, and link explicitly to the GPL-2
+    license file since that's what applies.
 
   [ Raphaël Pinson ]
   * Honor nobootwait option for /var/* and /usr/* remote filesystems.
