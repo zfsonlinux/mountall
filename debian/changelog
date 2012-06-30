@@ -1,10 +1,10 @@
-mountall (2.38) UNRELEASED; urgency=low
+mountall (2.38) unstable; urgency=low
 
   * Counterproductively document in debian/copyright the license of files in
     intl that form no part of the binary package, to get through the Debian
     NEW queue.
 
- -- Steve Langasek <vorlon@debian.org>  Sat, 30 Jun 2012 11:44:10 -0700
+ -- Steve Langasek <vorlon@debian.org>  Sat, 30 Jun 2012 11:44:59 -0700
 
 mountall (2.37) unstable; urgency=low
 
