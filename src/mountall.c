@@ -534,8 +534,20 @@ update_mount (Mount *     mnt,
 		} else if (! strncmp (mnt->device, "LABEL=", 6)) {
 			dequote (mnt->device + 6);
 		} else {
+			char *colon;
 			dequote (mnt->device);
-			strip_slashes (mnt->device);
+			/* If our device name is in host:/path format, as is
+			 * commonly used for network filesystems, don't strip
+			 * trailing slashes if this is the entire path.  We
+			 * look for the colon starting from the end, so that
+			 * we correctly handle IPv6 addresses for the host
+			 * part.
+			 */
+			if ((colon = strrchr (mnt->device,':')) != NULL
+			    && colon[1] == '/')
+				strip_slashes (colon + 2);
+			else
+				strip_slashes (mnt->device);
 		}
 	}
 
