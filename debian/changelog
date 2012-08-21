@@ -1,3 +1,12 @@
+mountall (2.39) UNRELEASED; urgency=low
+
+  * Adjust parsing of device names so that network mounts pointing to the
+    server's root don't have the path mis-normalized to the empty string.
+    Thanks to Damien Churchill <damien.churchill@ukplc.net> for the initial
+    implementation.  LP: #809221.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 20 Aug 2012 16:45:42 -0700
+
 mountall (2.38) unstable; urgency=low
 
   * Counterproductively document in debian/copyright the license of files in
