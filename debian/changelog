@@ -1,4 +1,4 @@
-mountall (2.39) UNRELEASED; urgency=low
+mountall (2.39) unstable; urgency=low
 
   * Adjust parsing of device names so that network mounts pointing to the
     server's root don't have the path mis-normalized to the empty string.
@@ -7,7 +7,7 @@ mountall (2.39) UNRELEASED; urgency=low
   * Add compatibility jobs with names to match the historic sysvinit init
     scripts, so that startpar can DTRT.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 20 Aug 2012 16:45:42 -0700
+ -- Steve Langasek <vorlon@debian.org>  Fri, 31 Aug 2012 18:31:19 +0000
 
 mountall (2.38) unstable; urgency=low
 
