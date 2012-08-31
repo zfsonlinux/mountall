@@ -4,6 +4,8 @@ mountall (2.39) UNRELEASED; urgency=low
     server's root don't have the path mis-normalized to the empty string.
     Thanks to Damien Churchill <damien.churchill@ukplc.net> for the initial
     implementation.  LP: #809221.
+  * Add compatibility jobs with names to match the historic sysvinit init
+    scripts, so that startpar can DTRT.
 
  -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 20 Aug 2012 16:45:42 -0700
 

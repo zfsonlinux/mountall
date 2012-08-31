@@ -11,4 +11,8 @@ dist_init_DATA = \
 	mounted-run.conf \
 	mounted-proc.conf \
 	mounted-tmp.conf \
-	mounted-var.conf
+	mounted-var.conf \
+	mountall.sh.conf \
+	mountkernfs.sh.conf \
+	mountdevsubfs.sh.conf \
+	mountnfs.sh.conf
