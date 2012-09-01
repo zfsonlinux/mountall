@@ -1,9 +1,9 @@
-mountall (2.40) UNRELEASED; urgency=low
+mountall (2.40) unstable; urgency=low
 
   * Add /run/user as a default mountpoint, in support of $XDG_RUNTIME_DIR.
     LP: #894391.
 
- -- Steve Langasek <vorlon@debian.org>  Fri, 31 Aug 2012 16:38:10 -0700
+ -- Steve Langasek <vorlon@debian.org>  Fri, 31 Aug 2012 19:55:01 -0700
 
 mountall (2.39) unstable; urgency=low
 
