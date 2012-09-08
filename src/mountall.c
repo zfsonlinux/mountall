@@ -1925,6 +1925,10 @@ mounting_event_handled (void *data,
 {
 	Mount *mnt = (Mount *)data;
 
+	/* We may generate new pending events below; make sure to clear
+	 * the current one before we do. */
+	mnt->pending_call = NULL;
+
 	if (!strcmp(mnt->type, "swap")) {
 		nih_info ("mounting event handled for swap %s", mnt->device);
 		run_swapon (mnt);
