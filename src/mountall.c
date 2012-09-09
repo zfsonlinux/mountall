@@ -188,6 +188,7 @@ void   trigger_events        (void);
 void   try_mounts            (void);
 void   try_mount             (Mount *mnt, int force);
 void   mounting_event_handled(void *data, NihDBusMessage *message);
+void   mounted_event_handled (void *data, NihDBusMessage *message);
 
 int    find_on_path          (const char *name);
 int    find_fsck             (const char *type);
@@ -1510,55 +1511,7 @@ mounted (Mount *mnt)
 		}
 	}
 
-	emit_event ("mounted", mnt, NULL);
-
-	/* Any previous mount options no longer apply
-	 * (ie. we're not read-only anymore)
-	 */
-	if (mnt->mount_opts)
-		nih_unref (mnt->mount_opts, mounts);
-	mnt->mount_opts = NULL;
-
-	if ((! written_mtab))
-		write_mtab ();
-
-	switch (mnt->tag) {
-	case TAG_LOCAL:
-		num_local_mounted++;
-		break;
-	case TAG_TIMEOUT:
-		num_local_mounted++;
-		num_timeout_mounted++;
-		if (num_timeout_mounted == num_timeout) {
-			nih_message (_("\n %s finished! "), "local_timeout");
-			/* Stop the timeout waiting for device to get ready"
-			 */
-			if (device_ready_timer) {
-				nih_free (device_ready_timer);
-				device_ready_timer = NULL;
-			}
-		}
-		break;
-	case TAG_REMOTE:
-		num_remote_mounted++;
-		break;
-	case TAG_VIRTUAL:
-		num_virtual_mounted++;
-		break;
-	case TAG_SWAP:
-		num_swap_mounted++;
-		break;
-	case TAG_NOWAIT:
-		break;
-	case TAG_SKIPPED:
-		break;
-	case TAG_UNKNOWN:
-		break;
-	default:
-		nih_assert_not_reached ();
-	}
-
-	trigger_events ();
+	emit_event ("mounted", mnt, mounted_event_handled);
 
 	fsck_update ();
 }
@@ -1936,6 +1889,74 @@ mounting_event_handled (void *data,
 		nih_info ("mounting event handled for %s", mnt->mountpoint);
 		run_mount (mnt, FALSE);
 	}
+}
+
+
+void
+mounted_event_handled (void *data,
+                       NihDBusMessage *message)
+{
+	Mount *mnt = (Mount *)data;
+
+	/* We may generate new pending events below; make sure to clear
+	 * the current one before we do. */
+	mnt->pending_call = NULL;
+
+	if (!strcmp(mnt->type, "swap")) {
+		nih_info ("mounted event handled for swap %s", mnt->device);
+	} else {
+		nih_info ("mounted event handled for %s", mnt->mountpoint);
+	}
+
+	/* Any previous mount options no longer apply
+	 * (ie. we're not read-only anymore)
+	 */
+	if (mnt->mount_opts)
+		nih_unref (mnt->mount_opts, mounts);
+	mnt->mount_opts = NULL;
+
+	if ((! written_mtab))
+		write_mtab ();
+
+	switch (mnt->tag) {
+	case TAG_LOCAL:
+		num_local_mounted++;
+		break;
+	case TAG_TIMEOUT:
+		num_local_mounted++;
+		num_timeout_mounted++;
+		if (num_timeout_mounted == num_timeout) {
+			nih_message (_("\n %s finished! "), "local_timeout");
+			/* Stop the timeout waiting for device to get ready"
+			 */
+			if (device_ready_timer) {
+				nih_free (device_ready_timer);
+				device_ready_timer = NULL;
+			}
+		}
+		break;
+	case TAG_REMOTE:
+		num_remote_mounted++;
+		break;
+	case TAG_VIRTUAL:
+		num_virtual_mounted++;
+		break;
+	case TAG_SWAP:
+		num_swap_mounted++;
+		break;
+	case TAG_NOWAIT:
+		break;
+	case TAG_SKIPPED:
+		break;
+	case TAG_UNKNOWN:
+		break;
+	default:
+		nih_assert_not_reached ();
+	}
+
+	trigger_events ();
+
+	fsck_update ();
 }
 
 
