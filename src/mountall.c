@@ -160,6 +160,10 @@ typedef struct process {
 	void (*handler) (Mount *mnt, pid_t pid, int status);
 } Process;
 
+typedef struct event_reply_data {
+	Mount *          mnt;
+	void (*handler) (void *data, NihDBusMessage *message);
+} EventReplyData;
 
 Mount *new_mount             (const char *mountpoint, const char *device,
 			      int check, const char *type, const char *opts);
@@ -1874,7 +1878,9 @@ void
 mounting_event_handled (void *data,
                         NihDBusMessage *message)
 {
-	Mount *mnt = (Mount *)data;
+	Mount *mnt = ((EventReplyData *)data)->mnt;
+
+	nih_free (data);
 
 	/* We may generate new pending events below; make sure to clear
 	 * the current one before we do. */
@@ -1894,7 +1900,9 @@ void
 mounted_event_handled (void *data,
                        NihDBusMessage *message)
 {
-	Mount *mnt = (Mount *)data;
+	Mount *mnt = ((EventReplyData *)data)->mnt;
+
+	nih_free (data);
 
 	/* We may generate new pending events below; make sure to clear
 	 * the current one before we do. */
@@ -2661,7 +2669,7 @@ emit_event (const char *name,
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
 	size_t           env_len = 0;
-	void            *reply_data = NULL;
+	EventReplyData  *reply_data = NULL;
 
 	nih_assert (name != NULL);
 
@@ -2701,7 +2709,7 @@ emit_event (const char *name,
 	}
 
 	if (mnt && cb)
-		reply_data = mnt;
+		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
 	
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
 						       name, env, reply_data ? TRUE : FALSE,
@@ -2712,6 +2720,9 @@ emit_event (const char *name,
 	if (pending_call) {
 	
 		if (reply_data) {
+
+			reply_data->mnt = mnt;
+			reply_data->handler = cb;
 
 			/* If previous event is still pending, wait for it. */
 			if (mnt->pending_call) {
@@ -2737,6 +2748,7 @@ emit_event (const char *name,
 		nih_warn ("%s", err->message);
 		nih_free (err);
 
+		nih_free (reply_data);
 	}
 }
 
@@ -2744,11 +2756,16 @@ void
 emit_event_error (void *          data,
 		  NihDBusMessage *message)
 {
+	EventReplyData *reply_data = (EventReplyData *)data;
 	NihError *err;
 
 	err = nih_error_get ();
 	nih_warn ("%s", err->message);
 	nih_free (err);
+
+	/* Even if the event returned an error, we still want to do the mount */
+	if (reply_data)
+		reply_data->handler (data, message);
 }
 
 
