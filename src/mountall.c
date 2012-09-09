@@ -1738,13 +1738,14 @@ try_mounts (void)
 			 * pending events.
 			 */
 			NIH_LIST_FOREACH (mounts, iter) {
-				Mount *mnt = (Mount *)iter;
+				Mount           *mnt = (Mount *)iter;
+				DBusPendingCall *pending_call = mnt->pending_call;
 
-				if (!mnt->pending_call)
+				if (!pending_call)
 					continue;
 
-				dbus_pending_call_block (mnt->pending_call);
-				dbus_pending_call_unref (mnt->pending_call);
+				dbus_pending_call_block (pending_call);
+				dbus_pending_call_unref (pending_call);
 				mnt->pending_call = NULL;
 			}
 
@@ -2713,8 +2714,9 @@ emit_event (const char *name,
 
 			/* If previous event is still pending, wait for it. */
 			if (mnt->pending_call) {
-				dbus_pending_call_block (mnt->pending_call);
-				dbus_pending_call_unref (mnt->pending_call);
+				DBusPendingCall *pending = mnt->pending_call;
+				dbus_pending_call_block (pending);
+				dbus_pending_call_unref (pending);
 			}
 
 			mnt->pending_call = pending_call;
