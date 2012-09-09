@@ -1468,10 +1468,6 @@ mounted (Mount *mnt)
 
 	nih_debug ("%s", MOUNT_NAME (mnt));
 
-	mnt->mounted = TRUE;
-	newly_mounted = TRUE;
-	nih_main_loop_interrupt ();
-
 	mnt->error = ERROR_NONE;
 	plymouth_update (FALSE);
 
@@ -1511,7 +1507,8 @@ mounted (Mount *mnt)
 		}
 	}
 
-	emit_event ("mounted", mnt, mounted_event_handled);
+	if (!mnt->pending_call)
+		emit_event ("mounted", mnt, mounted_event_handled);
 
 	fsck_update ();
 }
@@ -1902,6 +1899,10 @@ mounted_event_handled (void *data,
 	/* We may generate new pending events below; make sure to clear
 	 * the current one before we do. */
 	mnt->pending_call = NULL;
+
+	mnt->mounted = TRUE;
+	newly_mounted = TRUE;
+	nih_main_loop_interrupt ();
 
 	if (!strcmp(mnt->type, "swap")) {
 		nih_info ("mounted event handled for swap %s", mnt->device);
