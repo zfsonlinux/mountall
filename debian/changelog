@@ -1,4 +1,4 @@
-mountall (2.41) UNRELEASED; urgency=low
+mountall (2.41) unstable; urgency=low
 
   [ Alexander Achenbach ]
   * Don't block other, unrelated mounts from being processed while one
@@ -8,7 +8,7 @@ mountall (2.41) UNRELEASED; urgency=low
   * Likewise, allow 'mounted' signals to be processed in parallel with
     other unrelated mounts.
 
- -- Steve Langasek <vorlon@debian.org>  Sat, 08 Sep 2012 00:10:09 -0700
+ -- Steve Langasek <vorlon@debian.org>  Tue, 25 Sep 2012 23:21:59 -0700
 
 mountall (2.40) unstable; urgency=low
 
