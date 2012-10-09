@@ -1,4 +1,4 @@
-mountall (2.42) UNRELEASED; urgency=low
+mountall (2.42) unstable; urgency=low
 
   [ Andy Whitcroft ]
   * Add support for mounting the efivars filesystem onto
@@ -10,7 +10,7 @@ mountall (2.42) UNRELEASED; urgency=low
     list of mounts that are in need of fake-remounting and make sure mount -f
     gets called for them if they missed the boat. LP: #1060296
 
- -- Andy Whitcroft <apw@canonical.com>  Tue, 09 Oct 2012 10:12:42 +0100
+ -- Steve Langasek <vorlon@debian.org>  Tue, 09 Oct 2012 12:32:56 -0700
 
 mountall (2.41) unstable; urgency=low
 
