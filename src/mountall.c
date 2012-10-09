@@ -142,6 +142,7 @@ struct mount {
 	int                 checked_link;
 	Mount *             link_target;
 	NihList             deps;
+	int                 needs_mtab;
 };
 
 #define MOUNT_NAME(_mnt) (strcmp ((_mnt)->type, "swap")			\
@@ -505,6 +506,8 @@ new_mount (const char *mountpoint,
 
 	nih_alloc_set_destructor (mnt, nih_list_destroy);
 	nih_list_add (mounts, &mnt->entry);
+
+	mnt->needs_mtab = FALSE;
 
 	update_mount (mnt, device, check, type, opts);
 
@@ -1927,6 +1930,8 @@ mounted_event_handled (void *data,
 
 	if ((! written_mtab))
 		write_mtab ();
+	if (written_mtab && mnt->needs_mtab)
+		run_mount (mnt, TRUE);
 
 	switch (mnt->tag) {
 	case TAG_LOCAL:
@@ -2229,6 +2234,7 @@ run_mount (Mount *mnt,
 		   && strcmp (mnt->type, "ntfs")
 		   && strcmp (mnt->type, "ntfs-3g")) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
+		mnt->needs_mtab = TRUE;
 	} else if (mnt->has_showthrough) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
@@ -2580,6 +2586,7 @@ write_mtab (void)
 			continue;
 
 		run_mount (mnt, TRUE);
+		mnt->needs_mtab = FALSE;
 	}
 
 	written_mtab = TRUE;
