@@ -1,3 +1,10 @@
+mountall (2.42) UNRELEASED; urgency=low
+
+  * Add support for mounting the efivars filesystem onto
+    /sys/firmware/efi/efivars.  LP: #1063061.
+
+ -- Andy Whitcroft <apw@canonical.com>  Tue, 09 Oct 2012 10:12:42 +0100
+
 mountall (2.41) unstable; urgency=low
 
   [ Alexander Achenbach ]

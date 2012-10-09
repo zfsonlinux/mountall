@@ -12,6 +12,7 @@ none            /sys                      sysfs           nodev,noexec,nosuid   
 none            /sys/fs/fuse/connections  fusectl         optional                                     0 0
 none            /sys/kernel/debug         debugfs         optional                                     0 0
 none            /sys/kernel/security      securityfs      optional                                     0 0
+none            /sys/firmware/efi/efivars efivarfs        optional                                     0 0
 none            /spu                      spufs           gid=spu,optional                             0 0
 none            /dev                      devtmpfs,tmpfs  mode=0755                                    0 0
 none            /dev/pts                  devpts          noexec,nosuid,gid=tty,mode=0620              0 0
