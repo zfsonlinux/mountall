@@ -1,7 +1,14 @@
 mountall (2.42) UNRELEASED; urgency=low
 
+  [ Andy Whitcroft ]
   * Add support for mounting the efivars filesystem onto
     /sys/firmware/efi/efivars.  LP: #1063061.
+
+  [ Steve Langasek ]
+  * mount events now happen so much in parallel that /etc/mtab may not get
+    updated due to races between 'mounted' events.  Explicitly track the
+    list of mounts that are in need of fake-remounting and make sure mount -f
+    gets called for them if they missed the boat. LP: #1060296
 
  -- Andy Whitcroft <apw@canonical.com>  Tue, 09 Oct 2012 10:12:42 +0100
 
