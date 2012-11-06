@@ -920,7 +920,7 @@ parse_mountinfo_file (int reparsed)
 		 * If invoked first time, just set the flag and leave complete
 		 * state update (including event trigger) to mark_mounted ().
 		 */
-		if (reparsed) {
+		if (reparsed && ! mnt->pending_call) {
 			mounted (mnt);
 		} else {
 			mnt->mounted = TRUE;
@@ -2306,9 +2306,19 @@ run_mount_finished (Mount *mnt,
 
 	/* Parse mountinfo to see what mount did; in particular to update
 	 * the type if multiple types are listed in fstab.
-	 * Let parse_mountinfo () invoke mounted () to update state.
 	 */
-	parse_mountinfo ();
+	if (! mnt->mounted) {
+		parse_mountinfo ();
+		/* If the canonical path of the mount point doesn't match
+		 * what's in the fstab, reparsing /proc/mounts won't change
+		 * this mount but instead create a new record.  So handle
+		 * this case directly here.
+		 */
+		if (! mnt->mounted && ! mnt->pending_call)
+			mounted (mnt);
+	} else {
+		mounted (mnt);
+	}
 }
 
 
