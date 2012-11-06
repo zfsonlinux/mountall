@@ -1,11 +1,11 @@
-mountall (2.43) UNRELEASED; urgency=low
+mountall (2.43) unstable; urgency=low
 
   * Fix a regression introduced in 2.41: parse_mountinfo() doesn't 
     generate a mounted event for a filesystem whose canonicalized
     mountpoint doesn't match the mountpoint specified in /etc/fstab.  So
     we still need to call mounted() explicitly for this case.  LP: #1059471.
 
- -- Steve Langasek <steve.langasek@ubuntu.com>  Tue, 06 Nov 2012 08:18:08 +0000
+ -- Steve Langasek <vorlon@debian.org>  Tue, 06 Nov 2012 01:03:12 -0800
 
 mountall (2.42) unstable; urgency=low
 
