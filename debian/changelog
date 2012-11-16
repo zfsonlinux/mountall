@@ -1,8 +1,8 @@
 mountall (2.44) UNRELEASED; urgency=low
 
   * conf/{checkfs,checkroot-bootclean,checkroot,mountall-bootclean}.sh.conf,
-    conf/{mountnfs-bootclean,mtab}.sh.conf: additional null jobs for
-    compatibility with pre-existing sysvinit script names, so that the
+    conf/{mountnfs-bootclean,mtab,bootmisc}.sh.conf: additional null jobs
+    for compatibility with pre-existing sysvinit script names, so that the
     sysvinit scripts aren't run.  This speeds up the boot, improves
     compatibility with insserv, and guards against e.g.,
     mountall-bootclean.sh running after /run is already in use by ifupdown.
