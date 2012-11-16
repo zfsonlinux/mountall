@@ -13,6 +13,13 @@ dist_init_DATA = \
 	mounted-tmp.conf \
 	mounted-var.conf \
 	mountall.sh.conf \
+	mountall-bootclean.sh.conf \
 	mountkernfs.sh.conf \
 	mountdevsubfs.sh.conf \
-	mountnfs.sh.conf
+	checkfs.sh.conf \
+	checkroot-bootclean.sh.conf \
+	checkroot.sh.conf \
+	mountnfs.sh.conf \
+	mountnfs-bootclean.sh.conf \
+	mtab.sh.conf
+
