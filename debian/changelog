@@ -1,4 +1,4 @@
-mountall (2.44) UNRELEASED; urgency=low
+mountall (2.44) unstable; urgency=low
 
   * conf/{checkfs,checkroot-bootclean,checkroot,mountall-bootclean}.sh.conf,
     conf/{mountnfs-bootclean,mtab,bootmisc}.sh.conf: additional null jobs
@@ -7,7 +7,7 @@ mountall (2.44) UNRELEASED; urgency=low
     compatibility with insserv, and guards against e.g.,
     mountall-bootclean.sh running after /run is already in use by ifupdown.
 
- -- Steve Langasek <vorlon@debian.org>  Thu, 15 Nov 2012 15:26:43 -0800
+ -- Steve Langasek <vorlon@debian.org>  Fri, 16 Nov 2012 01:05:31 +0000
 
 mountall (2.43) unstable; urgency=low
 
