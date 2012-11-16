@@ -16,6 +16,7 @@ dist_init_DATA = \
 	mountall-bootclean.sh.conf \
 	mountkernfs.sh.conf \
 	mountdevsubfs.sh.conf \
+	bootmisc.sh.conf \
 	checkfs.sh.conf \
 	checkroot-bootclean.sh.conf \
 	checkroot.sh.conf \
