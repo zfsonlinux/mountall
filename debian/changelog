@@ -1,3 +1,10 @@
+mountall (2.45) UNRELEASED; urgency=low
+
+  * mounted-dev.conf: leave consoles alone in a lxc or libvirt container
+    (LP: #1075717)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Wed, 28 Nov 2012 15:26:29 -0600
+
 mountall (2.44) unstable; urgency=low
 
   * conf/{checkfs,checkroot-bootclean,checkroot,mountall-bootclean}.sh.conf,
