@@ -1,4 +1,4 @@
-mountall (2.46) UNRELEASED; urgency=low
+mountall (2.46) unstable; urgency=low
 
   * Fix a further remaining issue from 2.41: by fixing the missing 'mounted'
     events in 2.43, we have again introduced a case where mountall may block
@@ -6,7 +6,7 @@ mountall (2.46) UNRELEASED; urgency=low
     MOUNTPOINT=/run' and emitting virtual-filesystems, thus causing
     dependency loops and long boot timeouts.  LP: #1078926.
 
- -- Steve Langasek <vorlon@debian.org>  Mon, 03 Dec 2012 13:29:34 -0800
+ -- Steve Langasek <vorlon@debian.org>  Mon, 03 Dec 2012 23:44:16 +0000
 
 mountall (2.45) unstable; urgency=low
 
