@@ -1741,6 +1741,8 @@ try_mounts (void)
 			/* All mounts have been attempted, so wait for
 			 * pending events.
 			 */
+			int still_pending = 0;
+
 			NIH_LIST_FOREACH (mounts, iter) {
 				Mount           *mnt = (Mount *)iter;
 				DBusPendingCall *pending_call = mnt->pending_call;
@@ -1748,10 +1750,17 @@ try_mounts (void)
 				if (!pending_call)
 					continue;
 
+				if (! dbus_pending_call_get_completed (pending_call))
+				{
+					still_pending++;
+					continue;
+				}
 				dbus_pending_call_block (pending_call);
 				dbus_pending_call_unref (pending_call);
 				mnt->pending_call = NULL;
 			}
+			if (still_pending > 0)
+				return;
 
 			if (control_server) {
 				dbus_server_disconnect (control_server);

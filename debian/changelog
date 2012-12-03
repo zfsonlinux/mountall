@@ -1,3 +1,13 @@
+mountall (2.46) UNRELEASED; urgency=low
+
+  * Fix a further remaining issue from 2.41: by fixing the missing 'mounted'
+    events in 2.43, we have again introduced a case where mountall may block
+    waiting for 'mounted MOUNTPOINT=/' to return before handling 'mounted
+    MOUNTPOINT=/run' and emitting virtual-filesystems, thus causing
+    dependency loops and long boot timeouts.  LP: #1078926.
+
+ -- Steve Langasek <vorlon@debian.org>  Mon, 03 Dec 2012 13:29:34 -0800
+
 mountall (2.45) unstable; urgency=low
 
   [ Serge Hallyn ]
