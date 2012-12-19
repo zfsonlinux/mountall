@@ -684,7 +684,8 @@ cut_options (const void *parent,
 
 		va_copy (options, args);
 		while ((option = va_arg (options, const char *)) != NULL) {
-			if (j && ! strncmp (opts + i, option, j))
+			if (j && strlen(option) == j
+				&& ! strncmp (opts + i, option, j))
 				break;
 		}
 		va_end (options);
