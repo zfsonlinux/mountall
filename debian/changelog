@@ -1,3 +1,12 @@
+mountall (2.42ubuntu1) quantal; urgency=low
+
+  * Adjust parsing of options so mountall doesn't strip options that are
+    substrings of these strings (showthrough, optional, bootwait, nobootwait
+    or timeout). This fixes the issue where timeo was getting stripped from
+    nfs mounts. LP: #1041377.
+
+ -- Dave Chiluk <dave.chiluk@canonical.com>  Wed, 19 Dec 2012 10:21:43 -0600
+
 mountall (2.42) unstable; urgency=low
 
   [ Andy Whitcroft ]
