@@ -774,7 +774,7 @@ parse_zfs_list (void)
 	size_t bufsz = 4096;
 	FILE *zfs_stream;
 	const char zfs_command[] =
-	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount,mounted";
+	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount";
 	int zfs_result;
 
 	nih_debug ("parsing ZFS list");
@@ -793,7 +793,7 @@ parse_zfs_list (void)
 	/* Read one line from the pipe into the buffer. */
 	while (fgets (buf, bufsz, zfs_stream) != NULL) {
 		char *saveptr;
-		char *zfs_name, *zfs_mountpoint, *zfs_canmount, *zfs_mounted;
+		char *zfs_name, *zfs_mountpoint, *zfs_canmount;
 
 		/* If the line didn't fit, then enlarge the buffer and retry. */
 		while ((! strchr (buf, '\n')) && (! feof (zfs_stream))) {
@@ -816,14 +816,8 @@ parse_zfs_list (void)
 		}
 
 		/* ASSERT: canmount = on | off | noauto */
-		zfs_canmount = strtok_r (NULL, "\t", &saveptr);
+		zfs_canmount = strtok_r (NULL, "\t\n", &saveptr);
 		if (! zfs_canmount || strcmp (zfs_canmount, "on")) {
-			continue;
-		}
-
-		/* ASSERT: mounted = yes | no */
-		zfs_mounted = strtok_r (NULL, "\t\n", &saveptr);
-		if (! zfs_mounted || strcmp (zfs_mounted, "no")) {
 			continue;
 		}
 
