@@ -2700,8 +2700,17 @@ emit_event (const char *name,
 
 	nih_assert (name != NULL);
 
-	if (no_events)
+	if (mnt && cb) {
+		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
+		reply_data->mnt = mnt;
+		reply_data->handler = cb;
+	}
+
+	if (no_events) {
+		if (cb)
+			cb (reply_data, NULL);
 		return;
+	}
 
 	/* Flush the Plymouth connection to ensure all updates are sent,
 	 * since the event may kill plymouth.
@@ -2735,9 +2744,6 @@ emit_event (const char *name,
 		nih_discard (var);
 	}
 
-	if (mnt && cb)
-		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
-	
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
 						       name, env, reply_data ? TRUE : FALSE,
 						       reply_data ? cb : NULL,
@@ -2747,9 +2753,6 @@ emit_event (const char *name,
 	if (pending_call) {
 	
 		if (reply_data) {
-
-			reply_data->mnt = mnt;
-			reply_data->handler = cb;
 
 			/* If previous event is still pending, wait for it. */
 			if (mnt->pending_call) {

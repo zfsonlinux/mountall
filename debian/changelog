@@ -1,9 +1,15 @@
 mountall (2.47) UNRELEASED; urgency=low
 
+  [ Dave Chiluk ]
   * Adjust parsing of options so mountall doesn't strip options that are
     substrings of these strings (showthrough, optional, bootwait, nobootwait
     or timeout). This fixes the issue where timeo was getting stripped from
     nfs mounts. LP: #1041377.
+
+  [ Steve Langasek ]
+  * Ensure callbacks are called directly when running with --no-events,
+    otherwise the "event" handling of the non-events never finishes and
+    mountall hangs.  LP: #1099349.
 
  -- Dave Chiluk <dave.chiluk@canonical.com>  Wed, 19 Dec 2012 10:58:21 -0600
 
