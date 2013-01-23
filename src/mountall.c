@@ -684,7 +684,8 @@ cut_options (const void *parent,
 
 		va_copy (options, args);
 		while ((option = va_arg (options, const char *)) != NULL) {
-			if (j && ! strncmp (opts + i, option, j))
+			if (j && strlen(option) == j
+				&& ! strncmp (opts + i, option, j))
 				break;
 		}
 		va_end (options);
@@ -920,7 +921,7 @@ parse_mountinfo_file (int reparsed)
 		 * If invoked first time, just set the flag and leave complete
 		 * state update (including event trigger) to mark_mounted ().
 		 */
-		if (reparsed) {
+		if (reparsed && ! mnt->pending_call) {
 			mounted (mnt);
 		} else {
 			mnt->mounted = TRUE;
@@ -1741,6 +1742,8 @@ try_mounts (void)
 			/* All mounts have been attempted, so wait for
 			 * pending events.
 			 */
+			int still_pending = 0;
+
 			NIH_LIST_FOREACH (mounts, iter) {
 				Mount           *mnt = (Mount *)iter;
 				DBusPendingCall *pending_call = mnt->pending_call;
@@ -1748,10 +1751,17 @@ try_mounts (void)
 				if (!pending_call)
 					continue;
 
+				if (! dbus_pending_call_get_completed (pending_call))
+				{
+					still_pending++;
+					continue;
+				}
 				dbus_pending_call_block (pending_call);
 				dbus_pending_call_unref (pending_call);
 				mnt->pending_call = NULL;
 			}
+			if (still_pending > 0)
+				return;
 
 			if (control_server) {
 				dbus_server_disconnect (control_server);
@@ -2306,9 +2316,19 @@ run_mount_finished (Mount *mnt,
 
 	/* Parse mountinfo to see what mount did; in particular to update
 	 * the type if multiple types are listed in fstab.
-	 * Let parse_mountinfo () invoke mounted () to update state.
 	 */
-	parse_mountinfo ();
+	if (! mnt->mounted) {
+		parse_mountinfo ();
+		/* If the canonical path of the mount point doesn't match
+		 * what's in the fstab, reparsing /proc/mounts won't change
+		 * this mount but instead create a new record.  So handle
+		 * this case directly here.
+		 */
+		if (! mnt->mounted && ! mnt->pending_call)
+			mounted (mnt);
+	} else {
+		mounted (mnt);
+	}
 }
 
 
