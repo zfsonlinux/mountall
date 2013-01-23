@@ -1,0 +1,30 @@
+# .git/config
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	fetch = +refs/heads/*:refs/remotes/origin/*
+	url = git@github.com:zfsonlinux/mountall.git
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[remote "precise"]
+	url = bzr::lp:ubuntu/precise/mountall
+	fetch = +refs/heads/*:refs/remotes/precise/*
+[remote "quantal"]
+	url = bzr::lp:ubuntu/quantal/mountall
+	fetch = +refs/heads/*:refs/remotes/quantal/*
+[remote "raring"]
+	url = bzr::lp:ubuntu/raring/mountall
+	fetch = +refs/heads/*:refs/remotes/raring/*
+[branch "upstream/ubuntu/precise"]
+	remote = precise
+	merge = refs/heads/master
+[branch "upstream/ubuntu/quantal"]
+	remote = quantal
+	merge = refs/heads/master
+[branch "upstream/ubuntu/raring"]
+	remote = raring
+	merge = refs/heads/master
