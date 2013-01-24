@@ -1,15 +1,14 @@
-mountall (2.36.3-zfs2) precise; urgency=low
+mountall (2.36.3-zfs3) precise; urgency=low
 
   * Provide zfs-mountall virtual package.
-
   * Add 0001-Add-ZFS-support.patch
     And set nobootwait on ZFS mounts.
     Thanks: Luchesar ILIEV <luchesar.iliev@gmail.com>
-
   * Add 0002-Disregard-the-mounted-dataset-property.patch
     Thanks: Will Rouesnel <w.rouesnel@gmail.com>
+  * Add debian/source/format file.
 
- -- Darik Horn <dajhorn@vanadac.com>  Wed, 23 Jan 2013 00:42:08 -0600
+ -- Darik Horn <dajhorn@vanadac.com>  Wed, 23 Jan 2013 21:06:57 -0600
 
 mountall (2.36.3) precise-proposed; urgency=low
 
