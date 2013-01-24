@@ -1,2 +1,3 @@
-0001-Add-ZFS-support.patch
-0002-Disregard-the-mounted-dataset-property.patch
+0001-upstream-shim.patch
+0002-Add-ZFS-support.patch
+0003-Disregard-the-mounted-dataset-property.patch
