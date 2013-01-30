@@ -762,7 +762,7 @@ parse_zfs_list (void)
 	size_t bufsz = 4096;
 	FILE *zfs_stream;
 	const char zfs_command[] =
-	  "/sbin/zfs list -H -t filesystem -s mountpoint -o name,mountpoint,canmount";
+	    "/sbin/zfs list -H -t filesystem -s mountpoint -o name,mountpoint,canmount,readonly,atime";
 	int zfs_result;
 
 	nih_debug ("parsing ZFS list");
@@ -781,7 +781,8 @@ parse_zfs_list (void)
 	/* Read one line from the pipe into the buffer. */
 	while (fgets (buf, bufsz, zfs_stream) != NULL) {
 		char *saveptr;
-		char *zfs_name, *zfs_mountpoint, *zfs_canmount;
+		char *zfs_name, *zfs_mountpoint, *zfs_canmount, *zfs_optatime, *zfs_optronly;
+		nih_local char *zfs_mntoptions = NULL;
 
 		/* If the line didn't fit, then enlarge the buffer and retry. */
 		while ((! strchr (buf, '\n')) && (! feof (zfs_stream))) {
@@ -804,12 +805,26 @@ parse_zfs_list (void)
 		}
 
 		/* ASSERT: canmount = on | off | noauto */
-		zfs_canmount = strtok_r (NULL, "\t\n", &saveptr);
+		zfs_canmount = strtok_r (NULL, "\t", &saveptr);
 		if (! zfs_canmount || strcmp (zfs_canmount, "on")) {
 			continue;
 		}
 
-		new_mount (zfs_mountpoint, zfs_name, FALSE, "zfs", "zfsutil,nobootwait");
+		NIH_MUST (nih_strcat (&zfs_mntoptions, NULL, "zfsutil"));
+
+		/* ASSERT: readonly = on | off */
+		zfs_optronly = strtok_r (NULL, "\t", &saveptr);
+		if ( zfs_optronly && strcmp (zfs_optronly, "off") ) {
+			NIH_MUST (nih_strcat (&zfs_mntoptions, NULL, ",ro"));
+		}
+
+		/* ASSERT: atime = on | off */
+		zfs_optatime = strtok_r (NULL, "\t\n", &saveptr);
+		if ( zfs_optatime && strcmp (zfs_optatime, "on") ) {
+			NIH_MUST (nih_strcat (&zfs_mntoptions, NULL, ",noatime"));
+		}
+
+		new_mount (zfs_mountpoint, zfs_name, FALSE, "zfs", zfs_mntoptions);
 	}
 
 	zfs_result = pclose (zfs_stream);
