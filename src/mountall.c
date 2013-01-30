@@ -774,7 +774,7 @@ parse_zfs_list (void)
 	size_t bufsz = 4096;
 	FILE *zfs_stream;
 	const char zfs_command[] =
-	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount";
+	  "/sbin/zfs list -H -t filesystem -s mountpoint -o name,mountpoint,canmount";
 	int zfs_result;
 
 	nih_debug ("parsing ZFS list");
