@@ -1345,7 +1345,8 @@ mount_policy (void)
 		    && strcmp (mnt->device, "none")
 		    && strcmp (mnt->device, mnt->type)
 		    && (mnt->entry.prev != mounts)
-		    && strcmp (((Mount *)mnt->entry.prev)->device, "none")) {
+		    && strcmp (((Mount *)mnt->entry.prev)->device, "none")
+		    && strcmp (((Mount *)mnt->entry.prev)->type, "swap")) {
 			NihListEntry *dep;
 			Mount *       prior;
 
