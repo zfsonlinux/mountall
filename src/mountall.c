@@ -126,6 +126,8 @@ struct mount {
 	int                 fsck_fix;
 	int                 ready;
 
+	DBusPendingCall *   pending_call;
+
 	Error               error;
 
 	char *              type;
@@ -140,6 +142,7 @@ struct mount {
 	int                 checked_link;
 	Mount *             link_target;
 	NihList             deps;
+	int                 needs_mtab;
 };
 
 #define MOUNT_NAME(_mnt) (strcmp ((_mnt)->type, "swap")			\
@@ -158,6 +161,10 @@ typedef struct process {
 	void (*handler) (Mount *mnt, pid_t pid, int status);
 } Process;
 
+typedef struct event_reply_data {
+	Mount *          mnt;
+	void (*handler) (void *data, NihDBusMessage *message);
+} EventReplyData;
 
 Mount *new_mount             (const char *mountpoint, const char *device,
 			      int check, const char *type, const char *opts);
@@ -185,6 +192,8 @@ void   trigger_events        (void);
 
 void   try_mounts            (void);
 void   try_mount             (Mount *mnt, int force);
+void   mounting_event_handled(void *data, NihDBusMessage *message);
+void   mounted_event_handled (void *data, NihDBusMessage *message);
 
 int    find_on_path          (const char *name);
 int    find_fsck             (const char *type);
@@ -209,7 +218,8 @@ void   write_mtab            (void);
 void   mount_showthrough     (Mount *root);
 
 void   upstart_disconnected  (DBusConnection *connection);
-void   emit_event            (const char *name, Mount *mnt);
+void   emit_event            (const char *name, Mount *mnt,
+			      void (*cb) (void *, NihDBusMessage *message));
 void   emit_event_error      (void *data, NihDBusMessage *message);
 
 void   udev_monitor_watcher  (struct udev_monitor *udev_monitor,
@@ -479,6 +489,8 @@ new_mount (const char *mountpoint,
 	mnt->fsck_fix = FALSE;
 	mnt->ready = FALSE;
 
+	mnt->pending_call = NULL;
+
 	mnt->error = ERROR_NONE;
 
 	mnt->type = NULL;
@@ -494,6 +506,8 @@ new_mount (const char *mountpoint,
 
 	nih_alloc_set_destructor (mnt, nih_list_destroy);
 	nih_list_add (mounts, &mnt->entry);
+
+	mnt->needs_mtab = FALSE;
 
 	update_mount (mnt, device, check, type, opts);
 
@@ -658,7 +672,8 @@ cut_options (const void *parent,
 
 		va_copy (options, args);
 		while ((option = va_arg (options, const char *)) != NULL) {
-			if (j && ! strncmp (opts + i, option, j))
+			if (j && strlen(option) == j
+				&& ! strncmp (opts + i, option, j))
 				break;
 		}
 		va_end (options);
@@ -859,6 +874,9 @@ parse_mountinfo_file (int reparsed)
 		mnt = find_mount (mountpoint);
 		if (mnt
 		    && strcmp (type, "swap")) {
+
+			int needed_remount = needs_remount (mnt);
+
 			if (! strcmp (type, "rootfs"))
 				type = NULL;
 
@@ -871,6 +889,11 @@ parse_mountinfo_file (int reparsed)
 			if (mnt->mount_opts)
 				nih_unref (mnt->mount_opts, mounts);
 			mnt->mount_opts = opts;
+
+			/* If remounted, treat as newly done mount below. */
+			if (needed_remount && !needs_remount (mnt))
+				mnt->mounted = FALSE;
+
 		} else {
 			mnt = new_mount (mountpoint, device, FALSE, type, opts);
 			mnt->mount_opts = opts;
@@ -879,7 +902,14 @@ parse_mountinfo_file (int reparsed)
 		if (sscanf (dev, "%d:%d", &maj, &min) == 2)
 			mnt->mounted_dev = makedev (maj, min);
 
-		if (reparsed && (! mnt->mounted)) {
+		if (mnt->mounted)
+			continue;
+
+		/* Fully update mounted state if reparsed.
+		 * If invoked first time, just set the flag and leave complete
+		 * state update (including event trigger) to mark_mounted ().
+		 */
+		if (reparsed && ! mnt->pending_call) {
 			mounted (mnt);
 		} else {
 			mnt->mounted = TRUE;
@@ -1433,10 +1463,6 @@ mounted (Mount *mnt)
 
 	nih_debug ("%s", MOUNT_NAME (mnt));
 
-	mnt->mounted = TRUE;
-	newly_mounted = TRUE;
-	nih_main_loop_interrupt ();
-
 	mnt->error = ERROR_NONE;
 	plymouth_update (FALSE);
 
@@ -1476,55 +1502,8 @@ mounted (Mount *mnt)
 		}
 	}
 
-	emit_event ("mounted", mnt);
-
-	/* Any previous mount options no longer apply
-	 * (ie. we're not read-only anymore)
-	 */
-	if (mnt->mount_opts)
-		nih_unref (mnt->mount_opts, mounts);
-	mnt->mount_opts = NULL;
-
-	if ((! written_mtab))
-		write_mtab ();
-
-	switch (mnt->tag) {
-	case TAG_LOCAL:
-		num_local_mounted++;
-		break;
-	case TAG_TIMEOUT:
-		num_local_mounted++;
-		num_timeout_mounted++;
-		if (num_timeout_mounted == num_timeout) {
-			nih_message (_("\n %s finished! "), "local_timeout");
-			/* Stop the timeout waiting for device to get ready"
-			 */
-			if (device_ready_timer) {
-				nih_free (device_ready_timer);
-				device_ready_timer = NULL;
-			}
-		}
-		break;
-	case TAG_REMOTE:
-		num_remote_mounted++;
-		break;
-	case TAG_VIRTUAL:
-		num_virtual_mounted++;
-		break;
-	case TAG_SWAP:
-		num_swap_mounted++;
-		break;
-	case TAG_NOWAIT:
-		break;
-	case TAG_SKIPPED:
-		break;
-	case TAG_UNKNOWN:
-		break;
-	default:
-		nih_assert_not_reached ();
-	}
-
-	trigger_events ();
+	if (!mnt->pending_call)
+		emit_event ("mounted", mnt, mounted_event_handled);
 
 	fsck_update ();
 }
@@ -1597,7 +1576,7 @@ trigger_events (void)
 	if ((! virtual_triggered)
 	    && (num_virtual_mounted == num_virtual)) {
 		nih_info (_("%s finished"), "virtual");
-		emit_event ("virtual-filesystems", NULL);
+		emit_event ("virtual-filesystems", NULL, NULL);
 		virtual_triggered = TRUE;
 	}
 
@@ -1606,7 +1585,7 @@ trigger_events (void)
 	    && virtual_triggered
 	    && (num_local_mounted == num_local)) {
 		nih_info (_("%s finished"), "local");
-		emit_event ("local-filesystems", NULL);
+		emit_event ("local-filesystems", NULL, NULL);
 		local_triggered = TRUE;
 	}
 
@@ -1615,7 +1594,7 @@ trigger_events (void)
 	    && virtual_triggered
 	    && (num_remote_mounted == num_remote)) {
 		nih_info (_("%s finished"), "remote");
-		emit_event ("remote-filesystems", NULL);
+		emit_event ("remote-filesystems", NULL, NULL);
 		remote_triggered = TRUE;
 	}
 
@@ -1625,7 +1604,7 @@ trigger_events (void)
 	    && local_triggered
 	    && remote_triggered) {
 		nih_info (_("All filesystems mounted"));
-		emit_event ("filesystem", NULL);
+		emit_event ("filesystem", NULL, NULL);
 		filesystem_triggered = TRUE;
 	}
 
@@ -1633,7 +1612,7 @@ trigger_events (void)
 	if ((! swap_triggered)
 	    && (num_swap_mounted == num_swap)) {
 		nih_info (_("%s finished"), "swap");
-		emit_event ("all-swaps", NULL);
+		emit_event ("all-swaps", NULL, NULL);
 		swap_triggered = TRUE;
 	}
 
@@ -1679,7 +1658,7 @@ is_device_ready (void * data,
 			|| (! strncmp (mnt->device, "LABEL=", 6))))
 		{
 			nih_message ("%s device not ready in ROOTDELAY sec", MOUNT_NAME (mnt));
-			emit_event ("device-not-ready", mnt);
+			emit_event ("device-not-ready", mnt, NULL);
 		}
 	}
 }
@@ -1747,6 +1726,30 @@ try_mounts (void)
 		}
 
 		if (all) {
+			/* All mounts have been attempted, so wait for
+			 * pending events.
+			 */
+			int still_pending = 0;
+
+			NIH_LIST_FOREACH (mounts, iter) {
+				Mount           *mnt = (Mount *)iter;
+				DBusPendingCall *pending_call = mnt->pending_call;
+
+				if (!pending_call)
+					continue;
+
+				if (! dbus_pending_call_get_completed (pending_call))
+				{
+					still_pending++;
+					continue;
+				}
+				dbus_pending_call_block (pending_call);
+				dbus_pending_call_unref (pending_call);
+				mnt->pending_call = NULL;
+			}
+			if (still_pending > 0)
+				return;
+
 			if (control_server) {
 				dbus_server_disconnect (control_server);
 				dbus_server_unref (control_server);
@@ -1763,6 +1766,9 @@ try_mount (Mount *mnt,
 	struct stat sb;
 
 	nih_assert (mnt != NULL);
+
+	if (mnt->pending_call)
+	        return;
 
 	NIH_LIST_FOREACH (&mnt->deps, dep_iter) {
 		NihListEntry *dep_entry = (NihListEntry *)dep_iter;
@@ -1852,19 +1858,117 @@ try_mount (Mount *mnt,
 		return;
 	}
 
-	/* Queue a filesystem check if not yet ready, otherwise run
-	 * swapon or mount as appropriate.
+	/* Queue a filesystem check if not yet ready, otherwise emit mounting
+	 * event (callback will run swapon or mount as appropriate).
 	 */
 	if ((! mnt->ready)
 	    && (! is_remote (mnt))) {
 		run_fsck (mnt);
 	} else if (! strcmp (mnt->type, "swap")) {
-		emit_event ("mounting", mnt);
+		nih_info ("mounting event sent for swap %s", mnt->device);
+		emit_event ("mounting", mnt, mounting_event_handled);
+	} else {
+		nih_info ("mounting event sent for %s", mnt->mountpoint);
+		emit_event ("mounting", mnt, mounting_event_handled);
+	}
+}
+
+
+void
+mounting_event_handled (void *data,
+                        NihDBusMessage *message)
+{
+	Mount *mnt = ((EventReplyData *)data)->mnt;
+
+	nih_free (data);
+
+	/* We may generate new pending events below; make sure to clear
+	 * the current one before we do. */
+	mnt->pending_call = NULL;
+
+	if (!strcmp(mnt->type, "swap")) {
+		nih_info ("mounting event handled for swap %s", mnt->device);
 		run_swapon (mnt);
 	} else {
-		emit_event ("mounting", mnt);
+		nih_info ("mounting event handled for %s", mnt->mountpoint);
 		run_mount (mnt, FALSE);
 	}
+}
+
+
+void
+mounted_event_handled (void *data,
+                       NihDBusMessage *message)
+{
+	Mount *mnt = ((EventReplyData *)data)->mnt;
+
+	nih_free (data);
+
+	/* We may generate new pending events below; make sure to clear
+	 * the current one before we do. */
+	mnt->pending_call = NULL;
+
+	mnt->mounted = TRUE;
+	newly_mounted = TRUE;
+	nih_main_loop_interrupt ();
+
+	if (!strcmp(mnt->type, "swap")) {
+		nih_info ("mounted event handled for swap %s", mnt->device);
+	} else {
+		nih_info ("mounted event handled for %s", mnt->mountpoint);
+	}
+
+	/* Any previous mount options no longer apply
+	 * (ie. we're not read-only anymore)
+	 */
+	if (mnt->mount_opts)
+		nih_unref (mnt->mount_opts, mounts);
+	mnt->mount_opts = NULL;
+
+	if ((! written_mtab))
+		write_mtab ();
+	if (written_mtab && mnt->needs_mtab)
+		run_mount (mnt, TRUE);
+
+	switch (mnt->tag) {
+	case TAG_LOCAL:
+		num_local_mounted++;
+		break;
+	case TAG_TIMEOUT:
+		num_local_mounted++;
+		num_timeout_mounted++;
+		if (num_timeout_mounted == num_timeout) {
+			nih_message (_("\n %s finished! "), "local_timeout");
+			/* Stop the timeout waiting for device to get ready"
+			 */
+			if (device_ready_timer) {
+				nih_free (device_ready_timer);
+				device_ready_timer = NULL;
+			}
+		}
+		break;
+	case TAG_REMOTE:
+		num_remote_mounted++;
+		break;
+	case TAG_VIRTUAL:
+		num_virtual_mounted++;
+		break;
+	case TAG_SWAP:
+		num_swap_mounted++;
+		break;
+	case TAG_NOWAIT:
+		break;
+	case TAG_SKIPPED:
+		break;
+	case TAG_UNKNOWN:
+		break;
+	default:
+		nih_assert_not_reached ();
+	}
+
+	trigger_events ();
+
+	fsck_update ();
 }
 
 
@@ -2127,6 +2231,7 @@ run_mount (Mount *mnt,
 		   && strcmp (mnt->type, "ntfs")
 		   && strcmp (mnt->type, "ntfs-3g")) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
+		mnt->needs_mtab = TRUE;
 	} else if (mnt->has_showthrough) {
 		NIH_MUST (nih_str_array_add (&args, NULL, &args_len, "-n"));
 	}
@@ -2201,7 +2306,12 @@ run_mount_finished (Mount *mnt,
 	 */
 	if (! mnt->mounted) {
 		parse_mountinfo ();
-		if (! mnt->mounted)
+		/* If the canonical path of the mount point doesn't match
+		 * what's in the fstab, reparsing /proc/mounts won't change
+		 * this mount but instead create a new record.  So handle
+		 * this case directly here.
+		 */
+		if (! mnt->mounted && ! mnt->pending_call)
 			mounted (mnt);
 	} else {
 		mounted (mnt);
@@ -2483,6 +2593,7 @@ write_mtab (void)
 			continue;
 
 		run_mount (mnt, TRUE);
+		mnt->needs_mtab = FALSE;
 	}
 
 	written_mtab = TRUE;
@@ -2566,16 +2677,27 @@ upstart_disconnected (DBusConnection *connection)
 
 void
 emit_event (const char *name,
-	    Mount *     mnt)
+	    Mount *     mnt,
+	    void (*cb) (void *, NihDBusMessage *message))
 {
 	DBusPendingCall *pending_call;
 	nih_local char **env = NULL;
 	size_t           env_len = 0;
+	EventReplyData  *reply_data = NULL;
 
 	nih_assert (name != NULL);
 
-	if (no_events)
+	if (mnt && cb) {
+		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
+		reply_data->mnt = mnt;
+		reply_data->handler = cb;
+	}
+
+	if (no_events) {
+		if (cb)
+			cb (reply_data, NULL);
 		return;
+	}
 
 	/* Flush the Plymouth connection to ensure all updates are sent,
 	 * since the event may kill plymouth.
@@ -2610,33 +2732,57 @@ emit_event (const char *name,
 	}
 
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
-						       name, env, mnt ? TRUE : FALSE,
-						       NULL, emit_event_error, NULL,
+						       name, env, reply_data ? TRUE : FALSE,
+						       reply_data ? cb : NULL,
+						       emit_event_error, reply_data,
 						       NIH_DBUS_TIMEOUT_NEVER));
-	if (! pending_call) {
+
+	if (pending_call) {
+	
+		if (reply_data) {
+
+			/* If previous event is still pending, wait for it. */
+			if (mnt->pending_call) {
+				DBusPendingCall *pending = mnt->pending_call;
+				dbus_pending_call_block (pending);
+				dbus_pending_call_unref (pending);
+			}
+
+			mnt->pending_call = pending_call;
+
+		} else {
+
+                        /* Immediate return from upstart, wait for it. */
+			dbus_pending_call_block (pending_call);
+			dbus_pending_call_unref (pending_call);
+		}
+		
+	} else {
+	
 		NihError *err;
 
 		err = nih_error_get ();
 		nih_warn ("%s", err->message);
 		nih_free (err);
 
-		return;
+		nih_free (reply_data);
 	}
-
-	dbus_pending_call_block (pending_call);
-
-	dbus_pending_call_unref (pending_call);
 }
 
 void
 emit_event_error (void *          data,
 		  NihDBusMessage *message)
 {
+	EventReplyData *reply_data = (EventReplyData *)data;
 	NihError *err;
 
 	err = nih_error_get ();
 	nih_warn ("%s", err->message);
 	nih_free (err);
+
+	/* Even if the event returned an error, we still want to do the mount */
+	if (reply_data)
+		reply_data->handler (data, message);
 }
 
 
@@ -3714,7 +3860,7 @@ change_mount_device (const char *devname,
 					else {
 						nih_free (mnt->device);
 						mnt->device = newdev;
-						emit_event ("changed-device", mnt);
+						emit_event ("changed-device", mnt, NULL);
 					}
 				}
 				break;
@@ -3937,7 +4083,7 @@ main (int   argc,
 		nih_free (err);
 	}
 	if (!ret)
-		emit_event("mountallServer", NULL);
+		emit_event("mountallServer", NULL, NULL);
 	/* Activate the timer for a fs that is local, unmounted and waits for
 	 * a device to be ready, before it can be mounted onto it. Timer on
 	 * only for fs not marked with a "nobootwait=1" */

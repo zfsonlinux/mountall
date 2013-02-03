@@ -20,7 +20,8 @@ daemon after it has mounted a filesystem.
 .BR mountall (8)
 will wait for all services started by this event to be running, all tasks
 started by this event to have finished and all jobs stopped by this event
-to be stopped before continuing with other filesystems.
+to be stopped before emitting any other events related to this filesystem
+or continuing with other filesystems depending on this one.
 
 The
 .BR DEVICE ", " MOUNTPOINT ", " TYPE " and " OPTIONS
