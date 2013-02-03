@@ -1,4 +1,4 @@
-mountall (2.36.3-zfs3) precise; urgency=low
+mountall (2.36.4-zfs1) precise; urgency=low
 
   * Provide zfs-mountall virtual package.
   * Add 0001-Add-ZFS-support.patch
@@ -8,7 +8,15 @@ mountall (2.36.3-zfs3) precise; urgency=low
     Thanks: Will Rouesnel <w.rouesnel@gmail.com>
   * Add debian/source/format file.
 
- -- Darik Horn <dajhorn@vanadac.com>  Wed, 23 Jan 2013 21:06:57 -0600
+ -- Darik Horn <dajhorn@vanadac.com>  Sat, 02 Feb 2013 19:12:43 -0600
+
+mountall (2.36.4) precise-proposed; urgency=low
+
+  * Ensure callbacks are called directly when running with --no-events,
+    otherwise the "event" handling of the non-events never finishes and
+    mountall hangs.  LP: #1099349.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Wed, 16 Jan 2013 17:13:23 -0800
 
 mountall (2.36.3) precise-proposed; urgency=low
 
