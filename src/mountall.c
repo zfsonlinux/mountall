@@ -684,7 +684,8 @@ cut_options (const void *parent,
 
 		va_copy (options, args);
 		while ((option = va_arg (options, const char *)) != NULL) {
-			if (j && ! strncmp (opts + i, option, j))
+			if (j && strlen(option) == j
+				&& ! strncmp (opts + i, option, j))
 				break;
 		}
 		va_end (options);
@@ -920,7 +921,7 @@ parse_mountinfo_file (int reparsed)
 		 * If invoked first time, just set the flag and leave complete
 		 * state update (including event trigger) to mark_mounted ().
 		 */
-		if (reparsed) {
+		if (reparsed && ! mnt->pending_call) {
 			mounted (mnt);
 		} else {
 			mnt->mounted = TRUE;
@@ -1741,6 +1742,8 @@ try_mounts (void)
 			/* All mounts have been attempted, so wait for
 			 * pending events.
 			 */
+			int still_pending = 0;
+
 			NIH_LIST_FOREACH (mounts, iter) {
 				Mount           *mnt = (Mount *)iter;
 				DBusPendingCall *pending_call = mnt->pending_call;
@@ -1748,10 +1751,17 @@ try_mounts (void)
 				if (!pending_call)
 					continue;
 
+				if (! dbus_pending_call_get_completed (pending_call))
+				{
+					still_pending++;
+					continue;
+				}
 				dbus_pending_call_block (pending_call);
 				dbus_pending_call_unref (pending_call);
 				mnt->pending_call = NULL;
 			}
+			if (still_pending > 0)
+				return;
 
 			if (control_server) {
 				dbus_server_disconnect (control_server);
@@ -2306,9 +2316,19 @@ run_mount_finished (Mount *mnt,
 
 	/* Parse mountinfo to see what mount did; in particular to update
 	 * the type if multiple types are listed in fstab.
-	 * Let parse_mountinfo () invoke mounted () to update state.
 	 */
-	parse_mountinfo ();
+	if (! mnt->mounted) {
+		parse_mountinfo ();
+		/* If the canonical path of the mount point doesn't match
+		 * what's in the fstab, reparsing /proc/mounts won't change
+		 * this mount but instead create a new record.  So handle
+		 * this case directly here.
+		 */
+		if (! mnt->mounted && ! mnt->pending_call)
+			mounted (mnt);
+	} else {
+		mounted (mnt);
+	}
 }
 
 
@@ -2680,8 +2700,17 @@ emit_event (const char *name,
 
 	nih_assert (name != NULL);
 
-	if (no_events)
+	if (mnt && cb) {
+		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
+		reply_data->mnt = mnt;
+		reply_data->handler = cb;
+	}
+
+	if (no_events) {
+		if (cb)
+			cb (reply_data, NULL);
 		return;
+	}
 
 	/* Flush the Plymouth connection to ensure all updates are sent,
 	 * since the event may kill plymouth.
@@ -2715,9 +2744,6 @@ emit_event (const char *name,
 		nih_discard (var);
 	}
 
-	if (mnt && cb)
-		reply_data = NIH_MUST (nih_alloc (NULL, sizeof (EventReplyData)));
-	
 	pending_call = NIH_SHOULD (upstart_emit_event (upstart,
 						       name, env, reply_data ? TRUE : FALSE,
 						       reply_data ? cb : NULL,
@@ -2727,9 +2753,6 @@ emit_event (const char *name,
 	if (pending_call) {
 	
 		if (reply_data) {
-
-			reply_data->mnt = mnt;
-			reply_data->handler = cb;
 
 			/* If previous event is still pending, wait for it. */
 			if (mnt->pending_call) {
