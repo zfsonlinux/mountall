@@ -1,3 +1,19 @@
+mountall (2.42ubuntu0.4-zfs1) quantal; urgency=low
+
+  * Provide zfs-mountall virtual package.
+  * Add 0001-Add-ZFS-support.patch
+    And set nobootwait on ZFS mounts.
+    Thanks: Luchesar ILIEV <luchesar.iliev@gmail.com>
+  * Add 0002-Disregard-the-mounted-dataset-property.patch
+    Thanks: Will Rouesnel <w.rouesnel@gmail.com>
+  * Add debian/source/format file.
+  * Add solves-dependencies-problem-endless-loop.patch
+  * Add readonly-and-atime-options-reflected-during-mount.patch
+  * Add no-filesystem-should-depend-on-mounting-swap-first.patch
+    Thanks: mk01 <matuskral@me.com>
+
+ -- Darik Horn <dajhorn@vanadac.com>  Sat, 02 Feb 2013 19:56:41 -0600
+
 mountall (2.42ubuntu0.4) quantal-proposed; urgency=low
 
   * Ensure callbacks are called directly when running with --no-events,
