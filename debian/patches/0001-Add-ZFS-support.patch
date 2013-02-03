@@ -8,7 +8,7 @@ Pretend that the output of `zfs list` is appended to the `/etc/fstab` file.
  1 file changed, 86 insertions(+)
 
 diff --git a/src/mountall.c b/src/mountall.c
-index 97091e3..f679ba4 100644
+index 86c3c6f..fa0eb05 100644
 --- a/src/mountall.c
 +++ b/src/mountall.c
 @@ -178,6 +178,7 @@ char * get_option            (const void *parent, Mount *mnt, const char *option
@@ -110,7 +110,7 @@ index 97091e3..f679ba4 100644
  static int
  needs_remount (Mount *mnt)
  {
-@@ -3978,6 +4063,7 @@ main (int   argc,
+@@ -3981,6 +4066,7 @@ main (int   argc,
  	 */
  	parse_fstab (BUILTIN_FSTAB);
  	parse_fstab (_PATH_MNTTAB);

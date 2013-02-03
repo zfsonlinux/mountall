@@ -20,7 +20,7 @@ Closes: dajhorn/pkg-zfs#70
  1 file changed, 3 insertions(+), 9 deletions(-)
 
 diff --git a/src/mountall.c b/src/mountall.c
-index f679ba4..5c9be7b 100644
+index fa0eb05..2be5903 100644
 --- a/src/mountall.c
 +++ b/src/mountall.c
 @@ -762,7 +762,7 @@ parse_zfs_list (void)

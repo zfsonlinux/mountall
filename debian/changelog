@@ -7,8 +7,12 @@ mountall (2.36.4-zfs1) precise; urgency=low
   * Add 0002-Disregard-the-mounted-dataset-property.patch
     Thanks: Will Rouesnel <w.rouesnel@gmail.com>
   * Add debian/source/format file.
+  * Add solves-dependencies-problem-endless-loop.patch
+  * Add readonly-and-atime-options-reflected-during-mount.patch
+  * Add no-filesystem-should-depend-on-mounting-swap-first.patch
+    Thanks: mk01 <matuskral@me.com>
 
- -- Darik Horn <dajhorn@vanadac.com>  Sat, 02 Feb 2013 19:12:43 -0600
+ -- Darik Horn <dajhorn@vanadac.com>  Sat, 02 Feb 2013 19:36:54 -0600
 
 mountall (2.36.4) precise-proposed; urgency=low
 
