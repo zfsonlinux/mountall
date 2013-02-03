@@ -50,6 +50,12 @@ $ git clean -df
 $ git reset --hard
 ```
 
+## Release Build Instructions
+
+```
+$ git-buildpackage --git-tag -S -sa
+$ dput ppa:zfs-native/staging ../mountall_*_source.changes
+```
 
 ## Upstream Repositories
 
