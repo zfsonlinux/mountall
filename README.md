@@ -13,7 +13,6 @@ from this repository using the git-buildpackage tool.
 Just do quick builds like this:
 ```
 $ apt-get source --build mountall
-$ apt-get source --build mountall
 ```
 
 ## Developer Build Instructions
@@ -57,7 +56,8 @@ $ git reset --hard
 Each of the `upstream` branches in this repository is an unmodified copy of an
 official distribution repository, like those hosted by the Debian or Ubuntu
 projects.  The `git-buildpackage` framework combines an `upstream` branch with
-the corresponding `patch-queue` branch to create a `master` branch.
+the corresponding `patch-queue` branch to create a `master` branch according to
+the `debian/gbp.conf` file.
 
 By default, git will pull the `upstream` branches from the clone origin at
 Github and not the actual upstream respositories.  Look at the `git-config.txt`
@@ -74,4 +74,5 @@ it executable.  Also run `bzr launchpad-login` to ensure that you have a
 working bazaar installation.
 
 The `upstream` branches for Ubuntu may be disconnected or incomplete because
-Ubuntu does not always use source control for system updates.
+Ubuntu does not always use source control for system updates.  In such cases,
+the `upstream` branches will be supplemented by `git-import-orig`.
