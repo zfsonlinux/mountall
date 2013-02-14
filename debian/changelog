@@ -1,3 +1,12 @@
+mountall (2.48) UNRELEASED; urgency=low
+
+  * Make sure we don't show the error message claiming a device is not
+    ready when we're actually already handling it but are just waiting for
+    related upstart jobs that are blocking the mount to finish.
+    LP: #1091792.
+
+ -- Steve Langasek <vorlon@debian.org>  Wed, 13 Feb 2013 17:18:58 -0800
+
 mountall (2.47) unstable; urgency=low
 
   [ Dave Chiluk ]
