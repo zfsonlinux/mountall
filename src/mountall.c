@@ -3303,6 +3303,8 @@ boredom_timeout (void *    data,
 			continue;
 		if (mnt->mount_pid > 0)
 			continue;
+		if (mnt->pending_call != NULL)
+			continue;
 		if (mnt->tag == TAG_NOWAIT)
 			continue;
 		if (mnt->tag == TAG_SKIPPED)
