@@ -9,6 +9,7 @@
 none            /proc                     proc            nodev,noexec,nosuid                          0 0
 none            /proc/sys/fs/binfmt_misc  binfmt_misc     nodev,noexec,nosuid,optional                 0 0
 none            /sys                      sysfs           nodev,noexec,nosuid                          0 0
+none            /sys/fs/cgroup            tmpfs           optional,uid=0,gid=0,mode=0755,size=1024     0 0
 none            /sys/fs/fuse/connections  fusectl         optional                                     0 0
 none            /sys/kernel/debug         debugfs         optional                                     0 0
 none            /sys/kernel/security      securityfs      optional                                     0 0
