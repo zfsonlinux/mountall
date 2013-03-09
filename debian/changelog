@@ -1,4 +1,4 @@
-mountall (2.48) UNRELEASED; urgency=low
+mountall (2.48) unstable; urgency=low
 
   [ Steve Langasek ]
   * Make sure we don't show the error message claiming a device is not
@@ -9,7 +9,7 @@ mountall (2.48) UNRELEASED; urgency=low
   [ Stéphane Graber ]
   * Mount a tmpfs on /sys/fs/cgroup if it exists.
 
- -- Stéphane Graber <stgraber@ubuntu.com>  Fri, 08 Mar 2013 14:16:38 -0500
+ -- Steve Langasek <vorlon@debian.org>  Sat, 09 Mar 2013 00:36:22 +0000
 
 mountall (2.47) unstable; urgency=low
 
