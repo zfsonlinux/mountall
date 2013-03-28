@@ -146,6 +146,7 @@ struct mount {
 };
 
 #define MOUNT_NAME(_mnt) (strcmp ((_mnt)->type, "swap")			\
+			  && strcmp ((_mnt)->type, "zfs")		\
 			  && strcmp ((_mnt)->mountpoint, "none")	\
 			  ? (_mnt)->mountpoint : (_mnt)->device)
 
@@ -1118,9 +1119,7 @@ is_parent (char *root,
 
 	len = strlen (root);
 	if ((! strncmp (path, root, len))
-	    && ((path[len] == '\0')
-		|| (path[len] == '/')
-		|| (len && path[len-1] == '/')))
+	    && ((path[len] == '/') || (len && path[len-1] == '/')))
 		return TRUE;
 
 	return FALSE;
