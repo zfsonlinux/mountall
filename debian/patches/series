@@ -1,5 +1,5 @@
 0001-Add-ZFS-support.patch
 0002-Disregard-the-mounted-dataset-property.patch
-0003-solves-dependencies-problem-endless-loop.patch
-0004-readonly-and-atime-options-reflected-during-mount.patch
-0005-no-filesystem-should-depend-on-mounting-swap-first.patch
+0003-readonly-and-atime-options-reflected-during-mount.patch
+0004-no-filesystem-should-depend-on-mounting-swap-first.patch
+0005-Handle-duplicate-mountpoints.patch
