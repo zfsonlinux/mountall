@@ -1,3 +1,16 @@
+mountall (2.48build1-zfs1) raring; urgency=low
+
+  * Provide zfs-mountall virtual package.
+  * Add Add-ZFS-support.patch
+    And set nobootwait on ZFS mounts.
+    Thanks: Luchesar ILIEV <luchesar.iliev@gmail.com>
+  * Add Disregard-the-mounted-dataset-property.patch
+    Thanks: Will Rouesnel <w.rouesnel@gmail.com>
+  * Add debian/source/format file.
+  * Add Handle-duplicate-mountpoints.patch
+
+ -- Darik Horn <dajhorn@vanadac.com>  Fri, 29 Mar 2013 22:51:45 -0500
+
 mountall (2.48build1) raring; urgency=low
 
   * No-change rebuild against libudev1
