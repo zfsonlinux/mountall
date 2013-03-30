@@ -19,11 +19,11 @@ Closes: dajhorn/pkg-zfs#70
  src/mountall.c |   12 +++---------
  1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/src/mountall.c b/src/mountall.c
-index f679ba4..5c9be7b 100644
+Index: b/src/mountall.c
+===================================================================
 --- a/src/mountall.c
 +++ b/src/mountall.c
-@@ -762,7 +762,7 @@ parse_zfs_list (void)
+@@ -774,7 +774,7 @@
  	size_t bufsz = 4096;
  	FILE *zfs_stream;
  	const char zfs_command[] =
@@ -32,7 +32,7 @@ index f679ba4..5c9be7b 100644
  	int zfs_result;
  
  	nih_debug ("parsing ZFS list");
-@@ -781,7 +781,7 @@ parse_zfs_list (void)
+@@ -793,7 +793,7 @@
  	/* Read one line from the pipe into the buffer. */
  	while (fgets (buf, bufsz, zfs_stream) != NULL) {
  		char *saveptr;
@@ -41,7 +41,7 @@ index f679ba4..5c9be7b 100644
  
  		/* If the line didn't fit, then enlarge the buffer and retry. */
  		while ((! strchr (buf, '\n')) && (! feof (zfs_stream))) {
-@@ -804,17 +804,11 @@ parse_zfs_list (void)
+@@ -816,17 +816,11 @@
  		}
  
  		/* ASSERT: canmount = on | off | noauto */
@@ -60,4 +60,3 @@ index f679ba4..5c9be7b 100644
  		new_mount (zfs_mountpoint, zfs_name, FALSE, "zfs", "zfsutil,nobootwait");
  	}
  
--- 
