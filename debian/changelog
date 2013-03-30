@@ -1,24 +1,36 @@
-mountall (2.47-zfs3) raring; urgency=low
+mountall (2.48build1) raring; urgency=low
 
-  * Shim the upstream lp:ubuntu/raring/mountall repo.
-  * Provide zfs-mountall virtual package.
-  * Add 0001-Add-ZFS-support.patch
-    And set nobootwait on ZFS mounts.
-    Thanks: Luchesar ILIEV <luchesar.iliev@gmail.com>
-  * Add 0002-Disregard-the-mounted-dataset-property.patch
-    Thanks: Will Rouesnel <w.rouesnel@gmail.com>
-  * Add debian/source/format file.
+  * No-change rebuild against libudev1
 
- -- Darik Horn <dajhorn@vanadac.com>  Wed, 23 Jan 2013 22:17:26 -0600
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 13 Mar 2013 07:02:07 +0000
 
-mountall (2.47) UNRELEASED; urgency=low
+mountall (2.48) unstable; urgency=low
 
+  [ Steve Langasek ]
+  * Make sure we don't show the error message claiming a device is not
+    ready when we're actually already handling it but are just waiting for
+    related upstart jobs that are blocking the mount to finish.
+    LP: #1091792.
+
+  [ Stéphane Graber ]
+  * Mount a tmpfs on /sys/fs/cgroup if it exists.
+
+ -- Steve Langasek <vorlon@debian.org>  Sat, 09 Mar 2013 00:36:22 +0000
+
+mountall (2.47) unstable; urgency=low
+
+  [ Dave Chiluk ]
   * Adjust parsing of options so mountall doesn't strip options that are
     substrings of these strings (showthrough, optional, bootwait, nobootwait
     or timeout). This fixes the issue where timeo was getting stripped from
     nfs mounts. LP: #1041377.
 
- -- Dave Chiluk <dave.chiluk@canonical.com>  Wed, 19 Dec 2012 10:58:21 -0600
+  [ Steve Langasek ]
+  * Ensure callbacks are called directly when running with --no-events,
+    otherwise the "event" handling of the non-events never finishes and
+    mountall hangs.  LP: #1099349.
+
+ -- Steve Langasek <vorlon@debian.org>  Mon, 14 Jan 2013 16:37:36 -0800
 
 mountall (2.46) unstable; urgency=low
 
