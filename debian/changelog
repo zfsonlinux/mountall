@@ -1,3 +1,10 @@
+mountall (2.36.4-zfs2) precise; urgency=low
+
+  * Fix upstream-tag typo in gbp.conf file.
+  * Handle duplicate mount points.
+
+ -- Darik Horn <dajhorn@vanadac.com>  Sun, 31 Mar 2013 21:11:17 -0500
+
 mountall (2.36.4-zfs1) precise; urgency=low
 
   * Provide zfs-mountall virtual package.
