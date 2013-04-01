@@ -1,3 +1,9 @@
+mountall (2.48build1-zfs2) raring; urgency=low
+
+  * Merge patch-queue from master/ubuntu/quantal.
+
+ -- Darik Horn <dajhorn@vanadac.com>  Sun, 31 Mar 2013 21:20:05 -0500
+
 mountall (2.48build1-zfs1) raring; urgency=low
 
   * Provide zfs-mountall virtual package.
