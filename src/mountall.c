@@ -2105,8 +2105,7 @@ spawn (Mount *         mnt,
 	proc->mnt = mnt;
 
 	proc->args = args;
-	if (proc->args)
-		nih_ref (proc->args, proc);
+	nih_ref (proc->args, proc);
 
 	proc->pid = pid;
 	proc->handler = handler;
