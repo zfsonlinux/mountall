@@ -742,11 +742,11 @@ parse_fstab (const char *filename)
 				      mntent->mnt_type,
 				      mntent->mnt_opts);
 		} else {
-			mnt = new_mount (mntent->mnt_dir,
-					 mntent->mnt_fsname,
-					 mntent->mnt_passno != 0,
-					 mntent->mnt_type,
-					 mntent->mnt_opts);
+			new_mount (mntent->mnt_dir,
+				   mntent->mnt_fsname,
+				   mntent->mnt_passno != 0,
+				   mntent->mnt_type,
+				   mntent->mnt_opts);
 		}
 	}
 
