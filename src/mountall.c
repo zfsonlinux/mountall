@@ -1495,7 +1495,7 @@ mounted (Mount *mnt)
 		 * /dev/root symlink for the right device too ;-)
 		 */
 		root = find_mount ("/");
-		if (root->mounted_dev != (dev_t)-1) {
+		if (root && root->mounted_dev != (dev_t)-1) {
 			FILE *rules;
 
 			mask = umask (0022);
