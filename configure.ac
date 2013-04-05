@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.62)
-AC_INIT([mountall], [2.44], [ubuntu-devel@lists.ubuntu.com])
+AC_INIT([mountall], [2.49], [ubuntu-devel@lists.ubuntu.com])
 AC_COPYRIGHT([[Copyright © 201-2012 Canonical Ltd.]])
 AC_CONFIG_SRCDIR([util/mntctl.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -47,7 +47,7 @@ NIH_COMPILER_COVERAGE
 NIH_LINKER_OPTIMISATIONS
 
 
-AC_CONFIG_FILES([ Makefile intl/Makefile
+AC_CONFIG_FILES([ Makefile intl/Makefile apport/Makefile
 		  dbus/Makefile src/Makefile conf/Makefile
 		  util/Makefile man/Makefile po/Makefile.in 
 		  debian/initramfs/Makefile 
