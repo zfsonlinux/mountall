@@ -3,6 +3,11 @@ mountall (2.49) UNRELEASED; urgency=low
   [ James Hunt ]
   * apport/mountall.py: add a mountall apport hook.
 
+  [ Steve Langasek ]
+  * Ignore parse errors in /etc/default/rcS or /etc/default/locale; these
+    problems shouldn't be allowed to prevent the system from booting.
+    LP: #1192514.
+
  -- Steve Langasek <vorlon@debian.org>  Fri, 29 Mar 2013 14:20:35 -0700
 
 mountall (2.48) unstable; urgency=low
