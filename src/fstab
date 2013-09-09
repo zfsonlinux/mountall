@@ -22,3 +22,4 @@ none            /run                      tmpfs           noexec,nosuid,size=10%
 none            /run/lock                 tmpfs           nodev,noexec,nosuid,size=5242880             0 0
 none            /run/shm                  tmpfs           nosuid,nodev                                 0 0
 none            /run/user                 tmpfs           nodev,noexec,nosuid,size=104857600,mode=0755 0 0
+none            /sys/fs/pstore            pstore          optional                                     0 0
