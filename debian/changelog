@@ -1,3 +1,9 @@
+mountall (2.50) UNRELEASED; urgency=low
+
+  * Add support for pstore.  Closes: #722212.
+
+ -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
+
 mountall (2.49) unstable; urgency=low
 
   [ James Hunt ]
