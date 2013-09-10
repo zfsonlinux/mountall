@@ -1,6 +1,11 @@
 mountall (2.50) UNRELEASED; urgency=low
 
   * Add support for pstore.  Closes: #722212.
+  * Allow multiple fstab entries with the same mountpoint: we still mask
+    any entries that came from a different source (i.e., /etc/fstab will
+    mask /lib/init/fstab), but if there are multiple entries in /etc/fstab,
+    treat them all as separate mounts instead of letting the last one win.
+    LP: #503003.
 
  -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
 
