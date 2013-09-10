@@ -10,6 +10,9 @@ mountall (2.50) UNRELEASED; urgency=low
     default, logs will be captured and (assuming /var/log becomes writable
     at some point) mountall is debuggable without having to spew text to the
     console.
+  * Support reading --verbose/--debug options from /proc/cmdline, so that
+    we can give users a better way to debug mountall without having to
+    edit the upstart job.
 
  -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
 
