@@ -143,6 +143,7 @@ struct mount {
 	Mount *             link_target;
 	NihList             deps;
 	int                 needs_mtab;
+	char *              src;
 };
 
 #define MOUNT_NAME(_mnt) (strcmp ((_mnt)->type, "swap")			\
@@ -167,7 +168,8 @@ typedef struct event_reply_data {
 } EventReplyData;
 
 Mount *new_mount             (const char *mountpoint, const char *device,
-			      int check, const char *type, const char *opts);
+			      int check, const char *type, const char *opts,
+			      const char *src);
 Mount *find_mount            (const char *mountpoint);
 void   update_mount          (Mount *mnt, const char *device, int check,
 			      const char *type, const char *opts);
@@ -459,7 +461,8 @@ new_mount (const char *mountpoint,
 	   const char *device,
 	   int         check,
 	   const char *type,
-	   const char *opts)
+	   const char *opts,
+	   const char *src)
 {
 	Mount *mnt;
 
@@ -509,6 +512,8 @@ new_mount (const char *mountpoint,
 
 	mnt->needs_mtab = FALSE;
 
+	if (src)
+		mnt->src = NIH_MUST (nih_strdup (mounts, src));
 	update_mount (mnt, device, check, type, opts);
 
 	return mnt;
@@ -734,7 +739,7 @@ parse_fstab (const char *filename)
 			continue;
 
 		mnt = find_mount (mntent->mnt_dir);
-		if (mnt
+		if (mnt && (!mnt->src || strcmp (mnt->src, filename))
 		    && strcmp (mntent->mnt_type, "swap")) {
 			update_mount (mnt,
 				      mntent->mnt_fsname,
@@ -746,7 +751,8 @@ parse_fstab (const char *filename)
 				   mntent->mnt_fsname,
 				   mntent->mnt_passno != 0,
 				   mntent->mnt_type,
-				   mntent->mnt_opts);
+				   mntent->mnt_opts,
+				   filename);
 		}
 	}
 
@@ -907,7 +913,8 @@ parse_mountinfo_file (int reparsed)
 				mnt->mounted = FALSE;
 
 		} else {
-			mnt = new_mount (mountpoint, device, FALSE, type, opts);
+			mnt = new_mount (mountpoint, device, FALSE, type, opts,
+			                 NULL);
 			mnt->mount_opts = opts;
 		}
 
@@ -1163,7 +1170,7 @@ mount_policy (void)
 		}
 	}
 
- 	NIH_LIST_FOREACH (mounts, iter) {
+	for (NihList *iter = mounts->prev; iter != mounts; iter = iter->prev) {
 		Mount *mnt = (Mount *)iter;
 		Mount *mount_parent = NULL;
 		Mount *device_parent = NULL;
@@ -1175,9 +1182,21 @@ mount_policy (void)
 		 */
 		NIH_LIST_FOREACH (mounts, iter) {
 			Mount *other = (Mount *)iter;
+			int is_dep = 0;
 
 			/* Skip this mount entry */
 			if (other == mnt)
+				continue;
+
+			/* Since multiple mounts can have the same mount point,
+			 * we check here if the target already has us as a
+			 * dep to avoid a circular dependency. */
+			NIH_LIST_FOREACH (&(other->deps), iter) {
+				NihListEntry *dep = (NihListEntry *)iter;
+				if (dep->data == mnt)
+					is_dep = 1;
+			}
+			if (is_dep)
 				continue;
 
 			/* Is this a parent of our mountpoint? */
