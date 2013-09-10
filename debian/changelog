@@ -1,4 +1,4 @@
-mountall (2.50) UNRELEASED; urgency=low
+mountall (2.50) unstable; urgency=low
 
   * Add support for pstore.  Closes: #722212.
   * Allow multiple fstab entries with the same mountpoint: we still mask
@@ -18,7 +18,7 @@ mountall (2.50) UNRELEASED; urgency=low
     assert on a bogus request, just treat it as a no-op and continue.
     LP: #731800.
 
- -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
+ -- Steve Langasek <vorlon@debian.org>  Tue, 10 Sep 2013 04:01:19 +0000
 
 mountall (2.49) unstable; urgency=low
 
