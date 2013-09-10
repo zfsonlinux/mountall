@@ -6,6 +6,10 @@ mountall (2.50) UNRELEASED; urgency=low
     mask /lib/init/fstab), but if there are multiple entries in /etc/fstab,
     treat them all as separate mounts instead of letting the last one win.
     LP: #503003.
+  * Don't set 'console output' anymore; now that we have upstart logging by
+    default, logs will be captured and (assuming /var/log becomes writable
+    at some point) mountall is debuggable without having to spew text to the
+    console.
 
  -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
 
