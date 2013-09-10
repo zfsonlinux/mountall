@@ -1544,7 +1544,8 @@ void
 skip_mount (Mount *mnt)
 {
 	nih_assert (mnt != NULL);
-	nih_assert ((! mnt->mounted) || needs_remount (mnt));
+	if (mnt->mounted && ! needs_remount (mnt))
+		return;
 
 	nih_debug ("%s", MOUNT_NAME (mnt));
 

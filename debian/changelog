@@ -13,6 +13,10 @@ mountall (2.50) UNRELEASED; urgency=low
   * Support reading --verbose/--debug options from /proc/cmdline, so that
     we can give users a better way to debug mountall without having to
     edit the upstart job.
+  * Since everything is in a single event loop, a request from plymouth to
+    skip a mount may come in after the mount has already happened.  So don't
+    assert on a bogus request, just treat it as a no-op and continue.
+    LP: #731800.
 
  -- Steve Langasek <vorlon@debian.org>  Sun, 08 Sep 2013 23:12:35 -0700
 
