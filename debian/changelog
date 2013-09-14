@@ -1,4 +1,4 @@
-mountall (2.51) UNRELEASED; urgency=low
+mountall (2.51) unstable; urgency=low
 
   * Fix tagging of filesystems to not have local/remote inheritance
     overridden; otherwise we will mis-tag various mounts and deadlock the
@@ -7,7 +7,7 @@ mountall (2.51) UNRELEASED; urgency=low
     /etc/fstab: we now always treat the 'nobootwait' flag as applying to
     submounts. LP: #1223745, LP: #1153672.
 
- -- Steve Langasek <vorlon@debian.org>  Fri, 13 Sep 2013 12:52:37 -0700
+ -- Steve Langasek <vorlon@debian.org>  Fri, 13 Sep 2013 22:23:55 -0700
 
 mountall (2.50) unstable; urgency=low
 
