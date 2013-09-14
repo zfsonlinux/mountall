@@ -1342,15 +1342,29 @@ void
 tag_mount (Mount *mnt,
 	   Tag    tag)
 {
+	Tag initial_tag = mnt->tag;
+
 	nih_assert (mnt != NULL);
 
-	/* If no tag is given, work it out from the device type */
-	if (tag == TAG_UNKNOWN) {
+	switch (tag) {
+	case TAG_UNKNOWN:
+	case TAG_LOCAL:
+	case TAG_REMOTE:
+	case TAG_NOWAIT:
+		break;
+	default:
+		/* Not an inheritable tag. */
+		nih_assert_not_reached ();
+	}
+
+	/* First time we're asked about this mount, figure out its
+	 * intrinsic tag from the device type */
+	if (mnt->tag == TAG_UNKNOWN) {
 		if (! strcmp (mnt->type, "swap")) {
-			tag = TAG_SWAP;
+			mnt->tag = TAG_SWAP;
 		} else if (! strcmp (mnt->mountpoint, "/")) {
 			nih_debug ("%s is root filesystem", MOUNT_NAME (mnt));
-			tag = TAG_LOCAL;
+			mnt->tag = TAG_LOCAL;
 		} else if (is_remote (mnt)) {
 			if (((! strcmp (mnt->mountpoint, "/usr"))
 			     || (! strcmp (mnt->mountpoint, "/var"))
@@ -1359,34 +1373,34 @@ tag_mount (Mount *mnt,
 			     || (has_option (mnt, "bootwait", FALSE)))
 			    && ! has_option (mnt, "nobootwait", FALSE))
 			{
-				tag = TAG_REMOTE;
+				mnt->tag = TAG_REMOTE;
 			} else {
-				tag = TAG_NOWAIT;
+				mnt->tag = TAG_NOWAIT;
 			}
 		} else if (mnt->nodev
 			   && strcmp (mnt->type, "fuse")) {
 			if (! has_option (mnt, "nobootwait", FALSE)) {
-				tag = TAG_VIRTUAL;
+				mnt->tag = TAG_VIRTUAL;
 			} else {
-				tag = TAG_NOWAIT;
+				mnt->tag = TAG_NOWAIT;
 			}
 		} else {
 			if (! has_option (mnt, "nobootwait", FALSE)) {
 				if ( has_option (mnt, "timeout", FALSE))
 				{
-					tag = TAG_TIMEOUT; 
+					mnt->tag = TAG_TIMEOUT; 
 				}
 				else
-					tag = TAG_LOCAL;
-	
+					mnt->tag = TAG_LOCAL;
+
 			} else {
-				tag = TAG_NOWAIT;
+				mnt->tag = TAG_NOWAIT;
 			}
 		}
 	}
 
-	/* If no tag is set, default it from our dependencies */
-	if (mnt->tag == TAG_UNKNOWN) {
+	/* If no tag is passed, default it from our dependencies */
+	if (tag == TAG_UNKNOWN) {
 		NIH_LIST_FOREACH (&mnt->deps, dep_iter) {
 			NihListEntry *dep_entry = (NihListEntry *)dep_iter;
 			Mount *       dep = (Mount *)dep_entry->data;
@@ -1398,81 +1412,70 @@ tag_mount (Mount *mnt,
 			    && strcmp (mnt->type, "none"))
 				continue;
 
-			if ((dep->tag == TAG_LOCAL)
-			    && (mnt->tag != TAG_REMOTE))
-				mnt->tag = TAG_LOCAL;
-			if ((dep->tag == TAG_TIMEOUT)
-			    && (mnt->tag != TAG_REMOTE))
-				mnt->tag = TAG_LOCAL;
-			if (dep->tag == TAG_REMOTE)
-				mnt->tag = TAG_REMOTE;
+			if (dep->tag == TAG_NOWAIT)
+				tag = TAG_NOWAIT;
+			if ((dep->tag == TAG_REMOTE)
+			    && (tag != TAG_NOWAIT))
+				tag = TAG_REMOTE;
+			if (((dep->tag == TAG_LOCAL)
+			     || (dep->tag == TAG_TIMEOUT))
+			    && (tag != TAG_REMOTE)
+			    && (tag != TAG_NOWAIT))
+				tag = TAG_LOCAL;
 		}
 	}
 
-	/* Don't override a more restrictive tag already set from a parent
-	 * mountpoint.
-	 */
-	if ((tag == TAG_VIRTUAL)
-	    && (mnt->tag == TAG_REMOTE)) {
-		nih_debug ("%s is not virtual, inherited remote",
-			   MOUNT_NAME (mnt));
-		return;
-	}
+	/* Don't override a more restrictive tag already set. */
+	if (mnt->tag == TAG_NOWAIT)
+		tag = TAG_NOWAIT;
+	if ((mnt->tag == TAG_REMOTE)
+	    && (tag != TAG_NOWAIT))
+		tag = TAG_REMOTE;
+	if (((mnt->tag == TAG_LOCAL)
+	     || (mnt->tag == TAG_TIMEOUT))
+	    && (tag != TAG_REMOTE)
+	    && (tag != TAG_NOWAIT))
+		tag = TAG_LOCAL;
 
-	if ((tag == TAG_VIRTUAL)
-	    && (mnt->tag == TAG_LOCAL)) {
-		nih_debug ("%s is not virtual, inherited local",
-			   MOUNT_NAME (mnt));
-		return;
-	}
+	/* Set the tag, then set it on any mount point that depends on this
+	 * one. */
+	if (tag != TAG_UNKNOWN)
+		mnt->tag = tag;
 
-	if ((tag == TAG_VIRTUAL)
-	    && (mnt->tag == TAG_TIMEOUT)) {
-		nih_debug ("%s is not virtual, inherited local (with timeout)",
-			   MOUNT_NAME (mnt));
-		return;
-	}
-
-	if ((tag == TAG_LOCAL)
-	    && (mnt->tag == TAG_REMOTE)) {
-		nih_debug ("%s is not local, inherited remote",
-			   MOUNT_NAME (mnt));
-	}
-
-	if ((tag == TAG_TIMEOUT)
-	    && (mnt->tag == TAG_REMOTE)) {
-		nih_debug ("%s is not local (with timeout), inherited remote",
-			   MOUNT_NAME (mnt));
-	}
-
-	/* Set the tag, then if it's one we'd normally inherit, set it on
-	 * any mount point that depends on this one.
-	 */
-	mnt->tag = tag;
+	tag = mnt->tag;
 
 	/* TAG_TIMEOUT is TAG_LOCAL with a timeout. timeout cannot be
 	 * inherited but local could be */
 	if (tag == TAG_TIMEOUT)
 		tag = TAG_LOCAL;
+	if (initial_tag == TAG_TIMEOUT)
+		initial_tag = TAG_LOCAL;
 
-	if ((tag == TAG_LOCAL)
-	    || (tag == TAG_REMOTE)) {
-		NIH_LIST_FOREACH (mounts, iter) {
-			Mount *dep = (Mount *)iter;
+	/* Not inheritable, don't recurse */
+	if ((tag != TAG_LOCAL)
+	    && (tag != TAG_REMOTE)
+	    && (tag != TAG_NOWAIT))
+		return;
 
-			/* Do not inherit from the root filesystem unless
-			 * this is a placeholder.
-			 */
-			if ((! strcmp (mnt->mountpoint, "/"))
-			    && strcmp (dep->type, "none"))
-				continue;
+	/* No changes, so don't recurse. */
+	if (tag == initial_tag)
+		return;
 
-			NIH_LIST_FOREACH (&dep->deps, dep_iter) {
-				NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+	NIH_LIST_FOREACH (mounts, iter) {
+		Mount *dep = (Mount *)iter;
 
-				if (dep_entry->data == mnt)
-					tag_mount (dep, tag);
-			}
+		/* Do not inherit from the root filesystem unless
+		 * this is a placeholder.
+		 */
+		if ((! strcmp (mnt->mountpoint, "/"))
+		    && strcmp (dep->type, "none"))
+			continue;
+
+		NIH_LIST_FOREACH (&dep->deps, dep_iter) {
+			NihListEntry *dep_entry = (NihListEntry *)dep_iter;
+
+			if (dep_entry->data == mnt)
+				tag_mount (dep, tag);
 		}
 	}
 }

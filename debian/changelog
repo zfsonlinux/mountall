@@ -1,3 +1,14 @@
+mountall (2.51) UNRELEASED; urgency=low
+
+  * Fix tagging of filesystems to not have local/remote inheritance
+    overridden; otherwise we will mis-tag various mounts and deadlock the
+    boot.  Also fixes an inconsistency with the inheritance of
+    'bootwait'/'nobootwait' flags depending on the order of mounts in
+    /etc/fstab: we now always treat the 'nobootwait' flag as applying to
+    submounts. LP: #1223745, LP: #1153672.
+
+ -- Steve Langasek <vorlon@debian.org>  Fri, 13 Sep 2013 12:52:37 -0700
+
 mountall (2.50) unstable; urgency=low
 
   * Add support for pstore.  Closes: #722212.
