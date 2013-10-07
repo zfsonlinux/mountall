@@ -1,0 +1,22 @@
+From: mk01 <matuskral@me.com>
+Date: Fri, 1 Feb 2013 02:06:57 +0100
+Subject: no filesystem should depend on mounting swap first
+
+---
+ src/mountall.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+Index: b/src/mountall.c
+===================================================================
+--- a/src/mountall.c
++++ b/src/mountall.c
+@@ -1379,7 +1379,8 @@
+ 		    && strcmp (mnt->device, "none")
+ 		    && strcmp (mnt->device, mnt->type)
+ 		    && (mnt->entry.prev != mounts)
+-		    && strcmp (((Mount *)mnt->entry.prev)->device, "none")) {
++		    && strcmp (((Mount *)mnt->entry.prev)->device, "none")
++		    && strcmp (((Mount *)mnt->entry.prev)->type, "swap")) {
+ 			NihListEntry *dep;
+ 			Mount *       prior;
+ 
