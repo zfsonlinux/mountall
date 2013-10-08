@@ -1,3 +1,11 @@
+mountall (2.52) UNRELEASED; urgency=low
+
+  * Don't emit extra 'mounting' events for mounts already in progress; this
+    will cause double triggering of some jobs for remote filesystems, and
+    can also cause us to miss 'mounted' events.  LP: #1048017.
+
+ -- Steve Langasek <vorlon@debian.org>  Mon, 07 Oct 2013 13:43:48 -0700
+
 mountall (2.51) unstable; urgency=low
 
   * Fix tagging of filesystems to not have local/remote inheritance

@@ -1894,6 +1894,11 @@ try_mount (Mount *mnt,
 		return;
 	}
 
+	/* A mount is already in progress for this mount point; do not
+	 * send an extra event, which will just confuse things
+	 */
+	if (mnt->mount_pid > 0)
+		return;
 	/* Queue a filesystem check if not yet ready, otherwise emit mounting
 	 * event (callback will run swapon or mount as appropriate).
 	 */
