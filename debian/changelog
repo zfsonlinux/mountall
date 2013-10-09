@@ -3,6 +3,10 @@ mountall (2.52) UNRELEASED; urgency=low
   * Don't emit extra 'mounting' events for mounts already in progress; this
     will cause double triggering of some jobs for remote filesystems, and
     can also cause us to miss 'mounted' events.  LP: #1048017.
+  * Fix mountall upstart job to not start a subshell for reading
+    /proc/cmdline, since this causes upstart to lose track of the daemon
+    process and leaves mountall-net unable to signal it to retry network
+    mounts.  LP: #1235013.
 
  -- Steve Langasek <vorlon@debian.org>  Mon, 07 Oct 2013 13:43:48 -0700
 
