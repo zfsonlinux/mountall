@@ -1,4 +1,4 @@
-mountall (2.52) UNRELEASED; urgency=low
+mountall (2.52) unstable; urgency=low
 
   * Don't emit extra 'mounting' events for mounts already in progress; this
     will cause double triggering of some jobs for remote filesystems, and
@@ -8,7 +8,7 @@ mountall (2.52) UNRELEASED; urgency=low
     process and leaves mountall-net unable to signal it to retry network
     mounts.  LP: #1235013.
 
- -- Steve Langasek <vorlon@debian.org>  Mon, 07 Oct 2013 13:43:48 -0700
+ -- Steve Langasek <vorlon@debian.org>  Wed, 09 Oct 2013 04:12:51 +0000
 
 mountall (2.51) unstable; urgency=low
 
