@@ -9,8 +9,15 @@ mountall \- Mount filesystems during boot
 .\"
 .SH DESCRIPTION
 .B mountall
-reads
+is an Upstart
+.BR init (8)
+helper that mounts filesystems.
+
+It reads
 .BR fstab (5)
+and supplements the entries found with a set of built-in entries
+(generally found in
+.IR /lib/init/fstab ")"
 and calls
 .BR fsck (8),
 .BR mount (8)
@@ -19,11 +26,6 @@ and
 in the correct order to mount filesystems once the underlying devices
 have been created by
 .BR udevd (8).
-
-This is a temporary tool until
-.BR init (8)
-itself gains the necessary flexibility to perform this processing; you
-should not rely on its behaviour.
 .\"
 .SH OPTIONS
 .TP
