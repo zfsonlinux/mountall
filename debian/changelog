@@ -1,3 +1,11 @@
+mountall (2.53) UNRELEASED; urgency=medium
+
+  * man/mountall.8:
+    - Added SEE ALSO section.
+    - Updated date and copyright.
+
+ -- James Hunt <james.hunt@ubuntu.com>  Mon, 23 Dec 2013 17:44:05 +0000
+
 mountall (2.52) unstable; urgency=low
 
   * Don't emit extra 'mounting' events for mounts already in progress; this
