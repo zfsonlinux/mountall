@@ -1,3 +1,15 @@
+mountall (2.53) UNRELEASED; urgency=medium
+
+  * man/mountall.8:
+    - Added SEE ALSO section.
+    - Updated date and copyright.
+    - Remove comments about mountall being a temporary tool
+      since this is not true (it's been "temporary" since 2009) and it
+      undermines its current importance.
+    - Reworked DESCRIPTION and made mention of /lib/init/fstab.
+
+ -- James Hunt <james.hunt@ubuntu.com>  Mon, 23 Dec 2013 17:55:28 +0000
+
 mountall (2.52) unstable; urgency=low
 
   * Don't emit extra 'mounting' events for mounts already in progress; this
