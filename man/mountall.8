@@ -1,4 +1,4 @@
-.TH mountall 8 2009-09-07 upstart
+.TH mountall 8 2013-12-23 upstart
 .\"
 .SH NAME
 mountall \- Mount filesystems during boot
@@ -9,8 +9,15 @@ mountall \- Mount filesystems during boot
 .\"
 .SH DESCRIPTION
 .B mountall
-reads
+is an Upstart
+.BR init (8)
+helper that mounts filesystems.
+
+It reads
 .BR fstab (5)
+and supplements the entries found with a set of built-in entries
+(generally found in
+.IR /lib/init/fstab ")"
 and calls
 .BR fsck (8),
 .BR mount (8)
@@ -19,11 +26,6 @@ and
 in the correct order to mount filesystems once the underlying devices
 have been created by
 .BR udevd (8).
-
-This is a temporary tool until
-.BR init (8)
-itself gains the necessary flexibility to perform this processing; you
-should not rely on its behaviour.
 .\"
 .SH OPTIONS
 .TP
@@ -66,7 +68,19 @@ Report bugs at
 .RB < https://launchpad.net/ubuntu/+source/mountall/+bugs >
 .\"
 .SH COPYRIGHT
-Copyright \(co 2009 Canonical Ltd.
+Copyright \(co 2009-2013 Canonical Ltd.
 .PP
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.\"
+.SH SEE ALSO
+
+.BR all\-swaps (7),
+.BR filesystem (7),
+.BR init (8),
+.BR local-filesystems (7),
+.BR mounted (7),
+.BR mounting (7),
+.BR remote-filesystems (7),
+.BR virtual-filesystems (7).
+
