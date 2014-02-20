@@ -1,5 +1,6 @@
 mountall (2.53) UNRELEASED; urgency=medium
 
+  [ James Hunt ]
   * man/mountall.8:
     - Added SEE ALSO section.
     - Updated date and copyright.
@@ -7,6 +8,10 @@ mountall (2.53) UNRELEASED; urgency=medium
       since this is not true (it's been "temporary" since 2009) and it
       undermines its current importance.
     - Reworked DESCRIPTION and made mention of /lib/init/fstab.
+
+  [ Steve Langasek ]
+  * conf/mounted-run.conf: the dynamic motd location used by PAM has changed
+    to /run/motd.dynamic; update the job to match.
 
  -- James Hunt <james.hunt@ubuntu.com>  Mon, 23 Dec 2013 17:55:28 +0000
 
