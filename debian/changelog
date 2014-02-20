@@ -1,4 +1,4 @@
-mountall (2.53) UNRELEASED; urgency=medium
+mountall (2.53) unstable; urgency=medium
 
   [ James Hunt ]
   * man/mountall.8:
@@ -13,7 +13,7 @@ mountall (2.53) UNRELEASED; urgency=medium
   * conf/mounted-run.conf: the dynamic motd location used by PAM has changed
     to /run/motd.dynamic; update the job to match.
 
- -- James Hunt <james.hunt@ubuntu.com>  Mon, 23 Dec 2013 17:55:28 +0000
+ -- Steve Langasek <vorlon@debian.org>  Wed, 19 Feb 2014 16:17:14 -0800
 
 mountall (2.52) unstable; urgency=low
 
