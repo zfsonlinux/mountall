@@ -1,0 +1,62 @@
+From: Will Rouesnel <w.rouesnel@gmail.com>
+Date: Thu, 27 Dec 2012 05:59:37 -0600
+Subject: Disregard the 'mounted' dataset property.
+
+If `/etc/mtab` is not a symlink to `/proc/mounts`, and if it contains stale
+records, then `zfs list` returns incorrect 'mounted' values that cause
+corresponding datasets to be ignored.
+
+The mounted check is unnecessary (and the problem), since mountall checks if
+the mountpoints are already mounted before it spawns a mount job - but zfs list
+checks mtab before it's been written by mountall (and any stale mountpoints get
+misrepresented). Removing that check, everything seems to work fine (mounts
+correctly on startup, doesn't overmount things when run from the command line
+in a running session).
+
+Amended-by: Darik Horn <dajhorn@vanadac.com>
+Closes: dajhorn/pkg-zfs#70
+---
+ src/mountall.c |   12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+Index: b/src/mountall.c
+===================================================================
+--- a/src/mountall.c
++++ b/src/mountall.c
+@@ -783,7 +783,7 @@
+ 	size_t bufsz = 4096;
+ 	FILE *zfs_stream;
+ 	const char zfs_command[] =
+-	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount,mounted";
++	  "/sbin/zfs list -H -t filesystem -o name,mountpoint,canmount";
+ 	int zfs_result;
+ 
+ 	nih_debug ("parsing ZFS list");
+@@ -802,7 +802,7 @@
+ 	/* Read one line from the pipe into the buffer. */
+ 	while (fgets (buf, bufsz, zfs_stream) != NULL) {
+ 		char *saveptr;
+-		char *zfs_name, *zfs_mountpoint, *zfs_canmount, *zfs_mounted;
++		char *zfs_name, *zfs_mountpoint, *zfs_canmount;
+ 
+ 		/* If the line didn't fit, then enlarge the buffer and retry. */
+ 		while ((! strchr (buf, '\n')) && (! feof (zfs_stream))) {
+@@ -825,17 +825,11 @@
+ 		}
+ 
+ 		/* ASSERT: canmount = on | off | noauto */
+-		zfs_canmount = strtok_r (NULL, "\t", &saveptr);
++		zfs_canmount = strtok_r (NULL, "\t\n", &saveptr);
+ 		if (! zfs_canmount || strcmp (zfs_canmount, "on")) {
+ 			continue;
+ 		}
+ 
+-		/* ASSERT: mounted = yes | no */
+-		zfs_mounted = strtok_r (NULL, "\t\n", &saveptr);
+-		if (! zfs_mounted || strcmp (zfs_mounted, "no")) {
+-			continue;
+-		}
+-
+ 		new_mount (zfs_mountpoint, zfs_name, FALSE, "zfs", "zfsutil,nobootwait", NULL);
+ 	}
+ 
