@@ -1,3 +1,9 @@
+mountall (2.53-zfs1) trusty; urgency=low
+
+  * Import mountall 2.51-zfs1 changes for ZoL.
+
+ -- Darik Horn <dajhorn@vanadac.com>  Mon, 31 Mar 2014 00:25:43 -0500
+
 mountall (2.53) unstable; urgency=medium
 
   [ James Hunt ]
