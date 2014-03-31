@@ -1,0 +1,47 @@
+From: Darik Horn <dajhorn@vanadac.com>
+Date: Fri, 27 Mar 2013 22:29:47 -0600
+Subject: Handle duplicate mountpoints.
+
+When mountall is iterating in try_mounts() on new mount point, change
+is_parent() to return false when a record is tested against itself
+because a mount point cannot be a root of itself.
+
+Mountall does not preserve the behavior of `mount -a` if more than
+one device shares a mountpoint in the /etc/fstab file.  Suppose:
+
+	/var/tmp/alfa   /mnt/charlie  ext2  loop  0  0
+	/var/tmp/bravo  /mnt/charlie  ext2  loop  0  0
+
+Both filesystems are mounted on /mnt/charlie by `mount -a`, but
+bravo is ignored by `mountall`. This seems to be an artifact of the fix for
+LP ##443035 in zfsonlinux/mountall@eca315d06ae4a2913f9b2ec994c68c45fead912f.
+
+Furthermore, mountall hangs if such mounts are ZFS datasets or other
+virtual filesystems that are not backed by a real device node.
+
+Closes: zfsonlinux/mountall#5
+---
+
+Index: b/src/mountall.c
+===================================================================
+--- a/src/mountall.c
++++ b/src/mountall.c
+@@ -147,6 +147,7 @@
+ };
+ 
+ #define MOUNT_NAME(_mnt) (strcmp ((_mnt)->type, "swap")			\
++			  && strcmp ((_mnt)->type, "zfs")		\
+ 			  && strcmp ((_mnt)->mountpoint, "none")	\
+ 			  ? (_mnt)->mountpoint : (_mnt)->device)
+ 
+@@ -1143,9 +1144,7 @@
+ 
+ 	len = strlen (root);
+ 	if ((! strncmp (path, root, len))
+-	    && ((path[len] == '\0')
+-		|| (path[len] == '/')
+-		|| (len && path[len-1] == '/')))
++	    && ((path[len] == '/') || (len && path[len-1] == '/')))
+ 		return TRUE;
+ 
+ 	return FALSE;
