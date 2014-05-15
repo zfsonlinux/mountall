@@ -1,10 +1,10 @@
-mountall (2.54) UNRELEASED; urgency=medium
+mountall (2.54) unstable; urgency=medium
 
   * conf/mounted-proc.conf: /proc/slabinfo may not exist, in which case we
     should avoid trying to chmod it and generating spurious errors in the
     log.  LP: #1319724.
 
- -- Steve Langasek <vorlon@debian.org>  Thu, 15 May 2014 07:54:01 -0700
+ -- Steve Langasek <vorlon@debian.org>  Thu, 15 May 2014 07:54:40 -0700
 
 mountall (2.53) unstable; urgency=medium
 
