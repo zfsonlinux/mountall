@@ -1,3 +1,9 @@
+mountall (2.54build1) utopic; urgency=high
+
+  * No change rebuild against libplymouth4.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Mon, 14 Jul 2014 10:15:29 +0100
+
 mountall (2.54) unstable; urgency=medium
 
   * conf/mounted-proc.conf: /proc/slabinfo may not exist, in which case we
