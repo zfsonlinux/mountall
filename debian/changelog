@@ -1,3 +1,16 @@
+mountall (2.54ubuntu0.14.10.1-zfs1) utopic; urgency=high
+
+  [ Marc Deslauriers ]
+  * SECURITY UPDATE: insecure mount permissions (LP: #1390183)
+    - The mount utility now honours process umask when mounting certain
+      filesystems, resulting in them being potentially mounted with
+      inappropriate permissions.
+    - src/mountall.c: don't specifically set umask when running as a
+      daemon, inherit the umask Upstart sets instead.
+    - CVE-2014-1421
+
+ -- Darik Horn <dajhorn@vanadac.com>  Tue, 18 Nov 2014 09:06:37 -0600
+
 mountall (2.54build1-zfs1) utopic; urgency=low
 
   * Import mountall 2.53-zfs1 changes for ZoL.
