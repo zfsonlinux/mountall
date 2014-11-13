@@ -1,6 +1,5 @@
-mountall (2.54ubuntu0.14.10.1-zfs1) utopic; urgency=high
+mountall (2.54ubuntu1) vivid; urgency=medium
 
-  [ Marc Deslauriers ]
   * SECURITY UPDATE: insecure mount permissions (LP: #1390183)
     - The mount utility now honours process umask when mounting certain
       filesystems, resulting in them being potentially mounted with
@@ -9,14 +8,7 @@ mountall (2.54ubuntu0.14.10.1-zfs1) utopic; urgency=high
       daemon, inherit the umask Upstart sets instead.
     - CVE-2014-1421
 
- -- Darik Horn <dajhorn@vanadac.com>  Tue, 18 Nov 2014 09:06:37 -0600
-
-mountall (2.54build1-zfs1) utopic; urgency=low
-
-  * Import mountall 2.53-zfs1 changes for ZoL.
-  * Update gbp.conf file for Ubuntu 14.10 Utopic Unicorn.
-
- -- Darik Horn <dajhorn@vanadac.com>  Thu, 25 Sep 2014 20:37:36 -0500
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Thu, 13 Nov 2014 13:11:38 -0500
 
 mountall (2.54build1) utopic; urgency=high
 
