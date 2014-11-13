@@ -4079,7 +4079,6 @@ main (int   argc,
 		/* Usual daemon cleanups */
 		if (chdir ("/"))
 			;
-		umask (0);
 
 		/* Send all logging output to syslog */
 		//openlog (program_name, LOG_PID, LOG_DAEMON);
