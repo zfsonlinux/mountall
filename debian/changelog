@@ -1,3 +1,11 @@
+mountall (2.54ubuntu1-zfs1) vivid; urgency=low
+
+  * Import mountall 2.53-zfs1 changes for ZoL.
+  * Update gbp.conf for Ubuntu 15.04 Vivid Vervet.
+  * git-import-dsc mountall_2.54ubuntu1.dsc
+
+ -- Darik Horn <dajhorn@vanadac.com>  Sat, 21 Feb 2015 16:57:47 -0500
+
 mountall (2.54ubuntu1) vivid; urgency=medium
 
   * SECURITY UPDATE: insecure mount permissions (LP: #1390183)
